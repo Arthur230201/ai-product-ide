@@ -29,29 +29,30 @@ export function SpecViewer({ markdown, variant = 'edit' }: SpecViewerProps) {
                 </div>
               );
             }
+            // 编辑模式：使用深色主题，与黑色背景协调
             return (
-              <div className="overflow-x-auto my-6">
-                <table className="min-w-full border-collapse border border-zinc-600">
+              <div className="overflow-x-auto my-6 border border-zinc-700 rounded-lg">
+                <table className="min-w-full border-collapse">
                   {children}
                 </table>
               </div>
             );
           },
           thead: ({ children }) => (
-            <thead className={isPresentation ? "bg-zinc-700" : "bg-gray-100"}>{children}</thead>
+            <thead className={isPresentation ? "bg-zinc-700" : "bg-zinc-800/60"}>{children}</thead>
           ),
           th: ({ children }) => (
-            <th className={`border ${isPresentation ? 'border-zinc-600 text-zinc-100' : 'border-gray-300 text-gray-700'} px-4 py-3 text-left font-bold`}>
+            <th className={`border ${isPresentation ? 'border-zinc-600 text-zinc-100' : 'border-zinc-700 text-zinc-200'} px-4 py-3 text-left font-bold`}>
               {children}
             </th>
           ),
           td: ({ children }) => (
-            <td className={`border ${isPresentation ? 'border-zinc-600 text-zinc-300' : 'border-gray-300 text-gray-300'} px-4 py-3`}>
+            <td className={`border ${isPresentation ? 'border-zinc-600 text-zinc-300' : 'border-zinc-700 text-zinc-300'} px-4 py-3`}>
               {children}
             </td>
           ),
           tbody: ({ children }) => (
-            <tbody className={isPresentation ? "bg-zinc-800/50" : ""}>{children}</tbody>
+            <tbody className={isPresentation ? "bg-zinc-800/50" : "bg-zinc-900/30"}>{children}</tbody>
           ),
           h1: ({ children }) => (
             <h1 className="text-2xl font-bold text-zinc-50 mb-4">{children}</h1>

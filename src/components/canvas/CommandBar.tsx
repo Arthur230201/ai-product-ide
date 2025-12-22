@@ -704,10 +704,25 @@ export function CommandBar() {
 
     if (isEditMode && selectedNode) {
       // 检查是否有图片附件，如果有则使用 Model Relay 流程
-      const isImage = attachment?.type === 'media' && 
-                     attachment.preview && 
-                     attachment.mimeType?.startsWith('image/') &&
-                     !attachment.mimeType?.includes('pdf');
+      // 放宽检测条件：只要 mimeType 是 image/ 开头，或者 type 是 media 且有 preview（且不是 PDF/视频），就认为是图片
+      const isPDF = attachment?.mimeType === 'application/pdf';
+      const isVideo = attachment?.mimeType?.startsWith('video/');
+      const isImage = (attachment?.mimeType?.startsWith('image/') || 
+                      (attachment?.type === 'media' && attachment.preview && !isPDF && !isVideo)) &&
+                     !isPDF;
+
+      // 调试日志：记录图片检测结果
+      log('🔍 [CommandBar] 图片检测结果:', {
+        hasAttachment: !!attachment,
+        attachmentType: attachment?.type,
+        attachmentMimeType: attachment?.mimeType,
+        hasPreview: !!attachment?.preview,
+        isPDF,
+        isVideo,
+        isImage,
+        hasContent: !!attachment?.content,
+        willUseModelRelay: isImage && !!attachment?.content,
+      });
 
       if (isImage && attachment.content) {
         // ========== Model Relay 流程：UI 优先，然后自动生成 PRD ==========
@@ -1124,6 +1139,20 @@ export function CommandBar() {
       }
 
       // ========== 传统流程：使用 updateNodeArtifacts ==========
+      // 注意：如果走到这里，说明图片检测失败，可能的原因：
+      // 1. attachment.mimeType 不是 'image/' 开头
+      // 2. attachment.type 不是 'media'
+      // 3. attachment.preview 不存在
+      // 4. attachment.content 不存在
+      log('⚠️ [CommandBar] 图片检测失败，使用传统流程（updateNodeArtifacts）:', {
+        hasAttachment: !!attachment,
+        attachmentType: attachment?.type,
+        attachmentMimeType: attachment?.mimeType,
+        hasPreview: !!attachment?.preview,
+        hasContent: !!attachment?.content,
+        note: '如果这是图片，应该使用 Model Relay 流程生成 UI，而不是生成需求文档',
+      });
+      
       // 编辑模式：更新节点
       const attachments: Array<{ type: 'image' | 'text'; content: string; name?: string; mimeType?: string }> = [];
       

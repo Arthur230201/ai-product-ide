@@ -28,7 +28,7 @@ const EditorSection = ({ value, onChange, onBlur, placeholder }: { value: string
 export function NodeDetailPanel() {
   const { selectedNodeId, nodes, isDetailPanelOpen, closeNodeDetail, updateNodeData, projectMeta, aiConfig } = useCanvasStore();
   const [activeTab, setActiveTab] = useState<'spec' | 'impl' | 'test'>('spec');
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(0.7); // 默认缩放为70%，适应更窄的预览区域
   const [isLoading, setIsLoading] = useState(false);
   const [isEditingSpec, setIsEditingSpec] = useState(false);
   // 使用本地状态管理编辑中的文本，避免每次输入都更新 store
@@ -334,8 +334,8 @@ export function NodeDetailPanel() {
         </button>
       </div>
 
-      {/* 2. Main Body (Three-Column Grid Layout) - 响应式支持 */}
-      <div className="flex-1 grid grid-cols-[minmax(200px,20%)_1fr_minmax(250px,33.3%)] overflow-hidden h-full">
+      {/* 2. Main Body (Three-Column Grid Layout) - 优化空间分配：压缩左右两侧，扩大中间文档区域 */}
+      <div className="flex-1 grid grid-cols-[minmax(150px,12%)_1fr_minmax(200px,25%)] overflow-hidden h-full">
         
         {/* LEFT COLUMN: Node Tree (20%) */}
         <NodeTree />
@@ -640,9 +640,9 @@ export function NodeDetailPanel() {
             </div>
           </div>
 
-          {/* Preview Canvas */}
+          {/* Preview Canvas - 紧凑布局 */}
           <div 
-            className="flex-1 overflow-hidden flex justify-center items-start pt-4 pb-4 px-4 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] relative"
+            className="flex-1 overflow-hidden flex justify-center items-start pt-2 pb-2 px-2 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] relative"
           >
             {data.artifacts.view.previewUrl ? (
               <div style={{ 
@@ -662,10 +662,12 @@ export function NodeDetailPanel() {
                 />
               </div>
             ) : (
-              <LivePreview 
-                code={selectedNode?.data?.artifacts?.view?.code || data.artifacts.view.code} 
-                zoom={zoom}
-              />
+              <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center', width: '100%' }}>
+                <LivePreview 
+                  code={selectedNode?.data?.artifacts?.view?.code || data.artifacts.view.code} 
+                  zoom={1}
+                />
+              </div>
             )}
           </div>
         </div>
