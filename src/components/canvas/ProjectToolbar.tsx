@@ -233,8 +233,51 @@ export function ProjectToolbar() {
     }
   }, [isExportMenuOpen]);
 
-  // 当编辑面板打开时，隐藏工具栏以避免遮挡节点名称输入框
-  if (isDetailPanelOpen) {
+  // 检测演示模式：通过检查是否有演示模式的遮罩层
+  const [isPresentationMode, setIsPresentationMode] = useState(false);
+  
+  useEffect(() => {
+    const checkPresentationMode = () => {
+      // 检查是否有演示模式的遮罩层（通过 data 属性或 z-index）
+      const presentationOverlay = document.querySelector('[data-presentation-mode="true"]') || 
+                                  document.querySelector('[style*="z-index: 10000"], [style*="z-[10000"], [style*="zIndex: 10000"]');
+      const isActive = !!presentationOverlay;
+      setIsPresentationMode(isActive);
+      
+      // 如果检测到演示模式，也通过CSS隐藏工具栏
+      const toolbar = document.querySelector('[data-project-toolbar]') as HTMLElement;
+      if (toolbar) {
+        if (isActive) {
+          toolbar.style.display = 'none';
+        } else {
+          toolbar.style.display = '';
+        }
+      }
+    };
+    
+    // 初始检查
+    checkPresentationMode();
+    
+    // 使用 MutationObserver 监听 DOM 变化
+    const observer = new MutationObserver(checkPresentationMode);
+    observer.observe(document.body, { 
+      childList: true, 
+      subtree: true, 
+      attributes: true, 
+      attributeFilter: ['style', 'class'] 
+    });
+    
+    // 定期检查（作为备用方案）
+    const interval = setInterval(checkPresentationMode, 500);
+    
+    return () => {
+      observer.disconnect();
+      clearInterval(interval);
+    };
+  }, []);
+
+  // 当编辑面板打开时或演示模式时，隐藏工具栏
+  if (isDetailPanelOpen || isPresentationMode) {
     return null;
   }
 

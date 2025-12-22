@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RefreshCw } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvas-store';
 import type { FractalNode } from '@/types/fractal';
 import { LivePreview } from './LivePreview';
@@ -29,7 +29,7 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
   const [currentSlideNodeId, setCurrentSlideNodeId] = useState<string | null>(
     computeInitialNodeId
   );
-  const [previewScale, setPreviewScale] = useState(1); // 用户手动设置的缩放比例
+  const [zoom, setZoom] = useState(0.8); // 缩放比例，默认0.8（80%）
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const navigationHistoryRef = useRef<string[]>([]); // 导航历史记录
@@ -53,69 +53,6 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
     if (!currentSlideNodeId) return null;
     return nodes.find((node) => node.id === currentSlideNodeId) || null;
   }, [currentSlideNodeId, nodes]);
-
-  // 处理缩放按钮点击
-  const handleZoomIn = () => {
-    setPreviewScale((prev) => Math.min(2, prev + 0.1)); // 最大 200%
-  };
-
-  const handleZoomOut = () => {
-    setPreviewScale((prev) => Math.max(0.5, prev - 0.1)); // 最小 50%
-  };
-
-  // 计算最大允许缩放比例，确保预览内容不会溢出容器
-  const [maxAllowedScale, setMaxAllowedScale] = useState(2);
-  
-  useEffect(() => {
-    if (!leftPanelRef.current || !currentNode) return;
-    
-    const calculateMaxScale = () => {
-      const container = leftPanelRef.current;
-      if (!container) return;
-      
-      // 获取容器可用空间（减去 Header 高度，约 50px）
-      const containerRect = container.getBoundingClientRect();
-      const headerHeight = 50;
-      const availableWidth = containerRect.width;
-      const availableHeight = containerRect.height - headerHeight;
-      
-      if (availableWidth <= 0 || availableHeight <= 0) return;
-      
-      // 预览内容的原始尺寸（375x812）
-      const baseWidth = 375;
-      const baseHeight = 812;
-      
-      // 留出边距：上边距20px（防止超出上沿），下边距80px（为导航按钮留空间），左右各20px
-      const paddingTop = 20;
-      const paddingBottom = 80;
-      const paddingHorizontal = 40;
-      const maxWidth = availableWidth - paddingHorizontal;
-      const maxHeight = availableHeight - paddingTop - paddingBottom;
-      
-      // 计算最大允许缩放比例
-      const scaleX = maxWidth / baseWidth;
-      const scaleY = maxHeight / baseHeight;
-      const maxScale = Math.min(scaleX, scaleY);
-      
-      setMaxAllowedScale(Math.max(0.5, Math.min(2, maxScale))); // 限制在 0.5-2 之间
-    };
-    
-    // 延迟计算，确保 DOM 已渲染
-    const timer1 = setTimeout(calculateMaxScale, 50);
-    const timer2 = setTimeout(calculateMaxScale, 200);
-    
-    // 监听窗口大小变化
-    window.addEventListener('resize', calculateMaxScale);
-    
-    return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      window.removeEventListener('resize', calculateMaxScale);
-    };
-  }, [currentNode]);
-
-  // 应用缩放比例，但不超过最大允许值
-  const effectiveScale = currentNode ? Math.min(previewScale, maxAllowedScale) : 1;
 
   // 查找下一个节点（第一个出边的目标节点）
   const getNextNode = (): string | null => {
@@ -281,37 +218,20 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
   const prevNodeId = getPrevNode();
 
   return (
-    <div className="fixed inset-0 z-[100] bg-zinc-950 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-        <h2 className="text-xl font-semibold text-zinc-100">
-          {data.label} - 演示模式
-        </h2>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              // 清空缓存：清除 .next 缓存并刷新页面
-              if (typeof window !== 'undefined') {
-                // 清除 localStorage 和 sessionStorage
-                localStorage.clear();
-                sessionStorage.clear();
-                // 强制刷新页面
-                window.location.reload();
-              }
-            }}
-            className="p-2 hover:bg-zinc-800 rounded-md transition-colors"
-            title="清空缓存并刷新"
-          >
-            <RefreshCw className="w-5 h-5 text-zinc-400" />
-          </button>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-zinc-800 rounded-md transition-colors"
-            title="退出演示模式"
-          >
-            <X className="w-5 h-5 text-zinc-400" />
-          </button>
-        </div>
+    <div 
+      className="fixed inset-0 bg-zinc-950 flex flex-col"
+      style={{ zIndex: 10000 }}
+      data-presentation-mode="true"
+    >
+      {/* 退出按钮 - 右上角 */}
+      <div className="absolute top-4 right-4 z-[10001]">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-all shadow-lg hover:shadow-xl active:scale-95"
+          title="退出演示模式"
+        >
+          退出演示模式
+        </button>
       </div>
 
       {/* Main Content - Two Columns (1:2 比例) */}
@@ -326,63 +246,78 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
             minHeight: 0,
           }}
         >
-          {/* 左侧预览区域的 Header - 包含缩放控制 */}
-          <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-white/50">
-            <span className="text-xs font-mono text-gray-400 uppercase tracking-widest">Live Preview / iOS 17</span>
-            {/* 缩放控制 */}
-            <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-md px-2 py-1 shadow-sm">
+          {/* 导航栏 - 包含页面名称和缩放控制 */}
+          <div className="absolute top-0 left-0 right-0 z-[10001] flex items-center justify-between bg-white/95 backdrop-blur-sm border-b border-gray-200 px-4 py-3 shadow-sm">
+            {/* 页面名称 */}
+            <div className="flex items-center">
+              <h2 className="text-lg font-semibold text-gray-800">
+                {currentNode?.data?.label || currentNode?.data?.artifacts?.spec?.title || '未命名页面'}
+              </h2>
+            </div>
+            
+            {/* 缩放控制按钮 */}
+            <div className="flex items-center gap-2">
               <button
-                onClick={handleZoomOut}
-                title="缩小预览 (最小 50%)"
-                className="p-1 hover:bg-gray-100 rounded text-gray-600 transition-colors"
+                onClick={() => setZoom(prev => Math.max(0.5, prev - 0.1))}
+                className="p-2 hover:bg-gray-100 rounded transition-colors"
+                title="缩小"
+                disabled={zoom <= 0.5}
               >
-                <ZoomOut size={14} />
+                <ZoomOut className="w-4 h-4 text-gray-700" />
               </button>
-              <span className="text-xs text-gray-500 w-8 text-center font-mono" title="当前缩放比例">
-                {Math.round(previewScale * 100)}%
+              <span className="text-sm text-gray-700 font-medium min-w-[3rem] text-center">
+                {Math.round(zoom * 100)}%
               </span>
               <button
-                onClick={handleZoomIn}
-                title="放大预览 (最大 200%)"
-                className="p-1 hover:bg-gray-100 rounded text-gray-600 transition-colors"
+                onClick={() => setZoom(prev => Math.min(2, prev + 0.1))}
+                className="p-2 hover:bg-gray-100 rounded transition-colors"
+                title="放大"
+                disabled={zoom >= 2}
               >
-                <ZoomIn size={14} />
+                <ZoomIn className="w-4 h-4 text-gray-700" />
+              </button>
+              <button
+                onClick={() => setZoom(0.8)}
+                className="px-3 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                title="重置到80%"
+              >
+                重置
               </button>
             </div>
           </div>
 
-          {/* 预览内容容器 - Studio Background with subtle texture */}
+          {/* 预览内容容器 - Studio Background with subtle texture - 不允许滚动 */}
           <div 
-            className="flex-1 flex items-center justify-center overflow-hidden relative"
+            className="flex-1 flex flex-col items-center justify-start overflow-hidden relative"
             style={{ 
               minHeight: 0,
               background: 'radial-gradient(circle, rgba(0,0,0,0.02) 1px, transparent 1px)',
               backgroundSize: '20px 20px',
               backgroundColor: '#f3f4f6', // bg-gray-100
-              paddingTop: '20px', // 添加上边距，防止内容超出上沿
-              paddingBottom: '80px', // 为导航按钮留出空间
+              paddingTop: '56px', // 上边距，确保设备框架上沿在导航栏下方（导航栏高度约48px + 8px间距）
+              paddingBottom: '80px', // 下边距，为导航按钮留出空间
+              paddingLeft: '20px',
+              paddingRight: '20px',
             }}
           >
-            {/* 设备模拟器容器 - 只包含设备框架，不包含导航按钮 */}
+            {/* 设备模拟器容器 - iPhone 标准尺寸 375x812 - 应用缩放 */}
             <div 
               ref={previewContainerRef}
-              className="flex items-center justify-center"
+              className="flex items-start justify-center"
               style={{
-                transform: `scale(${effectiveScale})`,
-                transformOrigin: 'center center',
-                transition: 'transform 0.3s ease',
-                maxWidth: '100%',
-                maxHeight: '100%',
+                transform: `scale(${zoom})`,
+                transformOrigin: 'top center',
+                width: '100%',
+                height: 'auto',
+                marginTop: '8px', // 确保设备框架上沿在导航栏下方
               }}
             >
-              {/* iPhone 风格设备框架 */}
+              {/* iPhone 风格设备框架 - 标准尺寸 375x812 (iPhone X/11/12/13/14/15) */}
               <div 
-                className="relative"
+                className="relative flex-shrink-0"
                 style={{
                   width: '375px',
                   height: '812px',
-                  maxWidth: '100%',
-                  maxHeight: '100%',
                 }}
               >
                 {/* 设备边框 - iPhone 风格 */}
@@ -415,6 +350,7 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
                         minHeight: 0,
                         paddingLeft: '6px', // 左侧padding防止内容被遮挡
                         paddingRight: '6px', // 右侧padding防止内容被遮挡
+                        paddingBottom: '20px', // 底部padding，确保内容不被底部按钮遮挡
                       }}
                     >
                       <style>{`
@@ -457,8 +393,8 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
                               />
                             </div>
                           ) : (
-                            <div className="w-full">
-                              <LivePreview code={artifacts.view.code} zoom={1} />
+                            <div className="w-full h-full">
+                              <LivePreview code={artifacts.view.code} zoom={1} isPresentationMode={true} />
                             </div>
                           )}
                         </div>
@@ -468,42 +404,48 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
                 </div>
               </div>
             </div>
-            
-            {/* 导航按钮 - 固定在容器底部，不受缩放影响 */}
-            <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-3 py-3 px-4 z-10">
-              <button
-                onClick={handlePrev}
-                disabled={!prevNodeId && navigationHistoryRef.current.length === 0}
-                className={`
-                  flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all shadow-sm
-                  ${
-                    prevNodeId || navigationHistoryRef.current.length > 0
-                      ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 cursor-pointer active:scale-95'
-                      : 'bg-gray-50 text-gray-400 cursor-not-allowed'
-                  }
-                `}
-                title={prevNodeId || navigationHistoryRef.current.length > 0 ? "上一页" : "没有上一页"}
-              >
-                <ChevronLeft className="w-4 h-4" />
-                上一页
-              </button>
-              <button
-                onClick={handleNext}
-                disabled={!nextNodeId}
-                className={`
-                  flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all shadow-sm
-                  ${
-                    nextNodeId
-                      ? 'bg-gray-100 hover:bg-gray-200 text-gray-700 cursor-pointer active:scale-95'
-                      : 'bg-gray-50 text-gray-400 cursor-not-allowed'
-                  }
-                `}
-                title={nextNodeId ? "下一页" : "没有下一页"}
-              >
-                下一页
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+          </div>
+          
+          {/* 导航按钮 - 绝对定位在左侧列的下沿上方一点点 */}
+          <div 
+            className="absolute bottom-1 left-1/2 transform -translate-x-1/2 flex items-center justify-center gap-3 z-[10001]" 
+            style={{ 
+              pointerEvents: 'auto',
+              bottom: '8px', // 在页面下沿上方一点点（8px）
+            }}
+          >
+            <button
+              onClick={handlePrev}
+              disabled={!prevNodeId && navigationHistoryRef.current.length === 0}
+              className={`
+                flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all shadow-lg
+                ${
+                  prevNodeId || navigationHistoryRef.current.length > 0
+                    ? 'bg-white/95 hover:bg-white text-gray-700 cursor-pointer active:scale-95 backdrop-blur-sm border border-gray-200'
+                    : 'bg-gray-50/95 text-gray-400 cursor-not-allowed backdrop-blur-sm border border-gray-200'
+                }
+              `}
+              title={prevNodeId || navigationHistoryRef.current.length > 0 ? "上一页" : "没有上一页"}
+            >
+              <ChevronLeft className="w-4 h-4" />
+              上一页
+            </button>
+            <button
+              onClick={handleNext}
+              disabled={!nextNodeId}
+              className={`
+                flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-all shadow-lg
+                ${
+                  nextNodeId
+                    ? 'bg-white/95 hover:bg-white text-gray-700 cursor-pointer active:scale-95 backdrop-blur-sm border border-gray-200'
+                    : 'bg-gray-50/95 text-gray-400 cursor-not-allowed backdrop-blur-sm border border-gray-200'
+                }
+              `}
+              title={nextNodeId ? "下一页" : "没有下一页"}
+            >
+              下一页
+              <ChevronRight className="w-4 h-4" />
+            </button>
           </div>
           
         </div>
@@ -514,11 +456,41 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
             {/* 使用 SpecViewer 组件，与编辑模式一致 */}
             {(() => {
               // 将 requirements 数组转换为 Markdown 字符串
-              const requirementsMarkdown = Array.isArray(artifacts.spec.requirements)
-                ? artifacts.spec.requirements.join('\n\n')
-                : typeof artifacts.spec.requirements === 'string'
-                ? artifacts.spec.requirements
-                : '';
+              // 注意：表格行之间必须只用一个换行符，否则会破坏表格格式
+              let requirementsMarkdown = '';
+              if (Array.isArray(artifacts.spec.requirements)) {
+                const lines: string[] = [];
+                for (let i = 0; i < artifacts.spec.requirements.length; i++) {
+                  const line = artifacts.spec.requirements[i];
+                  if (typeof line === 'string') {
+                    const trimmed = line.trim();
+                    // 判断是否是表格行（以 | 开头，通常也以 | 结尾，或者包含 |---| 这样的分隔符）
+                    const isTableRow = trimmed.startsWith('|');
+                    const isTableSeparator = trimmed.match(/^\|[\s\-:]+\|$/); // 匹配 |---|---| 这样的分隔符
+                    
+                    if (i > 0) {
+                      const prevLine = artifacts.spec.requirements[i - 1];
+                      const prevTrimmed = typeof prevLine === 'string' ? prevLine.trim() : '';
+                      const prevIsTableRow = prevTrimmed.startsWith('|');
+                      
+                      // 如果当前行和上一行都是表格行（包括分隔符），用单换行符
+                      if ((isTableRow || isTableSeparator) && prevIsTableRow) {
+                        lines.push('\n');
+                      } else if (!isTableRow && !prevIsTableRow && trimmed) {
+                        // 非表格行之间用双换行符
+                        lines.push('\n\n');
+                      } else {
+                        // 其他情况用单换行符
+                        lines.push('\n');
+                      }
+                    }
+                    lines.push(line);
+                  }
+                }
+                requirementsMarkdown = lines.join('');
+              } else if (typeof artifacts.spec.requirements === 'string') {
+                requirementsMarkdown = artifacts.spec.requirements;
+              }
               
               return requirementsMarkdown ? (
                 <SpecViewer 
@@ -535,15 +507,6 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
         </div>
       </div>
 
-      {/* Bottom Bar - 仅保留退出按钮 */}
-      <div className="flex items-center justify-end p-4 border-t border-zinc-800 bg-zinc-900">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-all"
-        >
-          退出演示模式
-        </button>
-      </div>
     </div>
   );
 }

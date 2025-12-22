@@ -6,10 +6,12 @@ import * as Recharts from 'recharts';
 // 安全的动态组件渲染器
 export const LivePreview = ({ 
   code, 
-  zoom = 1
+  zoom = 1,
+  isPresentationMode = false
 }: { 
   code: string; 
   zoom?: number;
+  isPresentationMode?: boolean;
 }) => {
   const [renderedElement, setRenderedElement] = useState<React.ReactElement | null>(null);
   const [compilationError, setCompilationError] = useState<Error | null>(null);
@@ -376,8 +378,8 @@ export const LivePreview = ({
 
   // 在演示模式下，外部容器已经提供了设备框架，这里直接返回内容
   // 否则使用包装容器
-  if (isMobile && zoom === 1) {
-    // 可能是演示模式，直接返回内容（设备框架由外部提供）
+  if (isPresentationMode || (isMobile && zoom === 1)) {
+    // 演示模式或移动端预览模式，直接返回内容（设备框架由外部提供）
     return content;
   }
 

@@ -325,14 +325,19 @@ function RefreshButton({ isDetailPanelOpen }: { isDetailPanelOpen: boolean }) {
 }
 
 // 按钮容器组件，需要在 ReactFlowProvider 内部
-function TopButtons({ isDetailPanelOpen }: { isDetailPanelOpen: boolean }) {
+function TopButtons({ 
+  isDetailPanelOpen,
+  onPresentationModeChange
+}: { 
+  isDetailPanelOpen: boolean;
+  onPresentationModeChange: (isOpen: boolean) => void;
+}) {
   const { nodes, selectedNodeId } = useCanvasStore();
-  const [isPresentationMode, setIsPresentationMode] = useState(false);
   const [isStyleExtractorOpen, setIsStyleExtractorOpen] = useState(false);
 
   const handlePresentationMode = useCallback(() => {
-    setIsPresentationMode(true);
-  }, []);
+    onPresentationModeChange(true);
+  }, [onPresentationModeChange]);
 
   const handleStyleExtractor = useCallback(() => {
     setIsStyleExtractorOpen(true);
@@ -372,12 +377,6 @@ function TopButtons({ isDetailPanelOpen }: { isDetailPanelOpen: boolean }) {
           </button>
         </div>
       </div>
-      {isPresentationMode && (
-        <PresentationMode
-          initialNodeId={selectedNodeId || (nodes.length > 0 ? nodes[0].id : null)}
-          onClose={() => setIsPresentationMode(false)}
-        />
-      )}
       {isStyleExtractorOpen && (
         <StyleExtractorModal
           onClose={() => setIsStyleExtractorOpen(false)}
@@ -391,10 +390,8 @@ export function InfiniteCanvas() {
   const { nodes, selectedNodeId, isDetailPanelOpen } = useCanvasStore();
   const [isPresentationMode, setIsPresentationMode] = useState(false);
 
-  const handlePresentationMode = useCallback(() => {
-    // 总是允许进入演示模式，即使没有节点（会显示空状态）
-    // 优先使用选中的节点，否则使用第一个节点
-    setIsPresentationMode(true);
+  const handlePresentationModeChange = useCallback((isOpen: boolean) => {
+    setIsPresentationMode(isOpen);
   }, []);
 
   return (
@@ -402,12 +399,25 @@ export function InfiniteCanvas() {
       <ReactFlowProvider>
         <CanvasContent />
         {/* TopButtons 必须在 ReactFlowProvider 内部，因为 AutoLayoutButton 使用了 useReactFlow */}
-        <TopButtons isDetailPanelOpen={isDetailPanelOpen} />
-        {/* 刷新按钮位于左下角 */}
-        <RefreshButton isDetailPanelOpen={isDetailPanelOpen} />
+        {/* 演示模式下不显示顶部按钮 */}
+        {!isPresentationMode && (
+          <TopButtons 
+            isDetailPanelOpen={isDetailPanelOpen}
+            onPresentationModeChange={handlePresentationModeChange}
+          />
+        )}
+        {/* 刷新按钮位于左下角，演示模式下不显示 */}
+        {!isPresentationMode && <RefreshButton isDetailPanelOpen={isDetailPanelOpen} />}
       </ReactFlowProvider>
-      {/* CommandBar 只在非编辑模式显示（编辑模式下在 NodeDetailPanel 中间栏显示） */}
-      {!isDetailPanelOpen && (
+      {/* 演示模式 */}
+      {isPresentationMode && (
+        <PresentationMode
+          initialNodeId={selectedNodeId || (nodes.length > 0 ? nodes[0].id : null)}
+          onClose={() => setIsPresentationMode(false)}
+        />
+      )}
+      {/* CommandBar 只在非编辑模式且非演示模式显示 */}
+      {!isDetailPanelOpen && !isPresentationMode && (
         <div 
           className="fixed pointer-events-none"
           style={{ 

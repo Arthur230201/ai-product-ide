@@ -1,7 +1,9 @@
 'use client';
 
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { MermaidDiagram } from './MermaidDiagram';
 
 interface SpecViewerProps {
   markdown: string;
@@ -15,6 +17,7 @@ export function SpecViewer({ markdown, variant = 'edit' }: SpecViewerProps) {
     <div className={`prose prose-invert max-w-none ${isPresentation ? 'prose-zinc' : ''}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[]}
         components={{
           table: ({ children }) => {
             if (isPresentation) {
@@ -35,17 +38,20 @@ export function SpecViewer({ markdown, variant = 'edit' }: SpecViewerProps) {
             );
           },
           thead: ({ children }) => (
-            <thead className="bg-gray-100">{children}</thead>
+            <thead className={isPresentation ? "bg-zinc-700" : "bg-gray-100"}>{children}</thead>
           ),
           th: ({ children }) => (
-            <th className="border border-gray-300 px-4 py-3 text-left text-gray-700 font-bold">
+            <th className={`border ${isPresentation ? 'border-zinc-600 text-zinc-100' : 'border-gray-300 text-gray-700'} px-4 py-3 text-left font-bold`}>
               {children}
             </th>
           ),
           td: ({ children }) => (
-            <td className="border border-gray-300 px-4 py-3 text-gray-300">
+            <td className={`border ${isPresentation ? 'border-zinc-600 text-zinc-300' : 'border-gray-300 text-gray-300'} px-4 py-3`}>
               {children}
             </td>
+          ),
+          tbody: ({ children }) => (
+            <tbody className={isPresentation ? "bg-zinc-800/50" : ""}>{children}</tbody>
           ),
           h1: ({ children }) => (
             <h1 className="text-2xl font-bold text-zinc-50 mb-4">{children}</h1>
@@ -71,8 +77,20 @@ export function SpecViewer({ markdown, variant = 'edit' }: SpecViewerProps) {
           li: ({ children }) => (
             <li className="text-zinc-300">{children}</li>
           ),
-          code: ({ children, className }) => {
+          code: ({ children, className, ...props }) => {
             const isInline = !className;
+            const language = className ? className.replace('language-', '') : '';
+            
+            // 检测 Mermaid 图表
+            if (language === 'mermaid' && !isInline) {
+              const mermaidCode = String(children).replace(/\n$/, '');
+              return (
+                <div className="my-6">
+                  <MermaidDiagram code={mermaidCode} />
+                </div>
+              );
+            }
+            
             if (isInline) {
               return (
                 <code className="bg-zinc-800 text-purple-400 px-1 py-0.5 rounded text-sm">
@@ -86,9 +104,13 @@ export function SpecViewer({ markdown, variant = 'edit' }: SpecViewerProps) {
               </code>
             );
           },
-          pre: ({ children }) => (
-            <pre className="bg-zinc-900 p-4 rounded-lg overflow-x-auto mb-4">{children}</pre>
-          ),
+          pre: ({ children }) => {
+            // ReactMarkdown 会将代码块包装在 pre > code 中
+            // 如果 code 组件已经处理了 Mermaid，这里只需要正常渲染 pre
+            return (
+              <pre className="bg-zinc-900 p-4 rounded-lg overflow-x-auto mb-4">{children}</pre>
+            );
+          },
         }}
       >
         {markdown}
