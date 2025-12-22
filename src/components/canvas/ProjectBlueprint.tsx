@@ -13,7 +13,7 @@ interface ProjectBlueprintProps {
   onClose: () => void;
 }
 
-type TabType = 'profile' | 'business' | 'interaction' | 'data' | 'topology' | 'rules' | 'ai';
+type TabType = 'profile' | 'business' | 'interaction' | 'data' | 'topology' | 'rules';
 
 interface DataDictionaryField {
   fieldName: string;
@@ -101,7 +101,7 @@ const parseDbSchema = (schema: string): Array<{
 };
 
 export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
-  const { nodes, edges, projectMeta, globalRules, aiConfig, updateProjectMeta, updateGlobalRules, updateAIConfig } = useCanvasStore();
+  const { nodes, edges, projectMeta, globalRules, updateProjectMeta, updateGlobalRules } = useCanvasStore();
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [mounted, setMounted] = useState(false);
 
@@ -427,7 +427,6 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
         { id: 'data' as TabType, label: '全局数据字典', icon: '📊' },
         { id: 'topology' as TabType, label: '架构拓扑图', icon: '🗺️' },
         { id: 'rules' as TabType, label: '全局规则', icon: '📋' },
-        { id: 'ai' as TabType, label: 'AI 模型配置', icon: '🤖' },
       ].map((tab) =>
         React.createElement('button', {
           key: tab.id,
@@ -610,45 +609,6 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
               onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => updateGlobalRules({ dataTracking: e.target.value })
             })
           )
-          )
-        )
-      ),
-      // AI Config Tab
-      activeTab === 'ai' && React.createElement('div', { className: 'space-y-6' },
-        React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '配置 AI 模型，用于 UI 生成、PRD 生成等功能。'),
-        React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-6' },
-          React.createElement('div', { className: 'flex flex-col' },
-            React.createElement('label', { htmlFor: 'visionModel', className: 'text-sm font-medium text-zinc-300 mb-2' }, '视觉模型 (Vision Model)'),
-            React.createElement('input', {
-              id: 'visionModel',
-              type: 'text',
-              className: 'w-full bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50',
-              placeholder: '例如：gpt-5-2025-08-07, gpt-4o',
-              value: aiConfig.visionModel,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => updateAIConfig({ visionModel: e.target.value })
-            }),
-            React.createElement('p', { className: 'text-xs text-zinc-500 mt-1' }, '用于 UI 生成、拓扑解析等需要视觉输入的任务')
-          ),
-          React.createElement('div', { className: 'flex flex-col' },
-            React.createElement('label', { htmlFor: 'textModel', className: 'text-sm font-medium text-zinc-300 mb-2' }, '文本模型 (Text Model)'),
-            React.createElement('input', {
-              id: 'textModel',
-              type: 'text',
-              className: 'w-full bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50',
-              placeholder: '例如：gpt-5-2025-08-07, gpt-4o',
-              value: aiConfig.textModel,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => updateAIConfig({ textModel: e.target.value })
-            }),
-            React.createElement('p', { className: 'text-xs text-zinc-500 mt-1' }, '用于 PRD 生成、代码分析等纯文本任务')
-          )
-        ),
-        React.createElement('div', { className: 'bg-blue-500/10 border border-blue-500/20 rounded-lg p-4' },
-          React.createElement('p', { className: 'text-sm text-blue-300 font-medium mb-2' }, '💡 提示'),
-          React.createElement('ul', { className: 'text-xs text-blue-200/80 space-y-1 list-disc list-inside' },
-            React.createElement('li', null, '模型名称必须与 OpenAI API 支持的模型名称一致'),
-            React.createElement('li', null, '视觉模型需要支持图像输入（如 gpt-4o, gpt-5-2025-08-07）'),
-            React.createElement('li', null, '配置会保存在本地，刷新页面后仍然有效'),
-            React.createElement('li', null, '也可以通过环境变量 NEXT_PUBLIC_AI_VISION_MODEL 和 NEXT_PUBLIC_AI_TEXT_MODEL 设置默认值')
           )
         )
       )

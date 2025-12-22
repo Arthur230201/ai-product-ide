@@ -22,6 +22,7 @@ import { ProjectToolbar } from './ProjectToolbar';
 import { RefreshCw } from 'lucide-react';
 import { AutoLayoutButton } from './AutoLayoutButton';
 import { StyleExtractor } from './StyleExtractor';
+import { AIConfigButton } from './AIConfigButton';
 import { NodeDetailPanel } from './NodeDetailPanel';
 import { PresentationMode } from './PresentationMode';
 import { ContextMenu } from './ContextMenu';
@@ -358,6 +359,7 @@ function TopButtons({
         }}
       >
         <div className="p-2 flex gap-2 flex-wrap">
+          <AIConfigButton />
           <AutoLayoutButtonWrapper />
           <button
             onClick={handleStyleExtractor}

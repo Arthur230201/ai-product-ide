@@ -393,9 +393,69 @@ export const useCanvasStore = create<CanvasStore>()(
             ...node.data.artifacts,
             ...data.artifacts,
             // 深层合并 view, spec, impl, test
-            view: data.artifacts.view
-              ? { ...node.data.artifacts.view, ...data.artifacts.view }
-              : node.data.artifacts.view,
+            // 重要：如果传入的view.code为空或无效，保留原有的view
+            view: (() => {
+              const incomingView = data.artifacts.view;
+              const existingView = node.data.artifacts.view;
+              
+              // 调试日志
+              if (process.env.NODE_ENV === 'development' && incomingView) {
+                console.log('🔍 [canvas-store] updateNodeData view merge:', {
+                  nodeId: id,
+                  incomingCodeLength: incomingView.code?.length || 0,
+                  incomingCodePreview: incomingView.code?.substring(0, 50) || 'N/A',
+                  existingCodeLength: existingView?.code?.length || 0,
+                  existingCodePreview: existingView?.code?.substring(0, 50) || 'N/A',
+                  incomingIsValid: incomingView.code && incomingView.code.length > 0 && incomingView.code !== '// PLACEHOLDER',
+                  existingIsValid: existingView?.code && existingView.code.length > 0 && existingView.code !== '// PLACEHOLDER',
+                });
+              }
+              
+              // 如果传入的view存在
+              if (incomingView) {
+                // 检查传入的view.code是否有效（非空、非占位符）
+                const incomingCodeIsValid = incomingView.code && 
+                                          incomingView.code.length > 0 && 
+                                          incomingView.code !== '// PLACEHOLDER' &&
+                                          incomingView.code.trim() !== '';
+                
+                // 检查原有view.code是否有效
+                const existingCodeIsValid = existingView && 
+                                           existingView.code && 
+                                           existingView.code.length > 0 && 
+                                           existingView.code !== '// PLACEHOLDER' &&
+                                           existingView.code.trim() !== '';
+                
+                // 如果传入的view.code有效，合并（保留existingView的其他属性，如previewUrl）
+                if (incomingCodeIsValid) {
+                  const merged = { ...existingView, ...incomingView };
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('✅ [canvas-store] 使用传入的有效view.code，合并结果:', {
+                      mergedCodeLength: merged.code?.length || 0,
+                      hasPreviewUrl: !!merged.previewUrl,
+                    });
+                  }
+                  return merged;
+                }
+                // 如果传入的view.code为空或无效，保留原有view（不覆盖）
+                if (existingCodeIsValid) {
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('⚠️ [canvas-store] 传入的view.code无效，保留原有view');
+                  }
+                  return existingView; // 保留原有有效view
+                }
+                // 如果原有view也无效，使用传入的view（至少保留previewUrl等）
+                if (process.env.NODE_ENV === 'development') {
+                  console.log('⚠️ [canvas-store] 原有view也无效，使用传入的view');
+                }
+                return { ...existingView, ...incomingView };
+              }
+              // 如果没有传入view，保留原有view
+              if (process.env.NODE_ENV === 'development') {
+                console.log('⚠️ [canvas-store] 没有传入view，保留原有view');
+              }
+              return existingView;
+            })(),
             spec: data.artifacts.spec
               ? { ...node.data.artifacts.spec, ...data.artifacts.spec }
               : node.data.artifacts.spec,

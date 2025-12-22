@@ -663,10 +663,27 @@ export function NodeDetailPanel() {
               </div>
             ) : (
               <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center', width: '100%' }}>
-                <LivePreview 
-                  code={selectedNode?.data?.artifacts?.view?.code || data.artifacts.view.code} 
-                  zoom={1}
-                />
+                {(() => {
+                  const viewCode = selectedNode?.data?.artifacts?.view?.code || data?.artifacts?.view?.code || '';
+                  // 调试日志：检查代码是否存在
+                  if (process.env.NODE_ENV === 'development') {
+                    console.log('🔍 [NodeDetailPanel] LivePreview code check:', {
+                      hasSelectedNode: !!selectedNode,
+                      selectedNodeCodeLength: selectedNode?.data?.artifacts?.view?.code?.length || 0,
+                      dataCodeLength: data?.artifacts?.view?.code?.length || 0,
+                      finalCodeLength: viewCode.length,
+                      finalCodePreview: viewCode.substring(0, 100),
+                      isPlaceholder: viewCode === '// PLACEHOLDER',
+                      isEmpty: !viewCode || viewCode.length === 0,
+                    });
+                  }
+                  return (
+                    <LivePreview 
+                      code={viewCode} 
+                      zoom={1}
+                    />
+                  );
+                })()}
               </div>
             )}
           </div>

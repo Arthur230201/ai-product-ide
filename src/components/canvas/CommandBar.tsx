@@ -753,19 +753,31 @@ export function CommandBar() {
           accumulatedCode = '';
           fullCode = '';
 
-          // 优化后的提示词：强调精确复刻而非修正
+          // 优化后的提示词：结合Structure-First Protocol和精确复刻
           const optimizedPrompt = prompt.trim() || `请精确复刻这张UI截图，生成完全可交互的React+Tailwind组件。
 
 **核心要求：精确还原，不要过度修正**
 
-1. **精确还原所有UI元素**：
-   - 顶部导航栏（返回按钮、标题、操作按钮）
+**重要：忽略系统UI元素**
+- **完全忽略**手机系统自带的状态栏（时间显示如"9:41"、信号图标、Wi-Fi图标、电池图标等），这些是操作系统提供的UI，不需要在React组件中实现
+- **只关注应用内容**：从应用自己的导航栏、搜索栏等应用UI元素开始还原
+
+**分析流程（Structure-First Protocol）**：
+1. 先分析布局结构：识别容器层次（Flex/Grid）
+   - 如果看到卡片包含标题、元信息和底部标签，使用 \`flex-col\`（垂直堆叠），而不是复杂的行布局
+2. 规范化元素：
+   - 状态标签（如"进行中"、"已完成"）应使用Badge样式（\`text-xs px-2 py-0.5 rounded\`），而不是Button
+   - 侧边彩色条使用 \`border-l-4\` 或绝对定位，不要破坏布局流
+3. 提取主题色：识别主品牌色（如紫色/蓝色），使用任意值（如 \`text-[#A855F7]\`）或标准调色板一致应用
+
+1. **精确还原所有应用UI元素**（忽略系统UI）：
+   - 应用导航栏（返回按钮、标题、操作按钮）- 从应用自己的导航栏开始，忽略系统状态栏
    - 搜索栏和筛选器（包括占位符文本、图标）
    - 分类标签栏（完整还原所有标签，精确还原激活状态的视觉样式）
    - 列表项的所有细节：
      * 任务类型标签
      * 任务标题（包括特殊字符如书名号）
-     * 状态标签（已完成、进行中等）及其精确颜色
+     * 状态标签（已完成、进行中等）及其精确颜色 - 使用Badge样式
      * 负责人信息和发布时间
      * 平台/渠道列表及其状态图标（✓、时钟等）
      * 操作按钮（如"催办"按钮）
@@ -795,7 +807,7 @@ export function CommandBar() {
 6. **技术要求**：
    - 使用React Hooks（useState、useEffect）管理所有状态
    - 使用Tailwind CSS实现所有样式，禁止内联样式
-   - 使用Lucide React图标库还原所有图标
+   - 使用Lucide React图标库还原所有图标（从'lucide-react'导入）
    - 代码必须可直接运行，包含完整的交互逻辑`;
           
           // 确保图片数据格式正确（移除 data: URL 前缀，只保留 base64 数据）
@@ -964,6 +976,13 @@ export function CommandBar() {
           accumulatedCode = fullCode;
 
           // 实时更新 UI 代码到节点（用户可以看到 UI 立即出现）
+          log('💾 [CommandBar] 保存UI代码到store:', {
+            nodeId: selectedNode.id,
+            codeLength: accumulatedCode.length,
+            codePreview: accumulatedCode.substring(0, 100),
+            hasPreviewUrl: !!attachment.preview,
+          });
+          
           updateNodeData(selectedNode.id, {
             artifacts: {
               ...selectedNode.data.artifacts,
@@ -973,6 +992,19 @@ export function CommandBar() {
               },
             },
           });
+          
+          // 验证保存是否成功
+          setTimeout(() => {
+            const savedNode = nodes.find(n => n.id === selectedNode.id);
+            if (savedNode) {
+              log('✅ [CommandBar] UI代码保存验证:', {
+                nodeId: selectedNode.id,
+                savedCodeLength: savedNode.data.artifacts?.view?.code?.length || 0,
+                savedCodePreview: savedNode.data.artifacts?.view?.code?.substring(0, 100) || 'N/A',
+                isMatch: savedNode.data.artifacts?.view?.code === accumulatedCode,
+              });
+            }
+          }, 100);
 
           setLoadingStep('✅ UI 代码已生成');
           setProgress(100);
@@ -997,12 +1029,42 @@ export function CommandBar() {
           }
 
           // PRD 在后台异步生成，不阻塞用户交互
+          // 重要：保存fullCode和attachment的引用，确保在异步函数中可以访问
+          const savedFullCode = fullCode;
+          const savedPreviewUrl = attachment?.preview;
+          
           (async () => {
             try {
               setLoadingStep('📝 正在后台生成 PRD 文档...');
               
+              // 从store重新获取最新节点数据，确保使用最新的artifacts
+              const currentNodeId = selectedNode?.id;
+              if (!currentNodeId) {
+                logWarn('节点ID不存在，无法生成PRD');
+                return;
+              }
+              
+              // 从store获取最新节点数据
+              const latestNode = nodes.find(n => n.id === currentNodeId);
+              if (!latestNode) {
+                logWarn('节点不存在，无法生成PRD:', currentNodeId);
+                return;
+              }
+              
+              log('📝 [CommandBar] PRD生成前检查UI代码:', {
+                nodeId: currentNodeId,
+                storeViewCodeLength: latestNode.data.artifacts?.view?.code?.length || 0,
+                storeViewCodePreview: latestNode.data.artifacts?.view?.code?.substring(0, 100) || 'N/A',
+                savedFullCodeLength: savedFullCode?.length || 0,
+                savedFullCodePreview: savedFullCode?.substring(0, 100) || 'N/A',
+                hasSavedPreviewUrl: !!savedPreviewUrl,
+                storeHasView: !!latestNode.data.artifacts?.view,
+                storeViewIsPlaceholder: latestNode.data.artifacts?.view?.code === '// PLACEHOLDER',
+                storeViewIsEmpty: !latestNode.data.artifacts?.view?.code || latestNode.data.artifacts.view.code.length === 0,
+              });
+              
               // 获取现有的需求文档，以便在原有基础上增加新内容
-              const existingRequirements = selectedNode?.data?.artifacts?.spec?.requirements;
+              const existingRequirements = latestNode.data?.artifacts?.spec?.requirements;
               let existingRequirementsArray: string[] = [];
               if (existingRequirements) {
                 if (Array.isArray(existingRequirements)) {
@@ -1014,10 +1076,11 @@ export function CommandBar() {
               }
               
               // 获取页面标题用于生成功能ID前缀
-              const pageTitle = selectedNode?.data?.artifacts?.spec?.title || selectedNode?.data?.label || undefined;
+              const pageTitle = latestNode.data?.artifacts?.spec?.title || latestNode.data?.label || undefined;
               
+              // 使用savedFullCode而不是fullCode，确保在异步函数中使用正确的代码
               const analysisResult = await executeAnalysis({
-                codeContext: fullCode,
+                codeContext: savedFullCode || fullCode,
                 pageTitle: pageTitle,
                 existingRequirements: existingRequirementsArray.length > 0 ? existingRequirementsArray : undefined,
                 aiConfig: aiConfig, // 传递 AI 模型配置
@@ -1038,15 +1101,138 @@ export function CommandBar() {
                   .filter((line: string) => line.trim() !== '');
 
                 // 更新 PRD 到节点（不影响已生成的 UI）
-                updateNodeData(selectedNode.id, {
-                  artifacts: {
-                    ...selectedNode.data.artifacts,
+                // 再次从store获取最新节点数据，确保UI代码不会丢失
+                const finalNode = nodes.find(n => n.id === currentNodeId);
+                if (finalNode) {
+                  // 确保view数据存在，优先使用store中的最新数据，如果丢失则使用保存的fullCode
+                  const currentView = finalNode.data.artifacts?.view;
+                  let viewToPreserve = currentView;
+                  
+                  // 如果store中的view代码为空或不存在，使用之前保存的fullCode
+                  if (!currentView || !currentView.code || currentView.code.length === 0 || currentView.code === '// PLACEHOLDER') {
+                    if (savedFullCode && savedFullCode.length > 0 && savedFullCode !== '// PLACEHOLDER') {
+                      viewToPreserve = { 
+                        code: savedFullCode, 
+                        previewUrl: savedPreviewUrl || currentView?.previewUrl 
+                      };
+                      log('⚠️ [CommandBar] Store中的view代码丢失，使用savedFullCode恢复:', {
+                        savedFullCodeLength: savedFullCode.length,
+                        savedFullCodePreview: savedFullCode.substring(0, 100),
+                        hasPreviewUrl: !!savedPreviewUrl,
+                      });
+                    } else {
+                      // 如果savedFullCode也没有，至少保留previewUrl
+                      viewToPreserve = currentView || { code: '', previewUrl: savedPreviewUrl };
+                      logWarn('⚠️ [CommandBar] 无法恢复UI代码，savedFullCode也为空:', {
+                        hasCurrentView: !!currentView,
+                        hasSavedFullCode: !!savedFullCode,
+                        savedFullCodeLength: savedFullCode?.length || 0,
+                      });
+                    }
+                  }
+                  
+                  log('📝 [CommandBar] 更新PRD，保留UI代码:', {
+                    nodeId: currentNodeId,
+                    hasViewCode: !!viewToPreserve?.code,
+                    viewCodeLength: viewToPreserve?.code?.length || 0,
+                    viewCodePreview: viewToPreserve?.code?.substring(0, 100) || 'N/A',
+                    hasPreviewUrl: !!viewToPreserve?.previewUrl,
+                    source: currentView?.code ? 'store' : 'fullCode',
+                  });
+                  
+                  // 只更新spec部分，明确保留view、impl、test
+                  // 重要：必须传递view，确保UI代码不会丢失
+                  
+                  // 确保view.code有效：优先使用store中的最新代码，如果丢失则使用savedFullCode
+                  let finalViewCode = viewToPreserve?.code;
+                  if (!finalViewCode || finalViewCode.length === 0 || finalViewCode === '// PLACEHOLDER') {
+                    if (savedFullCode && savedFullCode.length > 0 && savedFullCode !== '// PLACEHOLDER') {
+                      finalViewCode = savedFullCode;
+                      log('🔧 [CommandBar] viewToPreserve.code无效，使用savedFullCode');
+                    } else if (finalNode.data.artifacts?.view?.code && 
+                               finalNode.data.artifacts.view.code.length > 0 && 
+                               finalNode.data.artifacts.view.code !== '// PLACEHOLDER') {
+                      finalViewCode = finalNode.data.artifacts.view.code;
+                      log('🔧 [CommandBar] 使用finalNode中的view.code');
+                    } else {
+                      logWarn('❌ [CommandBar] 所有来源的view.code都无效');
+                    }
+                  }
+                  
+                  // 确保previewUrl存在
+                  const finalPreviewUrl = viewToPreserve?.previewUrl || 
+                                        finalNode.data.artifacts?.view?.previewUrl || 
+                                        savedPreviewUrl;
+                  
+                  // 最终验证：确保finalViewCode不为空字符串
+                  if (!finalViewCode || finalViewCode.length === 0 || finalViewCode === '// PLACEHOLDER') {
+                    // 如果所有来源都无效，至少尝试从store中获取
+                    const storeViewCode = finalNode.data.artifacts?.view?.code;
+                    if (storeViewCode && storeViewCode.length > 0 && storeViewCode !== '// PLACEHOLDER') {
+                      finalViewCode = storeViewCode;
+                      log('🔧 [CommandBar] 最终回退：使用store中的view.code');
+                    } else if (savedFullCode && savedFullCode.length > 0 && savedFullCode !== '// PLACEHOLDER') {
+                      finalViewCode = savedFullCode;
+                      log('🔧 [CommandBar] 最终回退：使用savedFullCode');
+                    } else {
+                      logWarn('❌ [CommandBar] 所有来源的view.code都无效，将保留空字符串');
+                    }
+                  }
+                  
+                  const artifactsUpdate: any = {
+                    // 必须传递view，确保UI代码不会丢失
+                    view: {
+                      code: finalViewCode || '',
+                      previewUrl: finalPreviewUrl,
+                    },
+                    // 保留其他数据
+                    impl: finalNode.data.artifacts?.impl,
+                    test: finalNode.data.artifacts?.test,
+                    // 只更新spec部分
                     spec: {
-                      title: selectedNode.data.artifacts?.spec?.title || selectedNode.data.label || '未命名节点',
+                      title: finalNode.data.artifacts?.spec?.title || finalNode.data.label || '未命名节点',
                       requirements: requirementsArray,
                     },
-                  },
-                });
+                  };
+                  
+                  log('📝 [CommandBar] 最终更新artifacts:', {
+                    hasViewCode: !!artifactsUpdate.view?.code,
+                    viewCodeLength: artifactsUpdate.view?.code?.length || 0,
+                    viewCodePreview: artifactsUpdate.view?.code?.substring(0, 100) || 'N/A',
+                    hasPreviewUrl: !!artifactsUpdate.view?.previewUrl,
+                    viewCodeSource: finalViewCode === savedFullCode ? 'savedFullCode' : 
+                                   (finalViewCode === finalNode.data.artifacts?.view?.code ? 'finalNode' : 'viewToPreserve'),
+                    finalViewCodeIsValid: finalViewCode && finalViewCode.length > 0 && finalViewCode !== '// PLACEHOLDER',
+                  });
+                  
+                  // 更新前最终验证：如果view.code无效，不更新view，让store保留原有view
+                  if (!artifactsUpdate.view.code || artifactsUpdate.view.code.length === 0 || artifactsUpdate.view.code === '// PLACEHOLDER') {
+                    logWarn('❌ [CommandBar] 最终验证失败：view.code无效，将不传递view，让store保留原有view');
+                    // 不传递view，让store保留原有的view
+                    delete artifactsUpdate.view;
+                  }
+                  
+                  updateNodeData(currentNodeId, {
+                    artifacts: artifactsUpdate,
+                  });
+                  
+                  // 更新后验证：检查store中的view.code是否仍然存在
+                  setTimeout(() => {
+                    const updatedNode = nodes.find(n => n.id === currentNodeId);
+                    if (updatedNode) {
+                      log('✅ [CommandBar] 更新后验证:', {
+                        nodeId: currentNodeId,
+                        storeViewCodeLength: updatedNode.data.artifacts?.view?.code?.length || 0,
+                        storeViewCodePreview: updatedNode.data.artifacts?.view?.code?.substring(0, 100) || 'N/A',
+                        storeViewIsValid: updatedNode.data.artifacts?.view?.code && 
+                                        updatedNode.data.artifacts.view.code.length > 0 && 
+                                        updatedNode.data.artifacts.view.code !== '// PLACEHOLDER',
+                      });
+                    }
+                  }, 200);
+                } else {
+                  logWarn('节点不存在，无法更新PRD:', currentNodeId);
+                }
 
                 toast.success('PRD 文档已生成', {
                   description: '需求文档已在后台完成',

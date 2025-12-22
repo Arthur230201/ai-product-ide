@@ -13,6 +13,7 @@ interface InstructionCardProps {
   showActionButton?: boolean;
   onActionClick?: () => void;
   indicatorColor?: string;
+  category?: string; // 指令类别，用于动态设置指示条颜色
 }
 
 export function InstructionCard({
@@ -24,7 +25,8 @@ export function InstructionCard({
   sourceTags = [],
   showActionButton = false,
   onActionClick,
-  indicatorColor = 'bg-blue-500',
+  indicatorColor,
+  category,
 }: InstructionCardProps) {
   const statusStyles = {
     '进行中': 'bg-blue-50 text-blue-600',
@@ -32,15 +34,28 @@ export function InstructionCard({
     '待处理': 'bg-gray-50 text-gray-600',
   };
 
+  // 根据category动态设置指示条颜色
+  // "创意落地"使用紫色，其他使用蓝色
+  const getIndicatorColor = (): string => {
+    if (indicatorColor) {
+      return indicatorColor;
+    }
+    if (category === '创意落地') {
+      return 'bg-purple-500';
+    }
+    return 'bg-blue-500';
+  };
+
   return (
     <div className="relative bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-      {/* Left Indicator Bar */}
+      {/* Left Indicator Bar - CRITICAL: Must be visible on every card */}
       <div 
-        className={`absolute left-0 top-0 bottom-0 w-1.5 ${indicatorColor} rounded-l-lg`}
+        className={`absolute left-0 top-0 h-full w-2 ${getIndicatorColor()} rounded-l-lg`}
       />
 
       {/* Card Body - Vertical Column */}
-      <div className="flex flex-col pl-4 pr-4 pt-3 pb-3">
+      {/* Add left padding to prevent content overlap with indicator bar */}
+      <div className="flex flex-col pl-5 pr-4 pt-3 pb-3">
         {/* Header Row: Title + Status Badge */}
         <div className="flex items-center gap-2 mb-2">
           <h3 className="flex-1 font-semibold text-gray-900 text-sm">
