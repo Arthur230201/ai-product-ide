@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 自定义动画 - 按钮光晕闪烁效果 */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@import 'reactflow/dist/style.css';
+
+@layer base {
+  :root {
+    background-color: rgb(9 9 11); /* zinc-950 */
+    color: rgb(250 250 250); /* zinc-50 */
+  }
+
+  body {
+    background-color: rgb(9 9 11); /* zinc-950 */
+    color: rgb(250 250 250); /* zinc-50 */
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+  }
+  
+  html {
+    height: 100vh;
+    overflow: hidden;
+  }
+  
+  /* 确保动态生成的组件能够使用 Tailwind 样式 */
+  * {
+    box-sizing: border-box;
+  }
+}
+
+/* ReactFlow 深色模式支持 */
+.react-flow-dark {
+  background-color: rgb(9 9 11); /* zinc-950 */
+}
+
+.react-flow__controls-dark button {
+  background-color: rgb(39 39 42); /* zinc-800 */
+  color: rgb(244 244 245); /* zinc-100 */
+  border-color: rgb(63 63 70); /* zinc-700 */
+}
+
+.react-flow__controls-dark button:hover {
+  background-color: rgb(63 63 70); /* zinc-700 */
+}
+
+.react-flow__minimap-dark {
+  background-color: rgb(24 24 27); /* zinc-900 */
+  border: 1px solid rgb(39 39 42); /* zinc-800 */
+}
+
+.react-flow__edge {
+  stroke: rgb(96 165 250); /* blue-400 */
+}
+
+.react-flow__edge.selected {
+  stroke: rgb(59 130 246); /* blue-500 */
+}
+
+/* 确保 CommandBar 可以交互并固定在视口内 */
+[data-command-bar] {
+  pointer-events: auto !important;
+  z-index: 50 !important;
+  position: relative !important;
+  max-width: 100% !important;
+}
+
+/* 确保所有按钮和输入框都可以交互 */
+[data-command-bar] button,
+[data-command-bar] input,
+[data-command-bar] textarea,
+[data-command-bar] form {
+  pointer-events: auto !important;
+}
+
+/* 确保 ProjectToolbar 可以交互 */
+[data-project-toolbar] {
+  pointer-events: auto !important;
+  z-index: 9999 !important;
+  position: fixed !important;
+}
+
+/* 确保所有按钮都可以交互 */
+button {
+  pointer-events: auto !important;
+  cursor: pointer;
+}
+
+/* 确保 ReactFlow 不会阻止交互 */
+.react-flow {
+  pointer-events: auto;
+  width: 100% !important;
+  height: 100% !important;
+  position: relative;
+  z-index: 1;
+}
+
+.react-flow__pane {
+  pointer-events: auto;
+}
+
+.react-flow__viewport {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* 确保按钮和工具栏可以点击 */
+button,
+[role="button"],
+[data-project-toolbar] button,
+[data-command-bar] button {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  z-index: 9999 !important;
+  position: relative;
+}
+
+/* 确保工具栏容器可以交互 */
+[data-project-toolbar] {
+  pointer-events: auto !important;
+  z-index: 9999 !important;
+  position: fixed !important;
+  isolation: isolate;
+}
+
+/* 确保右上角按钮组始终显示 */
+.fixed.top-4.right-4 {
+  z-index: 9999 !important;
+  position: fixed !important;
+  isolation: isolate;
+}
+
+/* 确保所有固定定位的工具栏按钮始终显示 */
+[data-project-toolbar],
+.fixed.top-4.right-4,
+.fixed.top-4.left-4 {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* 确保 CommandBar 始终显示 */
+[data-command-bar] {
+  z-index: 9998 !important;
+  position: relative !important;
+}
+
+/* 确保项目蓝图模态框始终显示在最上层 */
+.fixed.inset-0[style*="zIndex: 10001"],
+div[style*="zIndex: 10001"],
+div[style*="zIndex: 10002"] {
+  z-index: 10002 !important;
+  position: fixed !important;
+}
+
+/* 确保项目蓝图模态框内容正确显示 */
+.bg-zinc-900.border.border-zinc-800.rounded-lg.shadow-2xl {
+  display: flex !important;
+  flex-direction: column !important;
+  pointer-events: auto !important;
+}
+

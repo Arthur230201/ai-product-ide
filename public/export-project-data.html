@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>导出项目数据</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #e0e0e0;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #60a5fa;
+            margin-top: 0;
+        }
+        .data-display {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .success {
+            color: #10b981;
+            margin: 10px 0;
+        }
+        .error {
+            color: #ef4444;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📦 项目数据导出工具</h1>
+        <p>此工具可以帮助您从浏览器的 localStorage 中导出未保存的项目数据。</p>
+        
+        <button onclick="loadData()">加载项目数据</button>
+        <button onclick="exportData()">导出为 JSON 文件</button>
+        <button onclick="copyToClipboard()">复制到剪贴板</button>
+        
+        <div id="status"></div>
+        <div id="dataDisplay" class="data-display" style="display: none;"></div>
+    </div>
+
+    <script>
+        let projectData = null;
+
+        function loadData() {
+            try {
+                // 正确的键名是 'fractal-canvas-storage'
+                const correctKey = 'fractal-canvas-storage';
+                
+                // 尝试查找所有可能的键名（用于调试）
+                const allKeys = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    allKeys.push(localStorage.key(i));
+                }
+
+                // 首先尝试正确的键名
+                let stored = localStorage.getItem(correctKey);
+                let dataKey = correctKey;
+
+                // 如果没找到，尝试其他可能的键（兼容旧版本）
+                if (!stored) {
+                    const possibleKeys = ['canvas-store', 'fractal-canvas-storage', 'canvas-storage'];
+                    for (const key of possibleKeys) {
+                        const value = localStorage.getItem(key);
+                        if (value) {
+                            try {
+                                const parsed = JSON.parse(value);
+                                // 检查是否包含 nodes 或 edges
+                                if (parsed && (parsed.state?.nodes || parsed.nodes || parsed.state?.edges || parsed.edges)) {
+                                    stored = value;
+                                    dataKey = key;
+                                    break;
+                                }
+                            } catch (e) {
+                                // 继续尝试下一个键
+                            }
+                        }
+                    }
+                }
+
+                // 如果还是没找到，列出所有键供用户参考
+                if (!stored) {
+                    const keysList = allKeys.length > 0 ? allKeys.join(', ') : '无';
+                    showStatus('❌ 未找到项目数据。\n\n请确保：\n1. 在正确的域名/端口下打开此工具（localhost:3000 或 localhost:3002）\n2. 项目数据已保存在浏览器中\n\n当前 localStorage 中的所有键: ' + keysList + '\n\n提示：请在同一浏览器和端口下打开此工具。', 'error');
+                    return;
+                }
+
+                const parsed = JSON.parse(stored);
+                projectData = parsed.state || parsed;
+
+                // 提取节点和边
+                const exportData = {
+                    nodes: projectData.nodes || [],
+                    edges: projectData.edges || [],
+                    exportedAt: new Date().toISOString(),
+                    version: '1.0'
+                };
+
+                document.getElementById('dataDisplay').textContent = JSON.stringify(exportData, null, 2);
+                document.getElementById('dataDisplay').style.display = 'block';
+                showStatus(`✅ 成功加载项目数据！\n数据来源: ${dataKey}\n包含 ${exportData.nodes.length} 个节点和 ${exportData.edges.length} 条边`, 'success');
+            } catch (error) {
+                showStatus('❌ 加载数据失败: ' + error.message + '\n\n错误详情请查看浏览器控制台 (F12)', 'error');
+                console.error('加载数据错误:', error);
+            }
+        }
+
+        function exportData() {
+            if (!projectData) {
+                showStatus('请先加载数据', 'error');
+                return;
+            }
+
+            try {
+                const exportData = {
+                    nodes: projectData.nodes || [],
+                    edges: projectData.edges || [],
+                    exportedAt: new Date().toISOString(),
+                    version: '1.0'
+                };
+
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `project-backup-${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showStatus('✅ 数据已导出为 JSON 文件', 'success');
+            } catch (error) {
+                showStatus('❌ 导出失败: ' + error.message, 'error');
+            }
+        }
+
+        function copyToClipboard() {
+            if (!projectData) {
+                showStatus('请先加载数据', 'error');
+                return;
+            }
+
+            try {
+                const exportData = {
+                    nodes: projectData.nodes || [],
+                    edges: projectData.edges || [],
+                    exportedAt: new Date().toISOString(),
+                    version: '1.0'
+                };
+
+                navigator.clipboard.writeText(JSON.stringify(exportData, null, 2));
+                showStatus('✅ 数据已复制到剪贴板', 'success');
+            } catch (error) {
+                showStatus('❌ 复制失败: ' + error.message, 'error');
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = message;
+            statusDiv.className = type;
+        }
+
+        // 自动加载数据
+        window.onload = function() {
+            loadData();
+        };
+    </script>
+</body>
+</html>

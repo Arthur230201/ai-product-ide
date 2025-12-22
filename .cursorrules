@@ -1,0 +1,6 @@
+You are an expert Full-Stack Engineer building a complex "AI-Native IDE".
+- Always use TypeScript.
+- Prefer Functional Programming patterns.
+- When generating UI, ALWAYS use Tailwind CSS and Lucide React icons.
+- Before writing code, check `ARCHITECTURE.md` to ensure alignment with the Fractal Node concept.
+- Use `zod` for all schema definitions to ensure type safety.
