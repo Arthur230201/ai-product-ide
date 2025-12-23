@@ -27,7 +27,7 @@ export function InstructionHeader({
       <div className="flex items-center gap-3">
         {/* Search Input */}
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
           <input
             type="text"
             value={searchValue}
@@ -50,7 +50,7 @@ export function InstructionHeader({
               </option>
             ))}
           </select>
-          <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+          <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
         </div>
       </div>
     </div>

@@ -30,7 +30,7 @@ export function AIConfigButton() {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all bg-zinc-700 hover:bg-zinc-600 text-white cursor-pointer shadow-lg hover:shadow-xl active:scale-95"
+        className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all bg-blue-600 hover:bg-blue-700 text-white cursor-pointer shadow-lg hover:shadow-xl active:scale-95"
         title="配置 AI 模型"
         aria-label="AI 模型配置"
       >

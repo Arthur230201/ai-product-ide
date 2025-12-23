@@ -12,7 +12,7 @@ export default function NotFound() {
           <h1 className="text-3xl font-bold">404</h1>
         </div>
         <h2 className="text-xl font-semibold mb-2">页面未找到</h2>
-        <p className="text-zinc-400 mb-6">
+        <p className="text-zinc-300 mb-6">
           抱歉，您访问的页面不存在。
         </p>
         <Link

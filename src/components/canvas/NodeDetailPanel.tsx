@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
-import { X, Maximize2, Minimize2, Download, Wand2, RefreshCw, FileText, Database, Bug, Play, ZoomIn, ZoomOut, Edit, Eye } from 'lucide-react';
+import { X, Maximize2, Minimize2, Download, Wand2, RefreshCw, FileText, Database, Bug, Play, ZoomIn, ZoomOut, Edit, Eye, FileCheck } from 'lucide-react';
 import { LivePreview } from './LivePreview'; 
 import { SpecViewer } from './SpecViewer';
 import { CommandBar } from './CommandBar';
 import { NodeTree } from './NodeTree';
 import { MobileDevicePreview } from './MobileDevicePreview';
-import { generateImplementation, generateTestCases, reverseGenerateSpec, refineUI } from '@/app/actions/node-operations';
+import { PrdConfigDialog } from './PrdConfigDialog';
+import { generateImplementation, generateTestCases, reverseGenerateSpec, refineUI, generateAnalysisFromCode } from '@/app/actions/node-operations';
+import { useServerAction } from 'zsa-react';
+import { generatePageLevelPrd, inferPrdOptions, PrdOptions } from '@/utils/codeToPrdTable';
 import { toast } from 'sonner';
 import { clsx } from 'clsx';
 import ReactMarkdown from 'react-markdown';
@@ -27,6 +30,7 @@ const EditorSection = ({ value, onChange, onBlur, placeholder }: { value: string
 
 export function NodeDetailPanel() {
   const { selectedNodeId, nodes, isDetailPanelOpen, closeNodeDetail, updateNodeData, projectMeta, aiConfig } = useCanvasStore();
+  const { execute: executeAnalysis, isPending: isGeneratingPrd } = useServerAction(generateAnalysisFromCode);
   const [activeTab, setActiveTab] = useState<'spec' | 'impl' | 'test'>('spec');
   const [zoom, setZoom] = useState(0.7); // 默认缩放为70%，适应更窄的预览区域
   const [isLoading, setIsLoading] = useState(false);
@@ -35,6 +39,8 @@ export function NodeDetailPanel() {
   const [localSpecText, setLocalSpecText] = useState<string>('');
   // 使用本地状态管理节点标题，支持直接编辑
   const [title, setTitle] = useState<string>('');
+  // PRD 配置对话框状态
+  const [showPrdConfig, setShowPrdConfig] = useState(false);
 
   // 获取选中的节点（使用 useMemo 稳定引用，避免无限循环）
   const selectedNode = useMemo(() => {
@@ -146,6 +152,151 @@ export function NodeDetailPanel() {
       toast.error('同步失败');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // 手动生成 PRD（基于UI代码分析）
+  const handleGeneratePrdFromCode = async () => {
+    const code = data.artifacts.view.code;
+    if (!code || code.trim().length === 0) {
+      toast.error('请先生成 UI 代码');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      
+      // 获取现有的需求文档
+      const existingRequirements = data.artifacts.spec?.requirements;
+      let existingRequirementsArray: string[] = [];
+      if (existingRequirements) {
+        if (Array.isArray(existingRequirements)) {
+          existingRequirementsArray = existingRequirements;
+        } else if (typeof existingRequirements === 'string') {
+          existingRequirementsArray = existingRequirements.split('\n').filter((l: string) => l.trim());
+        }
+      }
+      
+      // 获取页面标题
+      const pageTitle = data.artifacts.spec?.title || selectedNode.data.label || undefined;
+      
+      // 调用分析函数生成PRD
+      const analysisResult = await executeAnalysis({
+        codeContext: code,
+        pageTitle: pageTitle,
+        existingRequirements: existingRequirementsArray.length > 0 ? existingRequirementsArray : undefined,
+        aiConfig: aiConfig,
+      });
+
+      // 处理返回格式
+      let analysisData: { markdown?: string } | null = null;
+      if (Array.isArray(analysisResult)) {
+        analysisData = analysisResult[0] || null;
+      } else if (analysisResult && typeof analysisResult === 'object') {
+        analysisData = analysisResult.data || analysisResult;
+      }
+
+      if (analysisData?.markdown) {
+        const prdMarkdown = analysisData.markdown;
+        const requirementsArray = prdMarkdown
+          .split('\n')
+          .filter((line: string) => line.trim() !== '');
+
+        // 更新 PRD 到节点（只更新spec，不传递view，确保UI不会被覆盖）
+        // 从store获取最新节点数据，确保使用最新的view
+        const latestNode = nodes.find(n => n.id === selectedNode.id);
+        if (latestNode) {
+          updateNodeData(selectedNode.id, {
+            artifacts: {
+              // 只更新spec，不传递view，让store保留原有的view
+              spec: {
+                title: latestNode.data.artifacts?.spec?.title || latestNode.data.label || '未命名节点',
+                requirements: requirementsArray,
+              },
+            },
+          });
+          
+          // 验证更新后UI代码是否仍然存在
+          setTimeout(() => {
+            const updatedNode = nodes.find(n => n.id === selectedNode.id);
+            if (updatedNode) {
+              const hasValidView = updatedNode.data.artifacts?.view?.code && 
+                                  updatedNode.data.artifacts.view.code.length > 0 && 
+                                  updatedNode.data.artifacts.view.code !== '// PLACEHOLDER';
+              if (!hasValidView && code && code.length > 0) {
+                console.error('❌ [NodeDetailPanel] PRD更新后UI代码丢失，尝试恢复');
+                // 如果UI代码丢失，尝试恢复
+                updateNodeData(selectedNode.id, {
+                  artifacts: {
+                    view: {
+                      code: code,
+                      previewUrl: latestNode.data.artifacts?.view?.previewUrl,
+                    },
+                  },
+                });
+              }
+            }
+          }, 100);
+        }
+
+        toast.success('PRD 文档已生成');
+      } else {
+        toast.error('PRD 生成失败：未返回有效数据');
+      }
+    } catch (error) {
+      console.error('Generate PRD error:', error);
+      toast.error(`生成失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 生成完整页面级 PRD（使用配置对话框）
+  const handleGenerateFullPrd = () => {
+    const code = data.artifacts.view.code;
+    if (!code || code.trim().length === 0) {
+      toast.error('请先生成 UI 代码');
+      return;
+    }
+    
+    // 获取 AI 推断的默认值
+    const aiInferred = inferPrdOptions(code, data.artifacts.spec?.title);
+    
+    // 获取已保存的配置
+    const savedConfig = data.artifacts.spec?.prdConfig as PrdOptions | undefined;
+    
+    // 显示配置对话框
+    setShowPrdConfig(true);
+  };
+
+  // 确认生成 PRD
+  const handleConfirmPrdGeneration = (options: PrdOptions) => {
+    try {
+      const code = data.artifacts.view.code;
+      const fileName = `${data.label || 'Component'}.tsx`;
+      const componentName = data.label;
+      
+      // 生成完整 PRD
+      const fullPrd = generatePageLevelPrd(code, fileName, componentName, options);
+      
+      // 保存 PRD 和配置到节点数据
+      // 将完整 PRD 保存为数组的单个元素（保持 Markdown 格式完整）
+      updateNodeData(selectedNode.id, {
+        artifacts: {
+          ...data.artifacts,
+          spec: {
+            ...data.artifacts.spec,
+            requirements: [fullPrd], // 将完整 PRD 保存为 requirements 数组的单个元素
+            prdConfig: options, // 保存用户配置，下次自动填充
+          }
+        }
+      });
+      
+      setShowPrdConfig(false);
+      toast.success('完整 PRD 已生成');
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : '未知错误';
+      toast.error(`生成失败: ${errorMessage}`);
     }
   };
 
@@ -376,6 +527,21 @@ export function NodeDetailPanel() {
                 <div className="flex justify-between items-center mb-2 shrink-0">
                    <span className="text-xs text-zinc-500">支持 Markdown 编辑</span>
                    <div className="flex items-center gap-2">
+                     <button 
+                       onClick={handleGeneratePrdFromCode}
+                       disabled={isGeneratingPrd || isLoading}
+                       title="基于UI代码生成需求文档"
+                       className="text-xs flex items-center gap-1 bg-green-600 hover:bg-green-700 disabled:bg-zinc-700 disabled:cursor-not-allowed px-2 py-1 rounded text-white transition-colors"
+                     >
+                       <Wand2 size={12} /> {isGeneratingPrd ? '生成中...' : '生成需求文档'}
+                     </button>
+                     <button 
+                       onClick={handleGenerateFullPrd}
+                       title="生成完整的页面级 PRD 文档（包含5个部分）"
+                       className="text-xs flex items-center gap-1 bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-white transition-colors"
+                     >
+                       <FileCheck size={12} /> 生成完整 PRD
+                     </button>
                      <button 
                        onClick={() => setIsEditingSpec(!isEditingSpec)}
                        className="text-xs flex items-center gap-1 bg-zinc-800 px-2 py-1 rounded hover:bg-zinc-700 text-zinc-300"
@@ -644,52 +810,40 @@ export function NodeDetailPanel() {
           <div 
             className="flex-1 overflow-hidden flex justify-center items-start pt-2 pb-2 px-2 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] relative"
           >
-            {data.artifacts.view.previewUrl ? (
-              <div style={{ 
-                width: '375px', 
-                height: '812px', 
-                maxWidth: '100%', 
-                maxHeight: '100%',
-                transform: `scale(${zoom})`,
-                transformOrigin: 'top center',
-                transition: 'transform 0.2s ease',
-              }}>
-                <MobileDevicePreview 
-                  imageUrl={data.artifacts.view.previewUrl} 
-                  zoom={1}
-                  width={375}
-                  height={812}
-                />
-              </div>
-            ) : (
-              <div style={{ transform: `scale(${zoom})`, transformOrigin: 'top center', width: '100%' }}>
-                {(() => {
-                  const viewCode = selectedNode?.data?.artifacts?.view?.code || data?.artifacts?.view?.code || '';
-                  // 调试日志：检查代码是否存在
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log('🔍 [NodeDetailPanel] LivePreview code check:', {
-                      hasSelectedNode: !!selectedNode,
-                      selectedNodeCodeLength: selectedNode?.data?.artifacts?.view?.code?.length || 0,
-                      dataCodeLength: data?.artifacts?.view?.code?.length || 0,
-                      finalCodeLength: viewCode.length,
-                      finalCodePreview: viewCode.substring(0, 100),
-                      isPlaceholder: viewCode === '// PLACEHOLDER',
-                      isEmpty: !viewCode || viewCode.length === 0,
-                    });
-                  }
-                  return (
-                    <LivePreview 
-                      code={viewCode} 
-                      zoom={1}
-                    />
-                  );
-                })()}
-              </div>
-            )}
+            <div style={{ 
+              width: '375px', 
+              height: '812px', 
+              maxWidth: '100%', 
+              maxHeight: '100%',
+              transform: `scale(${zoom})`,
+              transformOrigin: 'top center',
+              transition: 'transform 0.2s ease',
+            }}>
+              <MobileDevicePreview 
+                imageUrl={data.artifacts.view.previewUrl} 
+                zoom={1}
+                width={375}
+                height={812}
+              />
+            </div>
           </div>
         </div>
 
       </div>
+
+      {/* PRD 配置对话框 */}
+      {selectedNode && (
+        <PrdConfigDialog
+          isOpen={showPrdConfig}
+          onClose={() => setShowPrdConfig(false)}
+          onConfirm={handleConfirmPrdGeneration}
+          initialValues={selectedNode.data.artifacts?.spec?.prdConfig as PrdOptions | undefined}
+          aiInferred={inferPrdOptions(
+            selectedNode.data.artifacts?.view?.code || '',
+            selectedNode.data.artifacts?.spec?.title
+          )}
+        />
+      )}
     </div>
   );
 }

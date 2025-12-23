@@ -336,10 +336,10 @@ export const LivePreview = ({
   }
 
   // 5. 渲染内容
-  // 注意：不添加默认背景色，让UI代码中的样式完全生效，确保还原度
+  // 注意：添加默认白色背景，确保UI代码如果没有设置背景色时也能正常显示
   const content = (
     <div 
-      className={`${isMobile && zoom !== 1 ? 'w-[375px] h-[812px]' : 'w-full h-full'} overflow-hidden relative`}
+      className={`${isMobile && zoom !== 1 ? 'w-[375px] h-[812px]' : 'w-full h-full'} overflow-hidden relative bg-white`}
       style={{
         transform: zoom !== 1 ? `scale(${zoom})` : 'none',
         transformOrigin: 'top center',
@@ -352,7 +352,7 @@ export const LivePreview = ({
       } as React.CSSProperties}
     >
       <div 
-        className={`${isMobile && zoom !== 1 ? 'w-[375px] h-[812px]' : 'w-full h-full'} overflow-x-hidden overflow-y-auto`}
+        className={`${isMobile && zoom !== 1 ? 'w-[375px] h-[812px]' : 'w-full h-full'} overflow-x-hidden overflow-y-auto bg-white`}
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',

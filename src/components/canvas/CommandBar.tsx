@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Paperclip, X, Send, Loader2, FileText, Image as ImageIcon, Video, Target } from 'lucide-react';
 import { useServerAction } from 'zsa-react';
 import { generateGraph } from '@/app/actions/generate-graph';
-import { updateNodeArtifacts, generateUIFromImage, generateAnalysisFromCode } from '@/app/actions/node-operations';
+import { updateNodeArtifacts, generateUIFromImage, generateUIFromText, generateAnalysisFromCode } from '@/app/actions/node-operations';
 import { useCanvasStore } from '@/store/canvas-store';
 import { toast } from 'sonner';
 import { log, logError, logWarn } from '@/lib/logger';
@@ -63,26 +63,394 @@ export function CommandBar() {
   // 创建模式的 action（必须在所有使用它的函数之前定义）
   const { execute: executeCreate, isPending: isCreating } = useServerAction(generateGraph, {
     onSuccess: (result) => {
-      if (result.data) {
-        addNodes(result.data.nodes);
-        addEdges(result.data.edges);
+      log('📥 [CommandBar] executeCreate 原始返回:', {
+        result,
+        resultType: typeof result,
+        isArray: Array.isArray(result),
+        hasData: !!(result as any)?.data,
+        keys: result && typeof result === 'object' ? Object.keys(result as any) : [],
+        // 尝试序列化查看完整结构（限制长度避免日志过大）
+        resultString: JSON.stringify(result).substring(0, 500),
+        // 直接检查 result.data 的内容
+        dataExists: !!(result as any)?.data,
+        dataType: typeof (result as any)?.data,
+        dataKeys: (result as any)?.data && typeof (result as any).data === 'object' ? Object.keys((result as any).data) : [],
+        dataNodesExists: !!(result as any)?.data?.nodes,
+        dataNodesType: typeof (result as any)?.data?.nodes,
+        dataNodesIsArray: Array.isArray((result as any)?.data?.nodes),
+        dataNodesLength: Array.isArray((result as any)?.data?.nodes) ? (result as any).data.nodes.length : 'N/A',
+        dataEdgesExists: !!(result as any)?.data?.edges,
+        dataEdgesType: typeof (result as any)?.data?.edges,
+        dataEdgesIsArray: Array.isArray((result as any)?.data?.edges),
+        dataEdgesLength: Array.isArray((result as any)?.data?.edges) ? (result as any).data.edges.length : 'N/A',
+        // 完整的数据结构（限制长度）
+        fullDataString: (result as any)?.data ? JSON.stringify((result as any).data).substring(0, 1000) : 'N/A',
+      });
+
+      // 处理 zsa-react 的返回格式
+      // zsa-react 的 useServerAction 返回格式：result 直接是 handler 的返回值
+      // 所以 result 应该是 { data: { nodes, edges } }
+      let resultData: { data?: { nodes?: any[]; edges?: any[] } } | null = null;
+
+      if (Array.isArray(result)) {
+        // 数组格式：[data, error]
+        log('📦 [CommandBar] 检测到数组格式返回');
+        resultData = result[0] || null;
+      } else if (result && typeof result === 'object') {
+        // 对象格式：直接是返回值
+        log('📦 [CommandBar] 检测到对象格式返回');
+        resultData = result as any;
+      } else {
+        logError('❌ [CommandBar] 未知的返回格式:', {
+          result,
+          resultType: typeof result,
+        });
+        return;
+      }
+
+      // 详细记录 resultData 的结构
+      log('🔍 [CommandBar] resultData 详细结构:', {
+        hasResultData: !!resultData,
+        resultDataKeys: resultData ? Object.keys(resultData) : [],
+        hasData: !!(resultData as any)?.data,
+        dataKeys: (resultData as any)?.data ? Object.keys((resultData as any).data) : [],
+        dataNodesType: typeof (resultData as any)?.data?.nodes,
+        dataNodesIsArray: Array.isArray((resultData as any)?.data?.nodes),
+        dataNodesLength: Array.isArray((resultData as any)?.data?.nodes) ? (resultData as any).data.nodes.length : 'N/A',
+        dataNodesValue: (resultData as any)?.data?.nodes ? JSON.stringify((resultData as any).data.nodes).substring(0, 200) : 'N/A',
+        dataEdgesType: typeof (resultData as any)?.data?.edges,
+        dataEdgesIsArray: Array.isArray((resultData as any)?.data?.edges),
+        dataEdgesLength: Array.isArray((resultData as any)?.data?.edges) ? (resultData as any).data.edges.length : 'N/A',
+        // 尝试直接访问 nodes 和 edges（不在 data 下）
+        hasDirectNodes: !!(resultData as any)?.nodes,
+        directNodesType: typeof (resultData as any)?.nodes,
+        directNodesIsArray: Array.isArray((resultData as any)?.nodes),
+        hasDirectEdges: !!(resultData as any)?.edges,
+        directEdgesType: typeof (resultData as any)?.edges,
+        directEdgesIsArray: Array.isArray((resultData as any)?.edges),
+        // 完整结构预览（限制长度）
+        fullStructure: JSON.stringify(resultData).substring(0, 1000),
+      });
+
+      // 提取 nodes 和 edges
+      // 尝试多种可能的路径
+      let nodes: any[] | undefined;
+      let edges: any[] | undefined;
+
+      // 优先尝试 resultData.data.nodes 和 resultData.data.edges
+      // 同时也尝试直接从 result.data 访问（以防 zsa-react 改变了结构）
+      let data: any = null;
+      if ((resultData as any)?.data) {
+        data = (resultData as any).data;
+      } else if ((result as any)?.data) {
+        // 如果 resultData.data 不存在，直接使用 result.data
+        data = (result as any).data;
+        log('⚠️ [CommandBar] resultData.data 不存在，使用 result.data');
+      }
+      
+      if (data) {
+        const dataKeys = Object.keys(data);
+        log('🔍 [CommandBar] 检查 data 对象:', {
+          dataType: typeof data,
+          dataKeys: dataKeys,
+          dataKeysCount: dataKeys.length,
+          // 显示第一个键的详细信息（因为只有一个键）
+          firstKey: dataKeys[0],
+          firstKeyValue: dataKeys[0] ? data[dataKeys[0]] : 'N/A',
+          firstKeyValueType: dataKeys[0] ? typeof data[dataKeys[0]] : 'N/A',
+          firstKeyValueIsArray: dataKeys[0] ? Array.isArray(data[dataKeys[0]]) : false,
+          firstKeyValueKeys: dataKeys[0] && typeof data[dataKeys[0]] === 'object' && data[dataKeys[0]] !== null 
+            ? Object.keys(data[dataKeys[0]]) 
+            : 'N/A',
+          // 检查第一个键的值中是否包含 nodes 和 edges
+          firstKeyHasNodes: dataKeys[0] && typeof data[dataKeys[0]] === 'object' && data[dataKeys[0]] !== null
+            ? 'nodes' in data[dataKeys[0]]
+            : false,
+          firstKeyHasEdges: dataKeys[0] && typeof data[dataKeys[0]] === 'object' && data[dataKeys[0]] !== null
+            ? 'edges' in data[dataKeys[0]]
+            : false,
+          hasNodes: 'nodes' in data,
+          hasEdges: 'edges' in data,
+          nodesValue: data.nodes,
+          nodesType: typeof data.nodes,
+          nodesIsArray: Array.isArray(data.nodes),
+          edgesValue: data.edges,
+          edgesType: typeof data.edges,
+          edgesIsArray: Array.isArray(data.edges),
+          // 完整 data 对象的结构（限制长度）
+          fullDataString: JSON.stringify(data).substring(0, 1000),
+        });
+        
+        // 如果 data 中只有一个键，且这个键的值是对象，尝试从这个对象中提取 nodes 和 edges
+        if (dataKeys.length === 1 && typeof data[dataKeys[0]] === 'object' && data[dataKeys[0]] !== null) {
+          const firstKeyValue = data[dataKeys[0]];
+          log('🔍 [CommandBar] 检测到 data 只有一个键，尝试从该键的值中提取 nodes 和 edges:', {
+            key: dataKeys[0],
+            valueType: typeof firstKeyValue,
+            valueKeys: Object.keys(firstKeyValue),
+            hasNodes: 'nodes' in firstKeyValue,
+            hasEdges: 'edges' in firstKeyValue,
+            nodesValue: firstKeyValue.nodes,
+            nodesIsArray: Array.isArray(firstKeyValue.nodes),
+            edgesValue: firstKeyValue.edges,
+            edgesIsArray: Array.isArray(firstKeyValue.edges),
+          });
+          
+          // 如果这个对象中有 nodes 和 edges，使用它们
+          if (Array.isArray(firstKeyValue.nodes) && !nodes) {
+            nodes = firstKeyValue.nodes;
+            log('✅ [CommandBar] 从 data 的第一个键的值中提取到节点:', { count: nodes?.length || 0 });
+          }
+          if (Array.isArray(firstKeyValue.edges) && !edges) {
+            edges = firstKeyValue.edges;
+            log('✅ [CommandBar] 从 data 的第一个键的值中提取到边:', { count: edges?.length || 0 });
+          }
+        }
+        
+        if (!nodes && Array.isArray(data.nodes)) {
+          nodes = data.nodes;
+          log('✅ [CommandBar] 从 resultData.data.nodes 提取到节点:', { count: nodes?.length || 0 });
+        } else if (!nodes) {
+          const nodesStringified = data.nodes !== undefined ? JSON.stringify(data.nodes).substring(0, 200) : 'undefined';
+          logWarn('⚠️ [CommandBar] resultData.data.nodes 不是数组:', {
+            type: typeof data.nodes,
+            value: data.nodes,
+            isUndefined: data.nodes === undefined,
+            isNull: data.nodes === null,
+            stringified: nodesStringified,
+          });
+        }
+        
+        if (!edges && Array.isArray(data.edges)) {
+          edges = data.edges;
+          log('✅ [CommandBar] 从 resultData.data.edges 提取到边:', { count: edges?.length || 0 });
+        } else if (!edges) {
+          const edgesStringified = data.edges !== undefined ? JSON.stringify(data.edges).substring(0, 200) : 'undefined';
+          logWarn('⚠️ [CommandBar] resultData.data.edges 不是数组:', {
+            type: typeof data.edges,
+            value: data.edges,
+            isUndefined: data.edges === undefined,
+            isNull: data.edges === null,
+            stringified: edgesStringified,
+          });
+        }
+      } else {
+        logWarn('⚠️ [CommandBar] resultData.data 和 result.data 都不存在:', {
+          hasResultData: !!resultData,
+          resultDataKeys: resultData ? Object.keys(resultData) : [],
+          hasResult: !!(result as any),
+          resultKeys: (result as any) && typeof (result as any) === 'object' ? Object.keys(result as any) : [],
+          // 尝试直接访问 result 的所有可能路径
+          directNodes: (result as any)?.nodes,
+          directEdges: (result as any)?.edges,
+          directDataNodes: (result as any)?.data?.nodes,
+          directDataEdges: (result as any)?.data?.edges,
+        });
+      }
+      
+      // 如果 data 路径失败，尝试直接访问 nodes 和 edges
+      if (!nodes && (resultData as any)?.nodes) {
+        if (Array.isArray((resultData as any).nodes)) {
+          nodes = (resultData as any).nodes;
+          log('✅ [CommandBar] 从 resultData.nodes 提取到节点:', { count: nodes?.length || 0 });
+        }
+      }
+      
+      if (!edges && (resultData as any)?.edges) {
+        if (Array.isArray((resultData as any).edges)) {
+          edges = (resultData as any).edges;
+          log('✅ [CommandBar] 从 resultData.edges 提取到边:', { count: edges?.length || 0 });
+        }
+      }
+
+      log('📦 [CommandBar] 最终解析结果:', {
+        hasNodes: !!nodes,
+        nodesIsArray: Array.isArray(nodes),
+        nodesLength: nodes?.length,
+        nodesPreview: nodes && Array.isArray(nodes) && nodes.length > 0 ? nodes.slice(0, 2).map(n => ({ id: n.id, label: n.data?.label, type: n.type })) : 'N/A',
+        hasEdges: !!edges,
+        edgesIsArray: Array.isArray(edges),
+        edgesLength: edges?.length,
+        edgesPreview: edges && Array.isArray(edges) && edges.length > 0 ? edges.slice(0, 2).map(e => ({ id: e.id, source: e.source, target: e.target })) : 'N/A',
+      });
+
+      // 记录添加节点前的状态
+      const nodesBeforeAdd = useCanvasStore.getState().nodes.length;
+      log('📊 [CommandBar] 添加节点前的状态:', {
+        nodesCount: nodesBeforeAdd,
+        willAddNodes: nodes && Array.isArray(nodes) && nodes.length > 0,
+        willAddEdges: edges && Array.isArray(edges),
+      });
+
+      // 确保 nodes 是有效数组
+      if (nodes && Array.isArray(nodes) && nodes.length > 0) {
+        try {
+          addNodes(nodes);
+          // 验证节点是否成功添加
+          const nodesAfterAdd = useCanvasStore.getState().nodes.length;
+          log('✅ [CommandBar] 成功添加节点:', { 
+            count: nodes.length,
+            nodesBefore: nodesBeforeAdd,
+            nodesAfter: nodesAfterAdd,
+            expectedTotal: nodesBeforeAdd + nodes.length,
+            actualTotal: nodesAfterAdd,
+            success: nodesAfterAdd === nodesBeforeAdd + nodes.length,
+          });
+          
+          // 如果节点没有成功添加，记录警告
+          if (nodesAfterAdd !== nodesBeforeAdd + nodes.length) {
+            logError('❌ [CommandBar] 节点添加失败！节点数量不匹配:', {
+              expected: nodesBeforeAdd + nodes.length,
+              actual: nodesAfterAdd,
+              nodesToAdd: nodes.map(n => ({ id: n.id, label: n.data?.label })),
+            });
+          }
+        } catch (error) {
+          logError('❌ [CommandBar] 添加节点时发生错误:', error);
+        }
+      } else {
+        logWarn('⚠️ [CommandBar] generateGraph 返回的 nodes 无效:', {
+          nodes,
+          isArray: Array.isArray(nodes),
+          length: nodes?.length,
+        });
+      }
+
+      // 确保 edges 是有效数组
+      if (edges && Array.isArray(edges)) {
+        try {
+          addEdges(edges);
+          log('✅ [CommandBar] 成功添加边:', { count: edges.length });
+        } catch (error) {
+          logError('❌ [CommandBar] 添加边时发生错误:', error);
+        }
+      } else {
+        logWarn('⚠️ [CommandBar] generateGraph 返回的 edges 无效:', {
+          edges,
+          isArray: Array.isArray(edges),
+        });
+      }
+
         // 添加节点后自动应用布局，避免节点重叠
+      if (nodes && Array.isArray(nodes) && nodes.length > 0) {
         setTimeout(() => {
           layoutNodes();
+          // 再次验证节点是否还在
+          const nodesAfterLayout = useCanvasStore.getState().nodes.length;
+          log('📊 [CommandBar] 布局后的节点数量:', {
+            nodesCount: nodesAfterLayout,
+            expected: nodesBeforeAdd + nodes.length,
+          });
         }, 100); // 延迟执行，确保节点已添加到状态中
       }
-      // 重置状态
-      setPrompt('');
-      setAttachment(null);
-      setIsProcessingVideo(false);
-      setIsTimeoutOverride(false); // 重置超时覆盖标志
-      clearLoadingTimers();
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      // 重置 textarea 高度
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
+      
+      // 重置状态（在节点成功添加后）
+      // 注意：只有在节点成功添加后才重置状态
+      const finalNodesCount = useCanvasStore.getState().nodes.length;
+      if (finalNodesCount > nodesBeforeAdd) {
+        log('🔄 [CommandBar] 节点已成功添加，重置状态');
+        
+        // 检查是否有图片附件，如果没有，为每个节点生成UI代码
+        const hasImage = attachment?.type === 'media' && 
+                        (attachment?.mimeType?.startsWith('image/') || 
+                         (attachment?.preview && attachment.mimeType !== 'application/pdf'));
+        
+        if (!hasImage && nodes && Array.isArray(nodes) && nodes.length > 0) {
+          log('🎨 [CommandBar] 没有图片附件，开始为每个节点生成UI代码');
+          setLoadingStep('🎨 正在为节点生成UI代码...');
+          setProgress(20);
+          
+          // 保存原始 prompt，用于生成UI
+          const originalPrompt = prompt;
+          
+          // 为每个节点异步生成UI代码（使用立即执行的异步函数）
+          (async () => {
+            try {
+              const generateUIPromises = nodes.map(async (node, index) => {
+                try {
+                  log(`🎨 [CommandBar] 开始为节点 ${index + 1}/${nodes.length} 生成UI: ${node.data?.label}`);
+                  setLoadingStep(`🎨 正在为"${node.data?.label}"生成UI代码... (${index + 1}/${nodes.length})`);
+                  setProgress(20 + (index + 1) * 60 / nodes.length);
+                  
+                  // 构建节点特定的提示词
+                  const nodePrompt = originalPrompt 
+                    ? `${originalPrompt}\n\n请为"${node.data?.label}"页面生成完整的UI代码。`
+                    : `请为"${node.data?.label}"页面生成完整的React组件代码，包含现代化的UI设计和完整的交互功能。`;
+                  
+                  const uiResult = await executeUIText({
+                    prompt: nodePrompt,
+                    nodeLabel: node.data?.label || node.id,
+                    projectMeta: useCanvasStore.getState().projectMeta,
+                    themeConfig: currentTheme,
+                    aiConfig: aiConfig,
+                  });
+                  
+                  // 处理返回结果
+                  let uiCode = '';
+                  if (Array.isArray(uiResult)) {
+                    uiCode = uiResult[0]?.code || uiResult[0] || '';
+                  } else if (uiResult && typeof uiResult === 'object') {
+                    uiCode = (uiResult as any).code || '';
+                  }
+                  
+                  if (uiCode && uiCode.length > 50) {
+                    // 更新节点的 view.code
+                    updateNodeData(node.id, {
+                      artifacts: {
+                        view: {
+                          code: uiCode,
+                        },
+                      },
+                    });
+                    log(`✅ [CommandBar] 节点 ${index + 1}/${nodes.length} UI代码生成成功: ${node.data?.label}`);
+                  } else {
+                    logWarn(`⚠️ [CommandBar] 节点 ${index + 1}/${nodes.length} UI代码生成失败或为空: ${node.data?.label}`);
+                  }
+                } catch (error) {
+                  logError(`❌ [CommandBar] 节点 ${index + 1}/${nodes.length} UI代码生成失败: ${node.data?.label}`, error);
+                }
+              });
+              
+              // 等待所有UI生成完成
+              await Promise.all(generateUIPromises);
+              log('✅ [CommandBar] 所有节点的UI代码生成完成');
+              setLoadingStep('✅ UI代码生成完成');
+              setProgress(100);
+              toast.success('节点和UI代码生成完成', {
+                description: `已生成 ${nodes.length} 个节点及其UI代码`,
+                duration: 3000,
+              });
+            } catch (error) {
+              logError('❌ [CommandBar] 部分节点的UI代码生成失败:', error);
+              toast.warning('部分UI代码生成失败', {
+                description: '部分节点的UI代码可能未生成，请手动生成',
+                duration: 5000,
+              });
+            } finally {
+              setIsProcessingVideo(false);
+              clearLoadingTimers();
+            }
+          })();
+        }
+        
+        setPrompt('');
+        setAttachment(null);
+        setIsProcessingVideo(false);
+        setIsTimeoutOverride(false); // 重置超时覆盖标志
+        clearLoadingTimers();
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        // 重置 textarea 高度
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+        }
+      } else {
+        logError('❌ [CommandBar] 节点添加失败，不重置状态，保留用户输入以便重试');
+        // 不清空 prompt 和 attachment，让用户可以重试
+        setIsProcessingVideo(false);
+        setIsTimeoutOverride(false);
+        clearLoadingTimers();
       }
     },
     onError: (error) => {
@@ -157,6 +525,7 @@ export function CommandBar() {
     },
   });
   const { execute: executeAnalysis, isPending: isGeneratingPRD } = useServerAction(generateAnalysisFromCode);
+  const { execute: executeUIText, isPending: isGeneratingUIText } = useServerAction(generateUIFromText);
 
   // 编辑模式的 action（必须在所有使用它的函数之前定义）
   const { execute: executeUpdate, isPending: isUpdating } = useServerAction(updateNodeArtifacts, {
@@ -277,7 +646,7 @@ export function CommandBar() {
       e.preventDefault();
       e.stopPropagation();
       const hasContent = Boolean(prompt.trim() || attachment);
-      const isLoading = isCreating || isUpdating || isProcessingVideo;
+      const isLoading = isCreating || isUpdating || isProcessingVideo || isGeneratingUIText;
       if (hasContent && !isLoading) {
         // 触发表单提交
         const form = e.currentTarget.closest('form');
@@ -299,7 +668,9 @@ export function CommandBar() {
 
   // 清理加载定时器
   const clearLoadingTimers = () => {
+    if (loadingTimersRef.current && Array.isArray(loadingTimersRef.current)) {
     loadingTimersRef.current.forEach(timer => clearTimeout(timer));
+    }
     loadingTimersRef.current = [];
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -332,6 +703,11 @@ export function CommandBar() {
   const startLoadingSteps = () => {
     clearLoadingTimers();
     setProgress(0);
+    
+    // 确保 loadingTimersRef.current 是数组（防止 undefined 错误）
+    if (!Array.isArray(loadingTimersRef.current)) {
+      loadingTimersRef.current = [];
+    }
     
     // 设置超时：300秒后自动重置（防止卡死）
     timeoutRef.current = setTimeout(() => {
@@ -493,85 +869,58 @@ export function CommandBar() {
     }
   };
 
-  // 图片压缩函数：在保持质量的同时减少文件大小
-  const compressImage = async (file: File, maxWidth: number = 1920, maxHeight: number = 1920, quality: number = 0.85): Promise<string> => {
+  /**
+   * 无损转 Base64
+   * 适用于：UI 截图、线框图、架构图
+   * 使用 FileReader 直接读取文件的原始二进制流，不经过任何压缩算法
+   */
+  const convertFileToLosslessBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
+      // 1. 强制检查：如果是 UI 图，尽量只允许 PNG
+      // JPEG 即使是 100% 质量，对于红/蓝色的锐利边缘也有损失
+      if (file.type.startsWith('image/') && !file.type.includes('png') && !file.type.includes('gif') && !file.type.includes('webp')) {
+        logWarn('⚠️ [CommandBar] 检测到非PNG图片格式，建议使用PNG格式以获得最佳UI还原效果:', {
+          fileName: file.name,
+          fileType: file.type,
+        });
+      }
+      
       const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          // 计算新尺寸（保持宽高比）
-          let width = img.width;
-          let height = img.height;
-          
-          if (width > maxWidth || height > maxHeight) {
-            const ratio = Math.min(maxWidth / width, maxHeight / height);
-            width = width * ratio;
-            height = height * ratio;
-          }
-          
-          // 创建 canvas 进行压缩
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          
-          if (!ctx) {
-            reject(new Error('无法创建画布上下文'));
-            return;
-          }
-          
-          // 使用高质量缩放
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(img, 0, 0, width, height);
-          
-          // 转换为 base64（JPEG 格式，质量可调）
-          const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
-          resolve(compressedBase64);
-        };
-        img.onerror = () => reject(new Error('图片加载失败'));
-        img.src = e.target?.result as string;
+      
+      reader.onload = () => {
+        const result = reader.result as string;
+        // 这里的 result 就是原汁原味的 Base64，不丢任何 1px 细节
+        resolve(result);
       };
-      reader.onerror = () => reject(new Error('文件读取失败'));
+      
+      reader.onerror = (error) => reject(error);
+      
+      // 直接读取，不做任何 canvas 处理
       reader.readAsDataURL(file);
     });
   };
 
   const processBinaryFile = async (file: File, fileCategory: 'image' | 'video' | 'pdf') => {
-    // 对于图片，先进行压缩
+    // 对于图片，使用无损读取（不压缩，保持原始质量）
     if (fileCategory === 'image') {
       try {
-        // 压缩图片：最大尺寸 1920x1920，质量 85%（在速度和文件大小间平衡）
-        const compressedBase64 = await compressImage(file, 1920, 1920, 0.85);
+        // 无损读取：直接使用 FileReader，不经过任何 canvas 压缩
+        const losslessBase64 = await convertFileToLosslessBase64(file);
         setAttachment({
           name: file.name,
           type: 'media',
-          content: compressedBase64,
-          preview: compressedBase64,
+          content: losslessBase64,
+          preview: losslessBase64,
           mimeType: file.type,
         });
         setIsProcessingVideo(false);
       } catch (error) {
-        logError('图片压缩失败，使用原图:', error);
-        // 压缩失败时回退到原始方式
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const base64String = event.target?.result as string;
-          setAttachment({
-            name: file.name,
-            type: 'media',
-            content: base64String,
-            preview: base64String,
-            mimeType: file.type,
+        logError('图片读取失败:', error);
+        toast.error('读取图片失败', {
+          description: '请重试',
+          duration: 3000,
           });
           setIsProcessingVideo(false);
-        };
-        reader.onerror = () => {
-          alert('读取图片失败，请重试');
-          setIsProcessingVideo(false);
-        };
-        reader.readAsDataURL(file);
       }
       return;
     }
@@ -640,38 +989,23 @@ export function CommandBar() {
           return;
         }
 
-        // 对于粘贴的图片，也进行压缩处理
+        // 对于粘贴的图片，使用无损读取（不压缩，保持原始质量）
         const file = new File([blob], `粘贴的图片_${Date.now()}.png`, { type: blob.type || 'image/png' });
         try {
-          const compressedBase64 = await compressImage(file, 1920, 1920, 0.85);
+          const losslessBase64 = await convertFileToLosslessBase64(file);
           setAttachment({
             name: `粘贴的图片_${Date.now()}.png`,
             type: 'media',
-            content: compressedBase64,
-            preview: compressedBase64,
+            content: losslessBase64,
+            preview: losslessBase64,
             mimeType: blob.type || 'image/png',
           });
         } catch (error) {
-          logError('粘贴图片压缩失败，使用原图:', error);
-          // 压缩失败时回退到原始方式
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            const base64String = event.target?.result as string;
-            setAttachment({
-              name: `粘贴的图片_${Date.now()}.png`,
-              type: 'media',
-              content: base64String,
-              preview: base64String,
-              mimeType: blob.type || 'image/png',
-            });
-          };
-          reader.onerror = () => {
+          logError('粘贴图片读取失败:', error);
             toast.error('读取图片失败', {
               description: '请重试',
               duration: 3000,
             });
-          };
-          reader.readAsDataURL(blob);
         }
         
         // 只处理第一个图片
@@ -684,7 +1018,7 @@ export function CommandBar() {
     e.preventDefault();
     e.stopPropagation();
     
-    const isLoading = isCreating || isUpdating || isProcessingVideo;
+    const isLoading = isCreating || isUpdating || isProcessingVideo || isGeneratingUIText;
     if (isLoading) {
       toast.info('正在处理中，请稍候...');
       return;
@@ -724,8 +1058,8 @@ export function CommandBar() {
         willUseModelRelay: isImage && !!attachment?.content,
       });
 
-      if (isImage && attachment.content) {
-        // ========== Model Relay 流程：UI 优先，然后自动生成 PRD ==========
+      if (isImage && attachment?.content) {
+        // ========== Model Relay 流程：UI 优先，PRD 由用户手动生成 ==========
         log('🚀 [CommandBar] 开始处理图片生成UI请求');
         log('📋 [CommandBar] 请求参数:', {
           prompt: prompt,
@@ -753,65 +1087,31 @@ export function CommandBar() {
           accumulatedCode = '';
           fullCode = '';
 
-          // 优化后的提示词：结合Structure-First Protocol和精确复刻
-          const optimizedPrompt = prompt.trim() || `请精确复刻这张UI截图，生成完全可交互的React+Tailwind组件。
+          // 新版本提示词：结构化提示词
+          const optimizedPrompt = prompt.trim() || `Analyze the uploaded image and generate production-ready React + Tailwind CSS code.
 
-**核心要求：精确还原，不要过度修正**
+**Step 1: Classify the Image**
+- Is this a high-fidelity design mockup? -> Use "Pixel-Perfect Clone" strategy.
+- Is this a wireframe/sketch? -> Use "Professional Interpretation" strategy.
 
-**重要：忽略系统UI元素**
-- **完全忽略**手机系统自带的状态栏（时间显示如"9:41"、信号图标、Wi-Fi图标、电池图标等），这些是操作系统提供的UI，不需要在React组件中实现
-- **只关注应用内容**：从应用自己的导航栏、搜索栏等应用UI元素开始还原
+**Step 2: Apply Universal Rules**
+- Every text element MUST have an explicit \`text-*\` color class (e.g., \`text-gray-900\`, \`text-slate-600\`).
+- Headings: Use dark colors (\`text-gray-900\` / \`text-slate-800\`).
+- Body text: Use medium-dark colors (\`text-gray-600\` / \`text-slate-500\`).
+- NEVER use light gray text (\`text-gray-300\` or lighter) on white backgrounds.
+- Look for indicator bars (colored side strips) and implement them with \`absolute\` positioning.
 
-**分析流程（Structure-First Protocol）**：
-1. 先分析布局结构：识别容器层次（Flex/Grid）
-   - 如果看到卡片包含标题、元信息和底部标签，使用 \`flex-col\`（垂直堆叠），而不是复杂的行布局
-2. 规范化元素：
-   - 状态标签（如"进行中"、"已完成"）应使用Badge样式（\`text-xs px-2 py-0.5 rounded\`），而不是Button
-   - 侧边彩色条使用 \`border-l-4\` 或绝对定位，不要破坏布局流
-3. 提取主题色：识别主品牌色（如紫色/蓝色），使用任意值（如 \`text-[#A855F7]\`）或标准调色板一致应用
+**Step 3: Generate Code**
+- Use React Hooks (useState, useEffect) for interactivity.
+- Use Tailwind CSS for all styling (NO inline styles).
+- Import icons from \`lucide-react\`.
+- Ignore phone system status bar elements.
+- Ensure all buttons, inputs, and tabs are interactive.
 
-1. **精确还原所有应用UI元素**（忽略系统UI）：
-   - 应用导航栏（返回按钮、标题、操作按钮）- 从应用自己的导航栏开始，忽略系统状态栏
-   - 搜索栏和筛选器（包括占位符文本、图标）
-   - 分类标签栏（完整还原所有标签，精确还原激活状态的视觉样式）
-   - 列表项的所有细节：
-     * 任务类型标签
-     * 任务标题（包括特殊字符如书名号）
-     * 状态标签（已完成、进行中等）及其精确颜色 - 使用Badge样式
-     * 负责人信息和发布时间
-     * 平台/渠道列表及其状态图标（✓、时钟等）
-     * 操作按钮（如"催办"按钮）
-
-2. **视觉精确匹配**：
-   - 精确匹配所有颜色（背景色、文本色、按钮色、状态标签颜色等）
-   - 精确匹配字体大小和粗细层次
-   - 精确匹配间距和对齐方式
-   - 精确匹配圆角、阴影、边框等视觉效果
-
-3. **布局结构**：
-   - 完整还原页面的整体布局结构
-   - 精确还原每个元素的相对位置和尺寸
-   - 如果是移动端UI，使用移动端优先的布局
-
-4. **交互功能**：
-   - 所有按钮必须可点击，添加hover和active状态
-   - 搜索框必须可输入，使用useState管理搜索关键词
-   - 筛选器必须可切换，使用useState管理排序状态
-   - 分类标签必须可切换，使用useState管理当前激活标签，精确还原激活状态的视觉样式
-   - 列表项如果有展开功能，必须实现展开/收起
-
-5. **数据展示**：
-   - 使用示例数据完整还原图片中显示的所有内容
-   - 确保数据格式和展示方式与图片完全一致
-
-6. **技术要求**：
-   - 使用React Hooks（useState、useEffect）管理所有状态
-   - 使用Tailwind CSS实现所有样式，禁止内联样式
-   - 使用Lucide React图标库还原所有图标（从'lucide-react'导入）
-   - 代码必须可直接运行，包含完整的交互逻辑`;
+Generate the complete .tsx code now.`;
           
           // 确保图片数据格式正确（移除 data: URL 前缀，只保留 base64 数据）
-          let imageBase64Data = attachment.content;
+          let imageBase64Data = attachment?.content || '';
           if (imageBase64Data.includes('data:')) {
             // 如果包含 data: URL 前缀，提取 base64 部分
             const parts = imageBase64Data.split(',');
@@ -825,7 +1125,7 @@ export function CommandBar() {
             promptLength: optimizedPrompt.length,
             imageBase64Length: imageBase64Data.length,
             imageBase64Prefix: imageBase64Data.substring(0, 50),
-            hasDataPrefix: attachment.content.includes('data:'),
+            hasDataPrefix: attachment?.content?.includes('data:') || false,
             timestamp: new Date().toISOString(),
           });
 
@@ -975,12 +1275,12 @@ export function CommandBar() {
           fullCode = code;
           accumulatedCode = fullCode;
 
-          // 实时更新 UI 代码到节点（用户可以看到 UI 立即出现）
-          log('💾 [CommandBar] 保存UI代码到store:', {
+          // 立即更新 UI 代码到节点（用户可以看到 UI 立即出现）
+          log('💾 [CommandBar] 立即保存UI代码到store:', {
             nodeId: selectedNode.id,
             codeLength: accumulatedCode.length,
             codePreview: accumulatedCode.substring(0, 100),
-            hasPreviewUrl: !!attachment.preview,
+            hasPreviewUrl: !!attachment?.preview,
           });
           
           updateNodeData(selectedNode.id, {
@@ -988,7 +1288,7 @@ export function CommandBar() {
               ...selectedNode.data.artifacts,
               view: {
                 code: accumulatedCode,
-                previewUrl: attachment.preview,
+                previewUrl: attachment?.preview,
               },
             },
           });
@@ -1009,9 +1309,9 @@ export function CommandBar() {
           setLoadingStep('✅ UI 代码已生成');
           setProgress(100);
 
-          // 立即返回成功，不等待 PRD 生成
+          // UI生成成功，提示用户可以手动生成PRD
           toast.success('UI 代码已生成', {
-            description: '正在后台生成 PRD 文档...',
+            description: '您可以在节点详情面板中手动生成 PRD 文档',
             duration: 3000,
           });
 
@@ -1027,237 +1327,6 @@ export function CommandBar() {
           if (textareaRef.current) {
             textareaRef.current.style.height = 'auto';
           }
-
-          // PRD 在后台异步生成，不阻塞用户交互
-          // 重要：保存fullCode和attachment的引用，确保在异步函数中可以访问
-          const savedFullCode = fullCode;
-          const savedPreviewUrl = attachment?.preview;
-          
-          (async () => {
-            try {
-              setLoadingStep('📝 正在后台生成 PRD 文档...');
-              
-              // 从store重新获取最新节点数据，确保使用最新的artifacts
-              const currentNodeId = selectedNode?.id;
-              if (!currentNodeId) {
-                logWarn('节点ID不存在，无法生成PRD');
-                return;
-              }
-              
-              // 从store获取最新节点数据
-              const latestNode = nodes.find(n => n.id === currentNodeId);
-              if (!latestNode) {
-                logWarn('节点不存在，无法生成PRD:', currentNodeId);
-                return;
-              }
-              
-              log('📝 [CommandBar] PRD生成前检查UI代码:', {
-                nodeId: currentNodeId,
-                storeViewCodeLength: latestNode.data.artifacts?.view?.code?.length || 0,
-                storeViewCodePreview: latestNode.data.artifacts?.view?.code?.substring(0, 100) || 'N/A',
-                savedFullCodeLength: savedFullCode?.length || 0,
-                savedFullCodePreview: savedFullCode?.substring(0, 100) || 'N/A',
-                hasSavedPreviewUrl: !!savedPreviewUrl,
-                storeHasView: !!latestNode.data.artifacts?.view,
-                storeViewIsPlaceholder: latestNode.data.artifacts?.view?.code === '// PLACEHOLDER',
-                storeViewIsEmpty: !latestNode.data.artifacts?.view?.code || latestNode.data.artifacts.view.code.length === 0,
-              });
-              
-              // 获取现有的需求文档，以便在原有基础上增加新内容
-              const existingRequirements = latestNode.data?.artifacts?.spec?.requirements;
-              let existingRequirementsArray: string[] = [];
-              if (existingRequirements) {
-                if (Array.isArray(existingRequirements)) {
-                  existingRequirementsArray = existingRequirements;
-                } else if (typeof existingRequirements === 'string') {
-                  const reqStr: string = existingRequirements;
-                  existingRequirementsArray = reqStr.split('\n').filter((l: string) => l.trim());
-                }
-              }
-              
-              // 获取页面标题用于生成功能ID前缀
-              const pageTitle = latestNode.data?.artifacts?.spec?.title || latestNode.data?.label || undefined;
-              
-              // 使用savedFullCode而不是fullCode，确保在异步函数中使用正确的代码
-              const analysisResult = await executeAnalysis({
-                codeContext: savedFullCode || fullCode,
-                pageTitle: pageTitle,
-                existingRequirements: existingRequirementsArray.length > 0 ? existingRequirementsArray : undefined,
-                aiConfig: aiConfig, // 传递 AI 模型配置
-              });
-
-              // 处理 zsa-react 的返回格式（可能是数组或对象）
-              let analysisData: { markdown?: string } | null = null;
-              if (Array.isArray(analysisResult)) {
-                analysisData = analysisResult[0] || null;
-              } else if (analysisResult && typeof analysisResult === 'object') {
-                analysisData = analysisResult.data || analysisResult;
-              }
-
-              if (analysisData?.markdown) {
-                const prdMarkdown = analysisData.markdown;
-                const requirementsArray = prdMarkdown
-                  .split('\n')
-                  .filter((line: string) => line.trim() !== '');
-
-                // 更新 PRD 到节点（不影响已生成的 UI）
-                // 再次从store获取最新节点数据，确保UI代码不会丢失
-                const finalNode = nodes.find(n => n.id === currentNodeId);
-                if (finalNode) {
-                  // 确保view数据存在，优先使用store中的最新数据，如果丢失则使用保存的fullCode
-                  const currentView = finalNode.data.artifacts?.view;
-                  let viewToPreserve = currentView;
-                  
-                  // 如果store中的view代码为空或不存在，使用之前保存的fullCode
-                  if (!currentView || !currentView.code || currentView.code.length === 0 || currentView.code === '// PLACEHOLDER') {
-                    if (savedFullCode && savedFullCode.length > 0 && savedFullCode !== '// PLACEHOLDER') {
-                      viewToPreserve = { 
-                        code: savedFullCode, 
-                        previewUrl: savedPreviewUrl || currentView?.previewUrl 
-                      };
-                      log('⚠️ [CommandBar] Store中的view代码丢失，使用savedFullCode恢复:', {
-                        savedFullCodeLength: savedFullCode.length,
-                        savedFullCodePreview: savedFullCode.substring(0, 100),
-                        hasPreviewUrl: !!savedPreviewUrl,
-                      });
-                    } else {
-                      // 如果savedFullCode也没有，至少保留previewUrl
-                      viewToPreserve = currentView || { code: '', previewUrl: savedPreviewUrl };
-                      logWarn('⚠️ [CommandBar] 无法恢复UI代码，savedFullCode也为空:', {
-                        hasCurrentView: !!currentView,
-                        hasSavedFullCode: !!savedFullCode,
-                        savedFullCodeLength: savedFullCode?.length || 0,
-                      });
-                    }
-                  }
-                  
-                  log('📝 [CommandBar] 更新PRD，保留UI代码:', {
-                    nodeId: currentNodeId,
-                    hasViewCode: !!viewToPreserve?.code,
-                    viewCodeLength: viewToPreserve?.code?.length || 0,
-                    viewCodePreview: viewToPreserve?.code?.substring(0, 100) || 'N/A',
-                    hasPreviewUrl: !!viewToPreserve?.previewUrl,
-                    source: currentView?.code ? 'store' : 'fullCode',
-                  });
-                  
-                  // 只更新spec部分，明确保留view、impl、test
-                  // 重要：必须传递view，确保UI代码不会丢失
-                  
-                  // 确保view.code有效：优先使用store中的最新代码，如果丢失则使用savedFullCode
-                  let finalViewCode = viewToPreserve?.code;
-                  if (!finalViewCode || finalViewCode.length === 0 || finalViewCode === '// PLACEHOLDER') {
-                    if (savedFullCode && savedFullCode.length > 0 && savedFullCode !== '// PLACEHOLDER') {
-                      finalViewCode = savedFullCode;
-                      log('🔧 [CommandBar] viewToPreserve.code无效，使用savedFullCode');
-                    } else if (finalNode.data.artifacts?.view?.code && 
-                               finalNode.data.artifacts.view.code.length > 0 && 
-                               finalNode.data.artifacts.view.code !== '// PLACEHOLDER') {
-                      finalViewCode = finalNode.data.artifacts.view.code;
-                      log('🔧 [CommandBar] 使用finalNode中的view.code');
-                    } else {
-                      logWarn('❌ [CommandBar] 所有来源的view.code都无效');
-                    }
-                  }
-                  
-                  // 确保previewUrl存在
-                  const finalPreviewUrl = viewToPreserve?.previewUrl || 
-                                        finalNode.data.artifacts?.view?.previewUrl || 
-                                        savedPreviewUrl;
-                  
-                  // 最终验证：确保finalViewCode不为空字符串
-                  if (!finalViewCode || finalViewCode.length === 0 || finalViewCode === '// PLACEHOLDER') {
-                    // 如果所有来源都无效，至少尝试从store中获取
-                    const storeViewCode = finalNode.data.artifacts?.view?.code;
-                    if (storeViewCode && storeViewCode.length > 0 && storeViewCode !== '// PLACEHOLDER') {
-                      finalViewCode = storeViewCode;
-                      log('🔧 [CommandBar] 最终回退：使用store中的view.code');
-                    } else if (savedFullCode && savedFullCode.length > 0 && savedFullCode !== '// PLACEHOLDER') {
-                      finalViewCode = savedFullCode;
-                      log('🔧 [CommandBar] 最终回退：使用savedFullCode');
-                    } else {
-                      logWarn('❌ [CommandBar] 所有来源的view.code都无效，将保留空字符串');
-                    }
-                  }
-                  
-                  const artifactsUpdate: any = {
-                    // 必须传递view，确保UI代码不会丢失
-                    view: {
-                      code: finalViewCode || '',
-                      previewUrl: finalPreviewUrl,
-                    },
-                    // 保留其他数据
-                    impl: finalNode.data.artifacts?.impl,
-                    test: finalNode.data.artifacts?.test,
-                    // 只更新spec部分
-                    spec: {
-                      title: finalNode.data.artifacts?.spec?.title || finalNode.data.label || '未命名节点',
-                      requirements: requirementsArray,
-                    },
-                  };
-                  
-                  log('📝 [CommandBar] 最终更新artifacts:', {
-                    hasViewCode: !!artifactsUpdate.view?.code,
-                    viewCodeLength: artifactsUpdate.view?.code?.length || 0,
-                    viewCodePreview: artifactsUpdate.view?.code?.substring(0, 100) || 'N/A',
-                    hasPreviewUrl: !!artifactsUpdate.view?.previewUrl,
-                    viewCodeSource: finalViewCode === savedFullCode ? 'savedFullCode' : 
-                                   (finalViewCode === finalNode.data.artifacts?.view?.code ? 'finalNode' : 'viewToPreserve'),
-                    finalViewCodeIsValid: finalViewCode && finalViewCode.length > 0 && finalViewCode !== '// PLACEHOLDER',
-                  });
-                  
-                  // 更新前最终验证：如果view.code无效，不更新view，让store保留原有view
-                  if (!artifactsUpdate.view.code || artifactsUpdate.view.code.length === 0 || artifactsUpdate.view.code === '// PLACEHOLDER') {
-                    logWarn('❌ [CommandBar] 最终验证失败：view.code无效，将不传递view，让store保留原有view');
-                    // 不传递view，让store保留原有的view
-                    delete artifactsUpdate.view;
-                  }
-                  
-                  updateNodeData(currentNodeId, {
-                    artifacts: artifactsUpdate,
-                  });
-                  
-                  // 更新后验证：检查store中的view.code是否仍然存在
-                  setTimeout(() => {
-                    const updatedNode = nodes.find(n => n.id === currentNodeId);
-                    if (updatedNode) {
-                      log('✅ [CommandBar] 更新后验证:', {
-                        nodeId: currentNodeId,
-                        storeViewCodeLength: updatedNode.data.artifacts?.view?.code?.length || 0,
-                        storeViewCodePreview: updatedNode.data.artifacts?.view?.code?.substring(0, 100) || 'N/A',
-                        storeViewIsValid: updatedNode.data.artifacts?.view?.code && 
-                                        updatedNode.data.artifacts.view.code.length > 0 && 
-                                        updatedNode.data.artifacts.view.code !== '// PLACEHOLDER',
-                      });
-                    }
-                  }, 200);
-                } else {
-                  logWarn('节点不存在，无法更新PRD:', currentNodeId);
-                }
-
-                toast.success('PRD 文档已生成', {
-                  description: '需求文档已在后台完成',
-                  duration: 3000,
-                });
-              } else {
-                // PRD 生成失败不影响 UI，只显示警告
-                toast.warning('PRD 文档生成失败', {
-                  description: '您可以稍后手动生成 PRD',
-                  duration: 5000,
-                });
-              }
-            } catch (error) {
-              // 静默处理错误，不打扰用户
-              logWarn('PRD 后台生成失败（不影响使用）:', error);
-              toast.info('PRD 生成延迟', {
-                description: '您可以稍后手动生成 PRD',
-                duration: 3000,
-              });
-            } finally {
-              setLoadingStep('');
-            }
-          })();
-
-          return; // 立即返回，不等待 PRD
         } catch (error) {
           // 改进错误消息提取
           let errorMessage = '';
@@ -1302,11 +1371,11 @@ export function CommandBar() {
           // 检查是否至少 UI 代码已生成
           const currentCode = selectedNode?.data?.artifacts?.view?.code;
           if (currentCode && currentCode.length > 0 && currentCode !== '// PLACEHOLDER') {
-            toast.warning('UI 已生成，但 PRD 生成失败', {
+            toast.warning('UI 生成失败', {
               description: errorMessage,
               duration: 5000,
             });
-            // 即使 PRD 失败，也重置状态，让用户可以继续使用 UI
+            // 重置状态，让用户可以继续使用
             setIsTimeoutOverride(false); // 重置超时覆盖标志
             setPrompt('');
             setAttachment(null);
@@ -1324,19 +1393,206 @@ export function CommandBar() {
         }
       }
 
+      // ========== 检查用户意图：是否要求生成UI ==========
+      // 如果用户提示词中包含"生成UI"、"生成本页面"等关键词，且没有图片，则使用 generateUIFromText
+      const userPromptLower = prompt.trim().toLowerCase();
+      const isRequestingUI = userPromptLower.includes('生成ui') || 
+                            userPromptLower.includes('生成 ui') ||
+                            userPromptLower.includes('生成本页面') ||
+                            userPromptLower.includes('生成页面') ||
+                            userPromptLower.includes('生成此页面') ||
+                            userPromptLower.includes('生成这个页面') ||
+                            userPromptLower.includes('生成界面') ||
+                            userPromptLower.includes('为我生成') ||
+                            userPromptLower.includes('生成页面ui') ||
+                            userPromptLower.includes('生成页面 ui');
+      
+      // 详细记录检测结果
+      log('🔍 [CommandBar] UI生成意图检测:', {
+        userPrompt: prompt.trim(),
+        userPromptLower,
+        isRequestingUI,
+        hasImage: isImage,
+        hasAttachment: !!attachment,
+        willUseGenerateUIFromText: isRequestingUI && !isImage && !attachment,
+        matchedKeywords: [
+          userPromptLower.includes('生成ui') ? '生成ui' : null,
+          userPromptLower.includes('生成 ui') ? '生成 ui' : null,
+          userPromptLower.includes('生成本页面') ? '生成本页面' : null,
+          userPromptLower.includes('生成页面') ? '生成页面' : null,
+          userPromptLower.includes('生成此页面') ? '生成此页面' : null,
+          userPromptLower.includes('生成这个页面') ? '生成这个页面' : null,
+          userPromptLower.includes('生成界面') ? '生成界面' : null,
+          userPromptLower.includes('为我生成') ? '为我生成' : null,
+        ].filter(Boolean),
+      });
+      
+      if (isRequestingUI && !isImage && !attachment) {
+        // 用户明确要求生成UI，且没有图片，使用 generateUIFromText
+        log('🎨 [CommandBar] 检测到用户要求生成UI，使用 generateUIFromText');
+        setLoadingStep('🎨 正在生成UI代码...');
+        setProgress(10);
+        
+        // 注意：不要在这里重置状态，保持按钮禁用状态直到生成完成
+        // 状态重置将在生成成功或失败后执行
+        
+        try {
+          const uiResult = await executeUIText({
+            prompt: prompt.trim() || `请为"${selectedNode.data.label}"页面生成完整的React组件代码，包含现代化的UI设计和完整的交互功能。`,
+            nodeLabel: selectedNode.data.label || selectedNode.id,
+            projectMeta: useCanvasStore.getState().projectMeta,
+            themeConfig: currentTheme,
+            aiConfig: aiConfig,
+          });
+          
+          // 处理返回结果
+          log('📥 [CommandBar] executeUIText 原始返回:', {
+            result: uiResult,
+            resultType: typeof uiResult,
+            isArray: Array.isArray(uiResult),
+            arrayLength: Array.isArray(uiResult) ? uiResult.length : undefined,
+            keys: uiResult && typeof uiResult === 'object' ? Object.keys(uiResult) : [],
+          });
+          
+          let uiCode = '';
+          if (Array.isArray(uiResult)) {
+            uiCode = uiResult[0]?.code || uiResult[0] || '';
+            log('📦 [CommandBar] 检测到数组格式返回，提取code:', {
+              hasFirstElement: !!uiResult[0],
+              firstElementType: typeof uiResult[0],
+              firstElementKeys: uiResult[0] && typeof uiResult[0] === 'object' ? Object.keys(uiResult[0]) : [],
+              extractedCode: uiCode.substring(0, 100),
+            });
+          } else if (uiResult && typeof uiResult === 'object') {
+            uiCode = (uiResult as any).code || '';
+            log('📦 [CommandBar] 检测到对象格式返回，提取code:', {
+              hasCode: !!(uiResult as any).code,
+              codeType: typeof (uiResult as any).code,
+              codeLength: (uiResult as any).code?.length || 0,
+              extractedCode: uiCode.substring(0, 100),
+            });
+          } else {
+            logWarn('⚠️ [CommandBar] 未知的返回格式:', {
+              result: uiResult,
+              resultType: typeof uiResult,
+            });
+          }
+          
+          log('🔍 [CommandBar] 提取的UI代码:', {
+            codeLength: uiCode.length,
+            codePreview: uiCode.substring(0, 200),
+            isValid: uiCode && uiCode.length > 50,
+          });
+          
+          if (uiCode && uiCode.length > 50) {
+            // 更新节点的 view.code
+            log('💾 [CommandBar] 准备更新节点:', {
+              nodeId: selectedNode.id,
+              nodeLabel: selectedNode.data.label,
+              codeLength: uiCode.length,
+              codePreview: uiCode.substring(0, 100),
+            });
+            
+            updateNodeData(selectedNode.id, {
+              artifacts: {
+                view: {
+                  code: uiCode,
+                },
+              },
+            });
+            
+            // 验证更新是否成功
+            setTimeout(() => {
+              const updatedNode = useCanvasStore.getState().nodes.find(n => n.id === selectedNode.id);
+              if (updatedNode) {
+                const savedCode = updatedNode.data.artifacts?.view?.code || '';
+                log('✅ [CommandBar] 节点更新验证:', {
+                  nodeId: selectedNode.id,
+                  savedCodeLength: savedCode.length,
+                  savedCodePreview: savedCode.substring(0, 100),
+                  isMatch: savedCode === uiCode,
+                  codeMatches: savedCode.substring(0, 50) === uiCode.substring(0, 50),
+                });
+                
+                if (savedCode.length === 0 || savedCode === '// PLACEHOLDER') {
+                  logError('❌ [CommandBar] 节点更新失败！代码未保存:', {
+                    nodeId: selectedNode.id,
+                    savedCode,
+                  });
+                  toast.error('UI代码更新失败', {
+                    description: '代码已生成但未能保存到节点，请刷新页面重试',
+                    duration: 5000,
+                  });
+                } else {
+                  log('✅ [CommandBar] UI代码已成功保存到节点');
+                }
+              } else {
+                logError('❌ [CommandBar] 节点更新验证失败：找不到节点:', {
+                  nodeId: selectedNode.id,
+                });
+              }
+            }, 100);
+            
+            log('✅ [CommandBar] UI代码生成成功');
+            setLoadingStep('✅ UI代码生成完成');
+            setProgress(100);
+            toast.success('UI代码生成成功', {
+              description: `已为"${selectedNode.data.label}"生成UI代码`,
+              duration: 3000,
+            });
+            
+            // 生成成功后重置状态
+            setPrompt('');
+            setAttachment(null);
+            setIsProcessingVideo(false);
+            setIsTimeoutOverride(false);
+            clearLoadingTimers();
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+            if (textareaRef.current) {
+              textareaRef.current.style.height = 'auto';
+            }
+            return; // 成功生成UI，直接返回
+          } else {
+            logWarn('⚠️ [CommandBar] UI代码生成失败或为空');
+            toast.warning('UI代码生成失败', {
+              description: '生成的代码为空，请重试',
+              duration: 3000,
+            });
+            // 生成失败后重置状态，允许用户重试
+            setIsProcessingVideo(false);
+            setIsTimeoutOverride(false);
+            clearLoadingTimers();
+            // 不清空 prompt，让用户可以重试
+            return; // 生成失败，但不继续执行 updateNodeArtifacts
+          }
+        } catch (error) {
+          logError('❌ [CommandBar] UI代码生成失败:', error);
+          toast.error('UI代码生成失败', {
+            description: error instanceof Error ? error.message : '未知错误',
+            duration: 5000,
+          });
+          // 生成失败后重置状态，允许用户重试
+          setIsProcessingVideo(false);
+          setIsTimeoutOverride(false);
+          clearLoadingTimers();
+          // 不清空 prompt，让用户可以重试
+          return; // 生成失败，但不继续执行 updateNodeArtifacts
+        }
+      }
+      
       // ========== 传统流程：使用 updateNodeArtifacts ==========
-      // 注意：如果走到这里，说明图片检测失败，可能的原因：
-      // 1. attachment.mimeType 不是 'image/' 开头
-      // 2. attachment.type 不是 'media'
-      // 3. attachment.preview 不存在
-      // 4. attachment.content 不存在
-      log('⚠️ [CommandBar] 图片检测失败，使用传统流程（updateNodeArtifacts）:', {
+      // 注意：如果走到这里，说明：
+      // 1. 用户没有明确要求生成UI，或者
+      // 2. 有附件（文本文件或PDF），需要更新需求文档等其他内容
+      log('⚠️ [CommandBar] 使用传统流程（updateNodeArtifacts）:', {
         hasAttachment: !!attachment,
         attachmentType: attachment?.type,
         attachmentMimeType: attachment?.mimeType,
-        hasPreview: !!attachment?.preview,
-        hasContent: !!attachment?.content,
-        note: '如果这是图片，应该使用 Model Relay 流程生成 UI，而不是生成需求文档',
+        isRequestingUI,
+        userPrompt: prompt.trim(),
+        note: '如果没有附件且用户要求生成UI，应该使用 generateUIFromText',
       });
       
       // 编辑模式：更新节点
@@ -1492,6 +1748,7 @@ export function CommandBar() {
           attachmentContent,
           attachmentType,
           mimeType: attachment?.mimeType,
+          aiConfig: aiConfig, // 传递 AI 模型配置
         });
         log('✅ [CommandBar] executeCreate completed');
       } catch (error) {
@@ -1506,7 +1763,7 @@ export function CommandBar() {
   // 如果超时覆盖标志为 true，强制重置 loading 状态
   const isLoading = isTimeoutOverride 
     ? false 
-    : (isCreating || isUpdating || isProcessingVideo || isGeneratingUI || isGeneratingPRD);
+    : (isCreating || isUpdating || isProcessingVideo || isGeneratingUI || isGeneratingPRD || isGeneratingUIText);
   
   // 调试信息
   useEffect(() => {
@@ -1520,9 +1777,10 @@ export function CommandBar() {
       isCreating,
       isUpdating,
       isProcessingVideo,
+      isGeneratingUIText,
       buttonDisabled: !hasContent || isLoading,
     });
-  }, [prompt, attachment, hasContent, isLoading, isCreating, isUpdating, isProcessingVideo]);
+  }, [prompt, attachment, hasContent, isLoading, isCreating, isUpdating, isProcessingVideo, isGeneratingUIText]);
 
   // 处理取消选择节点
   const handleClearSelection = () => {

@@ -424,14 +424,14 @@ export function InfiniteCanvas() {
           className="fixed pointer-events-none"
           style={{ 
             position: 'fixed',
-            bottom: '1rem',
+            bottom: '2rem',
             left: '50%',
             transform: 'translateX(-50%)',
             width: 'min(95vw, 48rem)',
             maxWidth: '48rem',
-            maxHeight: 'calc(100vh - 2rem)',
+            maxHeight: 'calc(100vh - 4rem)',
             display: 'flex',
-            alignItems: 'flex-end',
+            alignItems: 'center',
             justifyContent: 'center',
             zIndex: 9998,
             isolation: 'isolate',

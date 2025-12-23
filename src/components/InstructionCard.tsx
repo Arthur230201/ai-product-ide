@@ -79,11 +79,11 @@ export function InstructionCard({
               <User className="w-3 h-3 text-gray-500" />
             </div>
           )}
-          <span className="text-xs text-gray-400">{name}</span>
-          <span className="text-xs text-gray-400">•</span>
+          <span className="text-xs text-gray-500">{name}</span>
+          <span className="text-xs text-gray-500">•</span>
           <div className="flex items-center gap-1">
-            <Calendar className="w-3 h-3 text-gray-400" />
-            <span className="text-xs text-gray-400">{date}</span>
+            <Calendar className="w-3 h-3 text-gray-500" />
+            <span className="text-xs text-gray-500">{date}</span>
           </div>
         </div>
 

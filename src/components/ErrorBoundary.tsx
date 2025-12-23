@@ -44,7 +44,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <AlertCircle className="w-6 h-6 text-red-500" />
               <h2 className="text-xl font-semibold">组件错误</h2>
             </div>
-            <p className="text-zinc-400 mb-4">
+            <p className="text-zinc-300 mb-4">
               {this.state.error?.message || '组件渲染时出现错误'}
             </p>
             <button

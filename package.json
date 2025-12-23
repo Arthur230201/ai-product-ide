@@ -17,6 +17,7 @@
     "ai": "^5.0.112",
     "clsx": "^2.1.1",
     "dagre": "^0.8.5",
+    "docx": "^9.5.1",
     "file-saver": "^2.0.5",
     "html-docx-js-typescript": "^0.1.5",
     "lucide-react": "^0.561.0",

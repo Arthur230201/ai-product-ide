@@ -259,6 +259,21 @@ export const useCanvasStore = create<CanvasStore>()(
 
   addNodes: (newNodes: FractalNode[]) => {
     set((state) => {
+      // 验证 newNodes 是否为有效数组
+      if (!newNodes || !Array.isArray(newNodes)) {
+        console.error('❌ [canvas-store] addNodes: newNodes is not a valid array', {
+          newNodes,
+          type: typeof newNodes,
+          isArray: Array.isArray(newNodes),
+        });
+        return state; // 如果 newNodes 无效，直接返回当前状态，不做任何修改
+      }
+      
+      // 如果数组为空，直接返回
+      if (newNodes.length === 0) {
+        return state;
+      }
+      
       // 计算新节点的位置，避免与现有节点重叠
       const existingNodes = state.nodes;
       const nodeWidth = 300; // 节点宽度
@@ -389,11 +404,10 @@ export const useCanvasStore = create<CanvasStore>()(
         // 支持深层合并 artifacts
         const updatedData = { ...node.data };
         if (data.artifacts) {
+          // 关键修复：明确地只合并需要更新的部分，确保未传入的属性不会被意外覆盖
           updatedData.artifacts = {
             ...node.data.artifacts,
-            ...data.artifacts,
-            // 深层合并 view, spec, impl, test
-            // 重要：如果传入的view.code为空或无效，保留原有的view
+            // 深层合并 view（需要特殊处理，如果传入的view.code为空或无效，保留原有的view）
             view: (() => {
               const incomingView = data.artifacts.view;
               const existingView = node.data.artifacts.view;
@@ -428,11 +442,27 @@ export const useCanvasStore = create<CanvasStore>()(
                 
                 // 如果传入的view.code有效，合并（保留existingView的其他属性，如previewUrl）
                 if (incomingCodeIsValid) {
-                  const merged = { ...existingView, ...incomingView };
+                  // 直接使用传入的code，确保不会丢失
+                  const merged = { 
+                    ...existingView, 
+                    ...incomingView,
+                    // 强制使用传入的有效code，不进行任何fallback
+                    code: incomingView.code,
+                  };
                   if (process.env.NODE_ENV === 'development') {
                     console.log('✅ [canvas-store] 使用传入的有效view.code，合并结果:', {
                       mergedCodeLength: merged.code?.length || 0,
+                      mergedCodePreview: merged.code?.substring(0, 50) || 'N/A',
                       hasPreviewUrl: !!merged.previewUrl,
+                      incomingCodeLength: incomingView.code?.length || 0,
+                      existingCodeLength: existingView?.code?.length || 0,
+                    });
+                  }
+                  // 最终验证：确保合并后的code有效
+                  if (!merged.code || merged.code.length === 0 || merged.code === '// PLACEHOLDER') {
+                    console.error('❌ [canvas-store] 合并后code仍然无效，这不应该发生！', {
+                      incomingCode: incomingView.code?.substring(0, 50),
+                      existingCode: existingView?.code?.substring(0, 50),
                     });
                   }
                   return merged;
@@ -448,7 +478,13 @@ export const useCanvasStore = create<CanvasStore>()(
                 if (process.env.NODE_ENV === 'development') {
                   console.log('⚠️ [canvas-store] 原有view也无效，使用传入的view');
                 }
-                return { ...existingView, ...incomingView };
+                // 如果传入的view.code虽然无效，但至少尝试保留previewUrl等其他属性
+                const mergedInvalid = { ...existingView, ...incomingView };
+                // 即使传入的code无效，也不要用空字符串覆盖，至少保留原有的code
+                if (existingView?.code && existingView.code.length > 0) {
+                  mergedInvalid.code = existingView.code;
+                }
+                return mergedInvalid;
               }
               // 如果没有传入view，保留原有view
               if (process.env.NODE_ENV === 'development') {
@@ -1134,19 +1170,19 @@ export const useCanvasStore = create<CanvasStore>()(
             persistedState.currentTheme = defaultTheme;
           }
         }
-        
-        return persistedState;
-      } catch (error) {
-        console.error('Migration error, using defaults:', error);
-        return {
-          nodes: [createMockNode()],
-          edges: [],
-          selectedNodeId: null,
-          isDetailPanelOpen: false,
+          
+          return persistedState;
+        } catch (error) {
+          console.error('Migration error, using defaults:', error);
+          return {
+            nodes: [createMockNode()],
+            edges: [],
+            selectedNodeId: null,
+            isDetailPanelOpen: false,
           currentTheme: defaultTheme,
-        };
-      }
-    },
-  }
+          };
+        }
+      },
+    }
   )
 );

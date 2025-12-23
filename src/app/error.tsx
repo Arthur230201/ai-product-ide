@@ -21,7 +21,7 @@ export default function Error({
           <AlertCircle className="w-6 h-6 text-red-500" />
           <h2 className="text-xl font-semibold">出现错误</h2>
         </div>
-        <p className="text-zinc-400 mb-4">
+        <p className="text-zinc-300 mb-4">
           {error.message || '应用程序遇到了意外错误'}
         </p>
         {error.digest && (

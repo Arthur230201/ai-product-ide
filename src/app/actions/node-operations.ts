@@ -321,162 +321,108 @@ ${isDarkBackground ? '- 注意：背景是深色，确保所有文本使用浅�
         toneInstruction = '采用清晰、专业、用户友好的设计风格。';
       }
 
-      // 构建动态系统提示词（基于项目画像）
+      // 构建动态系统提示词（新版本：结构化提示词）
       const systemPrompt = `# Role
-Frontend Architect (Pixel-Perfect Specialist)
+Senior Frontend Architect & UI/UX Expert.
 
 你是一个专业的 React 前端开发专家，专注于 ${projectMeta.industry} 行业。
 
 项目背景：
 - 项目名称: "${projectMeta.projectName}"
 - 目标用户: ${projectMeta.targetAudience}
-- 项目简介: ${projectMeta.description || '未指定'}
+${projectMeta.description ? `- 项目简介: ${projectMeta.description}` : ''}
 
 # Task
-Convert the uploaded UI Screenshot into a production-ready **React + Tailwind CSS** component.
+Generate production-ready **React + Tailwind CSS** code based on the uploaded image.
 
-# Process (The "Structure-First" Protocol)
-1. **Analyze Layout**: Before coding, identify the container hierarchy (Flex/Grid).
-   - *Correction*: If you see a Card with a title, meta-info, and bottom tags, treat it as a \`flex-col\` (Vertical Stack), NOT a complex row.
-2. **Normalize Elements**:
-   - **Badges vs Buttons**: If a colored box contains status text (e.g., "进行中", "已完成"), treat it as a **Badge** (\`text-xs px-2 py-0.5 rounded\`), NOT a Button.
-   - **Decorations**: If you see a colored bar on the side, use \`border-l-4\` or absolute positioning. Do NOT let it break the flow.
-3. **Theme Inference**: Extract the primary brand color (e.g., Purple/Blue) and apply it consistently using arbitrary values if needed (e.g., \`text-[#A855F7]\`) or standard palette.
+# 核心要求
 
-# 精确复刻模式 (Pixel-Perfect Recreation Mode)
-**核心原则：精确还原图片中的所有视觉细节和布局结构**
+## 1. 像素级精确复刻
+- **精确还原**图片中的所有UI元素，包括：
+  - 布局结构：精确匹配容器层次、排列方式（Flex/Grid）
+  - 颜色：精确匹配背景色、文本色、按钮色、状态标签颜色等
+  - 字体：精确匹配字体大小、粗细、行高
+  - 间距：精确匹配 padding、margin、gap 等间距
+  - 圆角：精确匹配 rounded 类名
+  - 图标和状态指示器：完整还原所有图标、状态图标
+- **严格按照图片还原**：不要修改、不要规范化，完全按照图片中的样子复刻
 
-## 输入理解
-将上传的图片视为**精确的设计规范**，你的目标是**像素级精确复刻**，包括：
-- 所有UI元素的精确位置和尺寸
-- 所有颜色、字体大小、间距的精确还原
-- 所有图标、状态指示器、标签的完整还原
-- 所有布局层次和视觉层次的准确还原
-
-## 必须精确还原的元素
-
-### 重要：忽略系统UI元素
-- **系统状态栏**：**完全忽略**手机系统自带的状态栏（时间显示如"9:41"、信号图标、Wi-Fi图标、电池图标等），这些是操作系统提供的UI，不需要在React组件中实现
-- **系统导航栏**：如果图片中有系统级的导航栏（如iOS的Home Indicator），也请忽略
+## 2. 忽略系统UI元素
+- **完全忽略**手机系统状态栏（时间、信号图标、Wi-Fi图标、电池图标等）
 - **只关注应用内容**：从应用自己的导航栏、搜索栏等应用UI元素开始还原
 
-### 1. 导航栏和头部区域
-- **应用导航栏**：精确还原左侧返回按钮、中间标题、右侧操作按钮的布局和样式（从应用自己的导航栏开始，忽略系统状态栏）
-- **搜索栏和筛选器**：完整还原搜索框、占位符文本、筛选按钮的位置和样式
+## 3. 文本颜色（强制要求 - 必须为所有文本元素添加颜色类名）
+⚠️ **关键要求：所有文本元素必须明确设置Tailwind的text-*颜色类名，不能省略！**
 
-### 2. 标签栏和分类
-- **标签列表**：完整还原所有分类标签（如"全部指令"、"创意落地"等）
-- **激活状态**：精确还原当前激活标签的视觉样式（下划线、颜色变化等）
-- **标签间距和布局**：使用 flex 或 grid 精确还原标签的排列方式
+**错误示例（禁止）：**
+- \`<div>标题</div>\` ❌ 缺少颜色类名
+- \`<p className="text-sm">描述</p>\` ❌ 只有字体大小，缺少颜色
+- \`<span>文本</span>\` ❌ 完全没有样式类名
 
-### 3. 列表项和卡片
-- **列表结构**：完整还原每个列表项的完整结构，包括：
-  - 任务类型标签（如"转发推送"、"创意落地"等）
-  - 任务标题（包括书名号等特殊字符）
-  - 状态标签（"已完成"、"进行中"等）及其颜色
-  - 负责人信息和发布时间
-  - 平台/渠道列表及其状态图标（✓、时钟图标等）
-  - 操作按钮（如"催办"按钮）
-- **视觉层次**：精确还原文本大小、颜色、粗细的层次关系
-- **间距和对齐**：精确还原元素之间的间距和对齐方式
+**正确示例（必须）：**
+- \`<div className="text-gray-900">标题</div>\` ✅ 明确指定颜色
+- \`<p className="text-sm text-gray-500">描述</p>\` ✅ 同时有字体大小和颜色
+- \`<span className="text-blue-600">状态</span>\` ✅ 明确指定颜色
 
-### 4. 状态指示器和图标
-- **状态标签**：完整还原所有状态标签（已完成、进行中等）及其颜色
-- **图标**：使用 Lucide React 图标库精确还原所有图标（搜索、筛选、用户、平台等）
-- **状态图标**：完整还原完成状态图标（✓）和待处理图标（时钟等）
+**颜色规则（根据背景色选择）：**
+- **浅色背景**（bg-white, bg-gray-50等）：
+  - 主要文本（标题、重要内容）：**必须使用** \`text-gray-900\` 或 \`text-black\`
+  - 次要文本（描述、元信息、日期）：**必须使用至少** \`text-gray-500\`（**严格禁止 text-gray-400 或更浅**）
+  - 状态文本（蓝色/紫色/绿色）：**必须使用至少 600 级别**（如 \`text-blue-600\`, \`text-purple-600\`, \`text-green-600\`，**严格禁止 400 或更浅**）
+- **深色背景**（bg-gray-900等）：
+  - 主要文本：**必须使用** \`text-white\` 或 \`text-gray-50\`
+  - 次要文本：**必须使用至少** \`text-gray-300\`
 
-### 5. 颜色和样式
-- **精确颜色匹配**：仔细识别图片中的颜色，使用最接近的 Tailwind 颜色类
-- **背景色**：精确还原页面背景色、卡片背景色
-- **文本颜色**：精确还原标题、正文、辅助文本的颜色层次
-- **按钮颜色**：精确还原按钮的背景色、文字颜色、边框颜色
+**检查清单：**
+- [ ] 每个文本元素（div, p, span, h1-h6, label等）都必须有text-*颜色类名
+- [ ] 不能依赖默认颜色，必须明确指定
+- [ ] 如果图片中文本颜色较浅但可读，保持原色；如果不可读，调整为上述规则中的颜色
 
-## 布局结构精确还原
-- **整体布局**：识别并精确还原页面的整体布局结构（移动端单列、桌面端多列等）
-- **容器宽度**：精确还原内容区域的宽度和边距
-- **滚动区域**：如果图片显示滚动列表，确保列表可以滚动
+## 4. 文字换行控制
+- 按钮/标签内的单行文字：使用 \`whitespace-nowrap\`
+- 标题单行显示：使用 \`truncate\` 或调整容器宽度
+- 禁止因容器宽度导致文字换行
 
-## 严格 Tailwind 使用约束
-- **禁止**：永远不要使用内联样式进行定位
-- **必须**：使用 Tailwind 的布局系统（flex, grid, gap-*, p-*, m-*）
-- **精确间距**：仔细测量图片中的间距，使用最接近的 Tailwind 间距类（p-2, p-3, p-4, gap-2, gap-3, gap-4等）
-- **响应式**：如果是移动端UI，使用移动端优先的 Tailwind 类名
+## 5. 交互功能
+- 所有按钮可点击，使用 onClick 和 useState
+- 搜索框可输入，使用 useState 管理状态
+- 标签可切换，使用 useState 管理激活状态
+- 添加 hover 和 active 状态反馈
 
-## 交互功能要求
-1. **完整还原所有UI元素**：
-   - 导航栏（返回按钮、标题、操作按钮）
-   - 搜索栏和筛选器
-   - 分类标签栏
-   - 列表项（包括所有子元素：类型标签、标题、状态、负责人、平台列表、操作按钮等）
-   - 所有图标和状态指示器
-
-2. **所有元素必须完全可交互**：
-   - **导航按钮**：返回按钮、新增按钮等必须使用onClick事件处理器
-   - **搜索框**：使用useState管理搜索关键词，实现实时搜索
-   - **筛选器**：点击可切换排序方式，使用useState管理排序状态
-   - **分类标签**：点击可切换分类，使用useState管理当前激活的标签，精确还原激活状态的视觉样式
-   - **列表项**：点击可展开详情（如果有展开功能），使用useState管理展开状态
-   - **操作按钮**：如"催办"按钮，必须使用onClick事件处理器
-   - **所有按钮**：添加hover和active状态的视觉反馈（hover:bg-opacity-80, active:scale-95等）
-
-3. **必须使用React Hooks进行状态管理**：
-   - useState：管理搜索关键词、当前分类、展开状态、排序方式等
-   - useEffect：处理数据加载、筛选逻辑等副作用
-
-4. **数据展示**：
-   - 使用示例数据完整还原图片中显示的所有内容
-   - 确保数据格式和展示方式与图片完全一致
-   - 状态标签的颜色必须与图片一致（已完成=绿色，进行中=蓝色等）
-
-5. **样式精确还原**：
-   - 使用Tailwind CSS实现所有样式，禁止内联样式
-   - 精确匹配图片中的颜色、字体大小、间距、圆角等
-   - 使用Lucide React图标库（从'lucide-react'导入）还原所有图标
-
-6. **代码要求**：
-   - 代码必须可直接运行
-   - 包含完整的交互逻辑和状态管理
-   - 如果是移动端UI，使用移动端优先的响应式设计
-   - 组件名称必须是 App（function App() 或 const App = ()）
-   - 只返回代码，不要包含任何解释文字、markdown标记或注释${designSystemEnforcement}
+## 6. 技术要求
+- 使用 React Hooks（useState, useEffect）
+- 使用 Tailwind CSS 实现所有样式，禁止内联样式
+- 使用 Lucide React 图标库（从 'lucide-react' 导入）
+- 组件名称：App（function App() 或 const App = ()）
+- 代码可直接运行，包含完整交互逻辑
+${designSystemEnforcement}
 
 # Output
-- Return **ONLY** the full \`.tsx\` code.
-- Ensure all icons are imported from \`lucide-react\`.
-- 不要包含 \`\`\`tsx 或 \`\`\`jsx 等markdown标记
-- 不要包含任何注释或说明文字`;
+- 只返回完整的 .tsx 代码
+- 不要包含 markdown 标记、注释或说明文字`;
 
-      // 构建用户提示词（结合用户输入和默认提示）
-      const defaultUserPrompt = `请精确复刻这张UI截图，生成完全可交互的React组件代码。
+      // 构建用户提示词（新版本：结构化提示词）
+      const defaultUserPrompt = `Analyze the uploaded image and generate production-ready React + Tailwind CSS code.
 
-**重要要求：**
-1. **精确还原**：必须完整还原图片中的所有UI元素，包括：
-   - 顶部导航栏（返回按钮、标题、操作按钮）
-   - 搜索栏和筛选器
-   - 分类标签栏（包括激活状态的视觉样式）
-   - 列表项的所有细节（类型标签、标题、状态标签、负责人信息、平台列表、操作按钮等）
-   - 所有图标和状态指示器
+**Step 1: Classify the Image**
+- Is this a high-fidelity design mockup? -> Use "Pixel-Perfect Clone" strategy.
+- Is this a wireframe/sketch? -> Use "Professional Interpretation" strategy.
 
-2. **视觉精确匹配**：
-   - 精确匹配所有颜色（背景色、文本色、按钮色、状态标签颜色等）
-   - 精确匹配字体大小和粗细层次
-   - 精确匹配间距和对齐方式
-   - 精确匹配圆角和阴影效果
+**Step 2: Apply Universal Rules**
+- Every text element MUST have an explicit \`text-*\` color class (e.g., \`text-gray-900\`, \`text-slate-600\`).
+- Headings: Use dark colors (\`text-gray-900\` / \`text-slate-800\`).
+- Body text: Use medium-dark colors (\`text-gray-600\` / \`text-slate-500\`).
+- NEVER use light gray text (\`text-gray-300\` or lighter) on white backgrounds.
+- Look for indicator bars (colored side strips) and implement them with \`absolute\` positioning.
 
-3. **布局结构**：
-   - 完整还原页面的整体布局结构
-   - 精确还原每个元素的相对位置和尺寸
-   - 如果是移动端UI，确保使用移动端优先的布局
+**Step 3: Generate Code**
+- Use React Hooks (useState, useEffect) for interactivity.
+- Use Tailwind CSS for all styling (NO inline styles).
+- Import icons from \`lucide-react\`.
+- Ignore phone system status bar elements.
+- Ensure all buttons, inputs, and tabs are interactive.
 
-4. **交互功能**：
-   - 所有按钮必须可点击
-   - 搜索框必须可输入
-   - 分类标签必须可切换（并精确还原激活状态的视觉样式）
-   - 列表项如果有展开功能，必须实现展开/收起
-
-5. **数据展示**：
-   - 使用示例数据完整还原图片中显示的所有内容
-   - 确保数据格式和展示方式与图片完全一致`;
+Generate the complete .tsx code now.`;
 
       const userPrompt = input.prompt.trim() || defaultUserPrompt;
       log('💬 [generateUIFromImage] 用户提示词:', {
@@ -488,7 +434,7 @@ Convert the uploaded UI Screenshot into a production-ready **React + Tailwind CS
       // 获取模型配置
       const visionModel = getVisionModel(input.aiConfig);
       log(`🤖 [generateUIFromImage] 开始调用 OpenAI API (${visionModel})...`);
-      log('⏱️ [generateUIFromImage] 超时设置: 360秒 (6分钟), 最大重试次数: 3次');
+      log('⏱️ [generateUIFromImage] 超时设置: 360秒 (6分钟), 最大重试次数: 2次');
       const apiStartTime = Date.now();
       const result = await generateText({
         model: openaiClient(visionModel), // 使用自定义客户端，支持视觉输入
@@ -511,8 +457,8 @@ Convert the uploaded UI Screenshot into a production-ready **React + Tailwind CS
             ],
           },
         ],
-        temperature: 0.3, // 较低的温度以确保代码生成的稳定性和准确性
-        maxRetries: 3, // 最多重试 3 次
+        temperature: 0.1, // 极低温度确保严格遵循指令，实现像素级精确复刻
+        maxRetries: 2, // 减少重试次数以提高响应速度
       });
       const apiDuration = Date.now() - apiStartTime;
       log(`✅ [generateUIFromImage] OpenAI API 调用完成，耗时: ${apiDuration}ms`);
@@ -609,6 +555,330 @@ const GenerateAnalysisFromCodeInputSchema = z.object({
     textModel: z.string().optional(),
   }).optional().describe('AI模型配置，如果未提供则使用环境变量或默认值'),
 });
+
+const GenerateUIFromTextInputSchema = z.object({
+  prompt: z.string().describe('页面描述，用于生成UI代码'),
+  nodeLabel: z.string().describe('节点名称'),
+  projectMeta: z.object({
+    projectName: z.string(),
+    industry: z.string(),
+    targetAudience: z.string(),
+    description: z.string(),
+    version: z.string(),
+  }).optional().describe('项目画像配置'),
+  themeConfig: z.any().optional().describe('UI主题配置'),
+  aiConfig: z.object({
+    visionModel: z.string().optional(),
+    textModel: z.string().optional(),
+  }).optional().describe('AI模型配置'),
+});
+
+export const generateUIFromText = createServerAction()
+  .input(GenerateUIFromTextInputSchema)
+  .handler(async ({ input }) => {
+    const startTime = Date.now();
+    const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    log('='.repeat(80));
+    log(`🚀 [generateUIFromText] 开始处理文本生成UI请求 [${requestId}]`);
+    log(`📋 [generateUIFromText] 输入参数 [${requestId}]:`, {
+      promptLength: input.prompt?.length || 0,
+      nodeLabel: input.nodeLabel,
+      hasPrompt: !!input.prompt,
+      timestamp: new Date().toISOString(),
+    });
+    log('='.repeat(80));
+
+    try {
+      // 检查环境变量
+      if (!process.env.OPENAI_API_KEY) {
+        logError('❌ [generateUIFromText] OPENAI_API_KEY 未配置');
+        throw new Error('OPENAI_API_KEY 未配置。请在 .env.local 文件中添加 OPENAI_API_KEY=your_api_key');
+      }
+
+      // 获取项目画像配置
+      const projectMeta = input.projectMeta || {
+        projectName: '未命名项目',
+        industry: 'General Internet',
+        targetAudience: 'General Users',
+        description: '',
+        version: '1.0.0',
+      };
+
+      // 根据行业动态调整设计风格
+      let toneInstruction = '';
+      const industry = projectMeta.industry.toLowerCase();
+      if (industry.includes('finance') || industry.includes('fintech') || industry.includes('healthcare') || industry.includes('医疗')) {
+        toneInstruction = '采用严谨、正式的设计风格，注重数据准确性和安全性。';
+      } else if (industry.includes('gaming') || industry.includes('游戏') || industry.includes('social') || industry.includes('社交')) {
+        toneInstruction = '采用生动、富有创意的设计风格，注重用户体验和视觉吸引力。';
+      } else if (industry.includes('logistics') || industry.includes('物流') || industry.includes('enterprise') || industry.includes('企业')) {
+        toneInstruction = '采用专业、高效的设计风格，注重信息清晰度和操作效率。';
+      } else {
+        toneInstruction = '采用清晰、专业、用户友好的设计风格。';
+      }
+
+      // 构建设计系统约束（如果提供了主题配置）
+      let designSystemEnforcement = '';
+      if (input.themeConfig) {
+        const theme = input.themeConfig;
+        const isDarkBackground = theme.colors?.background?.dark?.includes('slate-9') || 
+                                 theme.colors?.background?.dark?.includes('zinc-9') ||
+                                 theme.colors?.background?.dark?.includes('gray-9');
+        
+        designSystemEnforcement = `
+
+[DESIGN SYSTEM ENFORCEMENT]
+你必须严格遵循以下设计配置（优先级高于默认 Tailwind 选择）：
+- 主色调：使用 bg-${theme.colors?.primary || 'blue-500'} 和 text-${theme.colors?.primary || 'blue-500'}
+- 次要色调：使用 bg-${theme.colors?.secondary || 'purple-500'} 和 text-${theme.colors?.secondary || 'purple-500'}
+- 背景色：使用 bg-${theme.colors?.background?.dark || 'slate-900'}
+- 表面色：使用 bg-${theme.colors?.surface || 'slate-800'}
+- 主要文本：使用 text-${theme.colors?.text?.primary || 'slate-50'}
+- 次要文本：使用 text-${theme.colors?.text?.secondary || 'slate-400'}
+- 边框色：使用 border-${theme.colors?.border || 'slate-700'}
+- 圆角：所有按钮、卡片、输入框必须使用 ${theme.shape?.borderRadius?.md || 'rounded-md'}
+- 按钮阴影：使用 ${theme.shadows?.buttonShadow || 'shadow-md'}
+- 卡片阴影：使用 ${theme.shadows?.cardShadow || 'shadow-lg'}
+- 密度：${theme.typography?.density === 'compact' ? '使用紧凑间距（p-2, gap-2）' : theme.typography?.density === 'spacious' ? '使用宽松间距（p-6, gap-6）' : '使用正常间距（p-4, gap-4）'}
+${isDarkBackground ? '- 注意：背景是深色，确保所有文本使用浅色类（text-white, text-gray-200, text-slate-50等）' : ''}
+- 风格描述：${theme.vibe || 'Modern Professional'}
+
+重要：这些设计令牌必须严格应用，不要使用其他颜色或样式。`;
+      }
+
+      // 构建系统提示词
+      const systemPrompt = `# Role
+Senior Frontend Architect & UI/UX Expert
+
+你是一个专业的 React 前端开发专家，专注于 ${projectMeta.industry} 行业。
+
+项目背景：
+- 项目名称: "${projectMeta.projectName}"
+- 目标用户: ${projectMeta.targetAudience}
+${projectMeta.description ? `- 项目简介: ${projectMeta.description}` : ''}
+
+# Task
+Generate production-ready **React + Tailwind CSS** code based on the page description.
+
+# 核心要求
+
+## 1. 基于描述生成UI
+- **理解需求**：仔细分析页面描述，理解页面的核心功能和用户场景
+- **设计UI结构**：根据描述设计合理的页面布局和UI组件
+- **实现交互**：为所有可交互元素添加完整的状态管理和事件处理
+- **语言要求**：**所有文本内容必须使用中文**，包括按钮文字、标签、提示信息等（除非用户明确要求英文）
+
+## 2. 背景色和文本颜色（强制要求）
+
+⚠️ **关键要求：**
+1. **默认背景色必须是白色**：最外层容器必须使用 \`bg-white\` 或 \`bg-gray-50\`
+2. **所有文本元素必须明确设置Tailwind的text-*颜色类名，不能省略！**
+
+**背景色规则（强制要求）：**
+- **最外层容器（App组件的根div）**：**必须使用** \`bg-white\`（**禁止使用** \`bg-gray-50\`、\`bg-gray-100\` 或其他非白色背景）
+- **卡片、面板等容器**：**必须使用** \`bg-white\`（**禁止使用**深色背景如 \`bg-gray-900\`、\`bg-slate-900\`、\`bg-zinc-900\`、\`bg-blue-900\`、\`bg-purple-900\` 等）
+- **严格禁止使用深色背景**：除非用户**明确要求**深色主题，否则**所有背景必须是白色**（\`bg-white\`）
+- **错误示例（禁止）：**
+  - ❌ \`<div className="bg-gray-900">...</div>\` - 深色背景
+  - ❌ \`<div className="bg-slate-800">...</div>\` - 深色背景
+  - ❌ \`<div className="bg-blue-900">...</div>\` - 深色背景
+- **正确示例（必须）：**
+  - ✅ \`<div className="bg-white">...</div>\` - 白色背景
+
+**文本颜色规则（基于白色背景）：**
+- **主要文本（标题、重要内容）**：**必须使用** \`text-gray-900\` 或 \`text-black\`
+- **次要文本（描述、辅助信息）**：**必须使用至少** \`text-gray-600\` 或 \`text-slate-600\`（**严格禁止 text-gray-400、text-gray-300、text-gray-200、text-gray-100、text-white 或更浅**）
+- **状态文本（蓝色/紫色/绿色）**：**必须使用至少 600 级别**（如 \`text-blue-600\`、\`text-purple-600\`、\`text-green-600\`，**严格禁止 400、300、200、100 或更浅**）
+- **禁用文本**：可以使用 \`text-gray-400\` 或 \`text-gray-500\`（但仅用于禁用状态）
+- **严格禁止**在白色背景上使用以下颜色（会导致不可见或难以阅读）：
+  - ❌ \`text-white\` - 完全不可见
+  - ❌ \`text-gray-100\` - 几乎不可见
+  - ❌ \`text-gray-200\` - 几乎不可见
+  - ❌ \`text-gray-300\` - 难以阅读
+  - ❌ \`text-gray-400\` - 仅用于禁用状态，不能用于正常文本
+  - ❌ \`text-blue-400\`、\`text-purple-400\`、\`text-green-400\` 等浅色状态文本
+
+**检查清单（必须全部满足）：**
+- [ ] 最外层容器有 \`bg-white\` 或 \`bg-gray-50\`（默认白色背景）
+- [ ] 每个文本元素都有明确的 text-* 颜色类名
+- [ ] 所有正常文本颜色在白色背景上清晰可见（至少 text-gray-600 或更深）
+- [ ] **没有使用** text-white、text-gray-100、text-gray-200、text-gray-300 在白色背景上
+- [ ] **没有使用** text-gray-400 用于正常文本（仅可用于禁用状态）
+- [ ] **没有使用** text-blue-400、text-purple-400 等浅色状态文本（必须使用 600 或更深）
+
+**常见错误示例（禁止）：**
+- ❌ \`<div className="bg-white"><p className="text-white">标题</p></div>\` - 白色文字在白色背景上不可见
+- ❌ \`<div className="bg-white"><span className="text-gray-300">描述</span></div>\` - 浅灰色文字在白色背景上难以阅读
+- ❌ \`<div className="bg-white"><button className="text-blue-400">按钮</button></div>\` - 浅蓝色文字在白色背景上不够清晰
+
+**正确示例（必须）：**
+- ✅ \`<div className="bg-white"><p className="text-gray-900">标题</p></div>\` - 深色文字在白色背景上清晰可见
+- ✅ \`<div className="bg-white"><span className="text-gray-600">描述</span></div>\` - 中等深色文字在白色背景上清晰可见
+- ✅ \`<div className="bg-white"><button className="text-blue-600">按钮</button></div>\` - 深色状态文字在白色背景上清晰可见
+
+## 3. 响应式设计（移动端优先）
+
+⚠️ **关键要求：移动端布局约束**
+
+- **默认生成移动端UI**：优先考虑移动端体验，使用移动端友好的布局
+- **容器宽度**：**必须使用** \`w-full\`（不要使用 \`max-w-md\` 或其他限制宽度的类，确保内容不超出屏幕）
+- **防止内容溢出**：
+  - 最外层容器：**必须使用** \`w-full overflow-x-hidden\` 防止横向滚动
+  - 所有容器：**禁止使用**固定宽度（如 \`w-[500px]\`）或超出屏幕的宽度
+  - 文本容器：使用 \`break-words\` 或 \`truncate\` 防止文本溢出
+  - 列表和卡片：使用 \`w-full\` 确保不超出屏幕宽度
+- **间距**：使用移动端友好的间距（\`p-4\`, \`gap-4\` 等），避免过大的 padding 导致内容被挤压
+- **字体大小**：使用移动端友好的字体大小（标题 \`text-2xl\` 或 \`text-3xl\`，正文 \`text-base\` 或 \`text-sm\`）
+- **触摸目标**：按钮和交互元素至少 \`min-h-[44px]\`（移动端触摸标准）
+- **垂直布局**：优先使用垂直布局（\`flex-col\`），避免横向布局导致内容超出屏幕
+- **如果用户明确要求PC端UI**：可以使用更宽的布局（\`max-w-4xl\` 或 \`max-w-6xl\`），更大的字体和间距
+
+**检查清单：**
+- [ ] 最外层容器使用 \`w-full overflow-x-hidden\`
+- [ ] 没有使用固定宽度（如 \`w-[500px]\`）
+- [ ] 所有文本容器有 \`break-words\` 或适当的文本处理
+- [ ] 内容在移动端屏幕（375px宽度）内完整显示，不超出屏幕
+
+## 4. 代码要求
+- 使用 React Hooks（useState, useEffect, useMemo, useCallback）进行状态管理
+- 使用 Tailwind CSS 实现所有样式，禁止内联样式
+- 使用 Lucide React 图标库（从 'lucide-react' 导入）添加合适的图标
+- 所有按钮、输入框、链接等交互元素必须可交互
+- 添加 hover 和 active 状态的视觉反馈
+- 组件名称必须是 App（function App() 或 const App = ()）
+- 代码必须可直接运行，包含完整的交互逻辑
+
+## 5. 语言和内容要求
+
+⚠️ **关键要求：中文内容**
+
+- **所有文本内容必须使用中文**：
+  - 按钮文字：使用中文（如"搜索"、"保存"、"创建"等）
+  - 标签和分类：使用中文（如"技术"、"设计"、"产品"等）
+  - 提示信息：使用中文（如"暂无结果"、"加载中"等）
+  - 标题和描述：使用中文
+  - **禁止使用英文**：除非用户明确要求英文内容，否则所有文本必须是中文
+- **示例：**
+  - ❌ "Search items" → ✅ "搜索项目"
+  - ❌ "Create" → ✅ "创建"
+  - ❌ "No results found" → ✅ "暂无结果"
+  - ❌ "Save" → ✅ "保存"
+  - ❌ "Filter" → ✅ "筛选"
+
+## 6. 设计风格
+${toneInstruction}
+- 使用现代化的UI设计模式
+- 确保响应式设计（移动端优先）
+- 使用合适的间距、圆角、阴影等视觉元素
+${designSystemEnforcement}
+
+# Output
+- Return **ONLY** the full \`.tsx\` code.
+- Ensure all icons are imported from \`lucide-react\`.
+- 不要包含 \`\`\`tsx 或 \`\`\`jsx 等markdown标记
+- 不要包含任何注释或说明文字`;
+
+      // 构建用户提示词
+      const userPrompt = input.prompt.trim() || `请为"${input.nodeLabel}"页面生成完整的React组件代码。
+
+要求：
+1. 根据页面名称和描述，设计合理的UI布局
+2. 实现所有必要的交互功能
+3. 使用现代化的设计风格
+4. 确保代码可以直接运行
+5. **必须使用白色背景**（\`bg-white\`），禁止使用深色背景
+6. **所有文本内容必须使用中文**，包括按钮、标签、提示信息等
+7. **确保内容在移动端屏幕内完整显示，不超出屏幕范围**（使用 \`w-full overflow-x-hidden\`）`;
+
+      // 获取模型配置
+      const textModel = getTextModel(input.aiConfig);
+      log(`🤖 [generateUIFromText] 使用模型: ${textModel}`);
+      
+      const apiStartTime = Date.now();
+      const result = await generateText({
+        model: openaiClient(textModel),
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: userPrompt,
+          },
+        ],
+        temperature: 0.5,
+        maxRetries: 3,
+      });
+      const apiDuration = Date.now() - apiStartTime;
+      log(`✅ [generateUIFromText] OpenAI API 调用完成，耗时: ${apiDuration}ms`);
+
+      // 提取生成的代码
+      let generatedCode = result.text.trim();
+      log('📝 [generateUIFromText] 原始生成结果:', {
+        textLength: result.text.length,
+        trimmedLength: generatedCode.length,
+        preview: generatedCode.substring(0, 200),
+      });
+
+      // 清理代码：移除可能的 markdown 代码块标记
+      generatedCode = generatedCode
+        .replace(/^```(?:tsx|jsx|typescript|javascript)?\n?/gm, '')
+        .replace(/\n?```$/gm, '')
+        .trim();
+      log('🧹 [generateUIFromText] 代码清理后:', {
+        cleanedLength: generatedCode.length,
+        preview: generatedCode.substring(0, 200),
+      });
+
+      // 验证代码是否有效
+      if (!generatedCode || generatedCode.length < 50) {
+        logError('❌ [generateUIFromText] 生成的代码太短:', {
+          codeLength: generatedCode?.length || 0,
+        });
+        throw new Error('生成的代码太短或不完整，请重试');
+      }
+
+      // 确保代码包含 React 组件
+      if (!generatedCode.includes('function') && !generatedCode.includes('const') && !generatedCode.includes('=>')) {
+        logError('❌ [generateUIFromText] 生成的代码不包含有效的React组件');
+        throw new Error('生成的代码不包含有效的React组件');
+      }
+
+      const totalDuration = Date.now() - startTime;
+      log(`🎉 [generateUIFromText] UI代码生成成功！总耗时: ${totalDuration}ms`);
+      log('📊 [generateUIFromText] 最终代码统计:', {
+        codeLength: generatedCode.length,
+        hasFunction: generatedCode.includes('function'),
+        hasConst: generatedCode.includes('const'),
+        hasArrow: generatedCode.includes('=>'),
+      });
+
+      return {
+        code: generatedCode,
+      };
+    } catch (error) {
+      const errorDuration = Date.now() - startTime;
+      logError(`❌ [generateUIFromText] 发生错误！耗时: ${errorDuration}ms`);
+      logError('❌ [generateUIFromText] 错误详情:', error);
+      
+      let errorMessage = '';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (error && typeof error === 'object') {
+        errorMessage = (error as any).message || (error as any).error || (error as any).msg || JSON.stringify(error);
+      } else {
+        errorMessage = String(error);
+      }
+      
+      if (errorMessage.includes('API key') || errorMessage.includes('OPENAI')) {
+        throw new Error(`UI代码生成失败: OpenAI API 配置错误。请检查 .env.local 文件中的 OPENAI_API_KEY 是否正确配置`);
+      }
+      
+      throw new Error(`UI代码生成失败: ${errorMessage}`);
+    }
+  });
 
 export const generateAnalysisFromCode = createServerAction()
   .input(GenerateAnalysisFromCodeInputSchema)
