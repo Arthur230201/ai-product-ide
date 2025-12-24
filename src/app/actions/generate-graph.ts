@@ -8,7 +8,6 @@ import { log, logError } from '@/lib/logger';
 import { getTextModel } from '@/lib/ai-config';
 import type { FractalNode } from '@/types/fractal';
 import type { Edge } from 'reactflow';
-import { MarkerType } from 'reactflow';
 
 const GenerateGraphInputSchema = z.object({
   prompt: z.string(),
@@ -226,16 +225,16 @@ Return JSON with nodes (pages only) and edges (navigation only). Each node must 
 
       // 转换为 Edge 格式
       const edges: Edge[] = (result.object.edges || []).map((edge, index) => {
-        const edgeObj: Edge = {
+        const edgeObj = {
           id: `edge-${edge.source}-${edge.target}-${index}`,
           source: edge.source,
           target: edge.target,
           label: edge.label || '',
-          type: 'default',
+          type: 'default' as const,
           markerEnd: {
-            type: MarkerType.ArrowClosed,
+            type: 'arrowclosed' as const,
           },
-        };
+        } as Edge;
         return edgeObj;
       });
 
