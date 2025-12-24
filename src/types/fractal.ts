@@ -37,7 +37,36 @@ export const TestArtifactSchema = z.object({
 
 export type TestArtifact = z.infer<typeof TestArtifactSchema>;
 
-// Logic Artifact: 业务逻辑规则（从 Flow 提取）
+// Business Context: 业务背景信息
+export const BusinessContextSchema = z.object({
+  domain: z.string().optional().describe('业务领域（如：新闻指令业务、电商订单）'),
+  role: z.string().optional().describe('用户角色（如：发起人、审批人、记者）'),
+  goal: z.string().optional().describe('业务目标（如：发起任务、审批流程）'),
+});
+
+export type BusinessContext = z.infer<typeof BusinessContextSchema>;
+
+// Business Event: 业务事件（基于事件驱动设计）
+export const ProcessFlowStepSchema = z.object({
+  step: z.number().describe('步骤序号'),
+  action: z.string().describe('动作名称（如：权限校验、路由计算、状态变更）'),
+  desc: z.string().describe('动作描述'),
+});
+
+export type ProcessFlowStep = z.infer<typeof ProcessFlowStepSchema>;
+
+export const BusinessEventSchema = z.object({
+  id: z.string().describe('事件唯一标识符（如：EVT-001）'),
+  name: z.string().describe('事件名称（如：提交指令事件、自动保存草稿）'),
+  trigger: z.string().describe('触发条件（如：点击提交按钮、每30秒、系统定时任务）'),
+  type: z.enum(['UserAction', 'SystemTimer', 'ExternalCallback']).describe('事件类型：UserAction（用户动作）、SystemTimer（系统定时）、ExternalCallback（外部回调）'),
+  processFlow: z.array(ProcessFlowStepSchema).describe('具体的流转逻辑链（步骤序列）'),
+  outcome: z.string().describe('最终结果（如：跳转至列表页、发送通知、更新状态）'),
+});
+
+export type BusinessEvent = z.infer<typeof BusinessEventSchema>;
+
+// 保留 Logic Artifact 以兼容旧数据（可选）
 export const LogicRuleSchema = z.object({
   trigger: z.string().describe('用户触发动作（如：点击提交按钮、选择下拉选项）'),
   process: z.string().describe('后端处理逻辑（如：调用API、校验权限、计算数据）'),
@@ -54,14 +83,18 @@ export const LogicArtifactSchema = z.object({
 export type LogicArtifact = z.infer<typeof LogicArtifactSchema>;
 
 /**
- * Node Artifacts - 所有5个维度的集合（新增 logic 维度）
+ * Node Artifacts - 所有维度的集合（支持事件驱动模型）
  */
 export const NodeArtifactsSchema = z.object({
   view: ViewArtifactSchema,
   spec: SpecArtifactSchema,
   impl: ImplArtifactSchema,
   test: TestArtifactSchema,
-  logic: LogicArtifactSchema.optional().describe('业务逻辑规则（Flow Logic）'),
+  // 事件驱动模型（新）
+  businessContext: BusinessContextSchema.optional().describe('业务背景信息'),
+  events: z.array(BusinessEventSchema).optional().describe('业务事件列表（按事件保存的流程逻辑）'),
+  // 兼容旧数据（可选）
+  logic: LogicArtifactSchema.optional().describe('业务逻辑规则（Flow Logic，兼容旧格式）'),
 });
 
 export type NodeArtifacts = z.infer<typeof NodeArtifactsSchema>;

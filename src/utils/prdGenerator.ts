@@ -271,6 +271,23 @@ export interface PageNode {
   title: string;          // e.g., "订单列表页"
   uiPreview: string;      // Base64 图片
   sections: RequirementSection[]; // 动态需求章节列表
+  businessContext?: {    // 业务背景信息
+    domain?: string;
+    role?: string;
+    goal?: string;
+  };
+  events?: Array<{       // 业务事件列表（事件驱动模型）
+    id: string;
+    name: string;
+    trigger: string;
+    type: 'UserAction' | 'SystemTimer' | 'ExternalCallback';
+    processFlow: Array<{
+      step: number;
+      action: string;
+      desc: string;
+    }>;
+    outcome: string;
+  }>;
 }
 
 /**
@@ -657,6 +674,46 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                       </div>
                     `;
                   
+                  // Build ECA Table (Event-Condition-Action Table) - 事件驱动模型
+                  const eventsHtml = node.events && node.events.length > 0
+                    ? `
+                      <div class="mb-6">
+                          <h3 class="text-lg font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">${nodeNum}.${sectionIdx++} 业务事件与流转逻辑</h3>
+                          <div class="overflow-x-auto">
+                              <table class="min-w-full border-collapse border border-slate-300 bg-white shadow-sm">
+                                  <thead>
+                                      <tr class="bg-slate-100">
+                                          <th class="border border-slate-300 px-4 py-3 text-left font-semibold text-slate-800">事件名称</th>
+                                          <th class="border border-slate-300 px-4 py-3 text-left font-semibold text-slate-800">触发条件</th>
+                                          <th class="border border-slate-300 px-4 py-3 text-left font-semibold text-slate-800">业务流转过程 (Logic Chain)</th>
+                                          <th class="border border-slate-300 px-4 py-3 text-left font-semibold text-slate-800">预期结果</th>
+                                      </tr>
+                                  </thead>
+                                  <tbody>
+                                      ${node.events.map((event, eventIdx) => {
+                                        const processFlowText = event.processFlow && event.processFlow.length > 0
+                                          ? event.processFlow.map(step => `${step.step}. ${step.action}：${step.desc}`).join('<br/>')
+                                          : '（暂无流转过程）';
+                                        const eventTypeLabel = event.type === 'UserAction' ? '用户动作' : event.type === 'SystemTimer' ? '系统定时' : '外部回调';
+                                        return `
+                                          <tr class="${eventIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}">
+                                              <td class="border border-slate-300 px-4 py-3 text-slate-700 font-medium">${event.name || '未命名事件'}</td>
+                                              <td class="border border-slate-300 px-4 py-3 text-slate-600">
+                                                  <span class="inline-block px-2 py-1 text-xs rounded bg-blue-100 text-blue-800 mr-2">${eventTypeLabel}</span>
+                                                  ${event.trigger || '（未指定）'}
+                                              </td>
+                                              <td class="border border-slate-300 px-4 py-3 text-slate-600 text-sm">${processFlowText}</td>
+                                              <td class="border border-slate-300 px-4 py-3 text-slate-600">${event.outcome || '（未指定）'}</td>
+                                          </tr>
+                                        `;
+                                      }).join('')}
+                                  </tbody>
+                              </table>
+                          </div>
+                      </div>
+                    `
+                    : '';
+                  
                   return `
                 <div id="node-${nodeIdx}" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20">
                     <!-- Page Title (H2) -->
@@ -695,6 +752,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                             <div class="markdown-body text-sm bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
                                 <div class="p-6">
                                     ${sectionsHtml}
+                                    ${eventsHtml}
                                 </div>
                             </div>
                         </div>
@@ -881,6 +939,10 @@ ${globalRules.dataTracking || '（待补充）'}
       }
     }
     
+    // 提取业务背景和事件数据（事件驱动模型）
+    const businessContext = node.data?.artifacts?.businessContext;
+    const events = node.data?.artifacts?.events;
+    
     // 如果没有章节，添加一个占位章节
     if (sections.length === 0) {
       sections.push({
@@ -894,6 +956,19 @@ ${globalRules.dataTracking || '（待补充）'}
       title: spec?.title || node.data.label || '未命名页面',
       uiPreview,
       sections,
+      businessContext: businessContext ? {
+        domain: businessContext.domain,
+        role: businessContext.role,
+        goal: businessContext.goal,
+      } : undefined,
+      events: events ? events.map(event => ({
+        id: event.id,
+        name: event.name,
+        trigger: event.trigger,
+        type: event.type,
+        processFlow: event.processFlow || [],
+        outcome: event.outcome,
+      })) : undefined,
     };
   });
 

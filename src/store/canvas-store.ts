@@ -501,6 +501,16 @@ export const useCanvasStore = create<CanvasStore>()(
             test: data.artifacts.test
               ? { ...node.data.artifacts.test, ...data.artifacts.test }
               : node.data.artifacts.test,
+            // 事件驱动模型（新）
+            businessContext: data.artifacts.businessContext !== undefined
+              ? (node.data.artifacts.businessContext
+                  ? { ...node.data.artifacts.businessContext, ...data.artifacts.businessContext }
+                  : data.artifacts.businessContext)
+              : node.data.artifacts.businessContext,
+            events: data.artifacts.events !== undefined
+              ? data.artifacts.events
+              : node.data.artifacts.events,
+            // 兼容旧数据（可选）
             logic: data.artifacts.logic !== undefined
               ? (node.data.artifacts.logic 
                   ? { ...node.data.artifacts.logic, ...data.artifacts.logic }

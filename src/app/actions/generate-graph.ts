@@ -23,25 +23,36 @@ const GenerateGraphInputSchema = z.object({
   }).optional(),
 });
 
-// 定义 Logic Rule Schema（用于 AI 返回）
-const LogicRuleSchema = z.object({
-  trigger: z.string().describe('用户触发动作（如：点击提交按钮、选择下拉选项）'),
-  process: z.string().describe('后端处理逻辑（如：调用API、校验权限、计算数据）'),
-  outcome: z.string().describe('处理结果（如：跳转页面、显示Toast、更新状态）'),
+// 定义 Business Event Schema（用于 AI 返回 - 事件驱动模型）
+const ProcessFlowStepSchema = z.object({
+  step: z.number().describe('步骤序号'),
+  action: z.string().describe('动作名称（如：权限校验、路由计算、状态变更）'),
+  desc: z.string().describe('动作描述'),
 });
 
-const LogicArtifactSchema = z.object({
-  description: z.string().describe('逻辑的自然语言摘要描述'),
-  rules: z.array(LogicRuleSchema).describe('结构化逻辑规则列表'),
+const BusinessEventSchema = z.object({
+  id: z.string().describe('事件唯一标识符（如：EVT-001）'),
+  name: z.string().describe('事件名称（如：提交指令事件、自动保存草稿）'),
+  trigger: z.string().describe('触发条件（如：点击提交按钮、每30秒、系统定时任务）'),
+  type: z.enum(['UserAction', 'SystemTimer', 'ExternalCallback']).describe('事件类型：UserAction（用户动作）、SystemTimer（系统定时）、ExternalCallback（外部回调）'),
+  processFlow: z.array(ProcessFlowStepSchema).describe('具体的流转逻辑链（步骤序列）'),
+  outcome: z.string().describe('最终结果（如：跳转至列表页、发送通知、更新状态）'),
 });
 
-// 定义 AI 返回的节点结构 Schema
+const BusinessContextSchema = z.object({
+  domain: z.string().optional().describe('业务领域（如：新闻指令业务、电商订单）'),
+  role: z.string().optional().describe('用户角色（如：发起人、审批人、记者）'),
+  goal: z.string().optional().describe('业务目标（如：发起任务、审批流程）'),
+});
+
+// 定义 AI 返回的节点结构 Schema（事件驱动模型）
 const NodeSchema = z.object({
   id: z.string().describe('节点唯一标识符（简短有意义，如 "home_page", "user_profile"）'),
   label: z.string().describe('节点显示名称（中文）'),
   type: z.enum(['page']).describe('节点类型：page（页面），每个节点代表一个物理页面/屏幕'),
   description: z.string().optional().describe('页面详细描述，包含状态变化、角色权限等'),
-  logic: LogicArtifactSchema.optional().describe('该页面触发的业务逻辑规则（Flow Logic）'),
+  businessContext: BusinessContextSchema.optional().describe('业务背景信息'),
+  events: z.array(BusinessEventSchema).optional().describe('业务事件列表（按事件保存的流程逻辑）'),
 });
 
 const EdgeSchema = z.object({
@@ -81,80 +92,60 @@ export const generateGraph = createServerAction()
       const textModel = input.aiConfig?.textModel || getTextModel();
       log(`🤖 [generateGraph] 使用模型: ${textModel}`);
 
-      // 构建系统提示词 - 双流抽取机制
+      // 构建系统提示词 - 事件驱动模型（Event-Driven Model）
       const systemPrompt = `# Role
-AI Application Core Engine (Business Analyst & UI Architect).
+AI Business Architect & Event Storming Specialist.
 
 # Task
-Process the User Input (Text/Image/Doc) and generate a **Structured Product JSON**.
-You must guarantee the extraction of two distinct layers: **Visual (Page)** and **Logical (Flow)**.
+Analyze the User Input and generate a **Event-Driven Product Site Map JSON**.
 
-# 🧠 Core Strategy: Dual-Stream Extraction
+# 🧠 Core Processing Engine: "Page-Event Model"
 
-## Stream 1: Page Logic Extraction (The Container)
-**Goal**: Identify "Where" the user is operating.
+## Step 1: Physical Page Extraction (The Stage)
+Identify the physical screens (URL Routes).
+- **Rule**: If the UI changes significantly or the URL changes, it is a Page Node.
+- **Output**: \`nodes[].data.artifacts.view\`
 
-1. **Identify Screens**: Extract distinct physical screens (URL routes).
-   - Apply the "URL Test": Does this step trigger a page navigation?
-   - **YES** → Create a new Page Node
-   - **NO** → Merge into current Page Node's description
+## Step 2: Business Event Extraction (The Script)
+For each identified page, extract the **Business Processes** driven by specific **Events**.
+Do NOT write generic text descriptions. You must break logic down into "Events".
 
-2. **State & Role Variations**: 
-   - If the same URL shows different UI based on state/role, merge into ONE page node
-   - Describe variations in the \`description\` field
+**Extraction Rules:**
+1. **Identify the Event**: Look for specific triggers (e.g., "Click Submit", "Timeout 12h", "Review Rejected").
+2. **Trace the Logic Chain**: Specify what happens *after* the trigger (Service calls, Database updates, Notifications).
+3. **Preserve Business Context**: Keep specific business terms (e.g., "Dispatch to Editorial Dept", not just "Routing").
+4. **Structure Process Flow**: Break down each event into sequential steps with clear actions and descriptions.
 
-3. **Infrastructure Pages**: 
-   - Identify missing entry points (Workbench, Dashboard, List Pages)
-   - Create these as separate Page Nodes
+## Step 3: Business Context Extraction
+For each page, identify:
+- **Domain**: The business domain (e.g., "新闻指令业务", "电商订单")
+- **Role**: The user role who operates this page (e.g., "发起人", "审批人", "记者")
+- **Goal**: The business goal of this page (e.g., "发起任务", "审批流程")
 
-4. **Storage**: Save page information in node structure
-
-## Stream 2: Flow Logic Extraction (The Rules)
-**Goal**: Identify "What" happens behind the scenes.
-
-1. **Extract Triggers**: 
-   - What does the user do? (e.g., "Click Submit", "Select Dropdown", "Open Modal")
-   - Identify ALL user interactions on this page
-
-2. **Extract Services**: 
-   - What invisible backend logic is triggered? 
-   - Examples: "Routing Algorithm", "Auto-Rename", "Permission Check", "API Call", "Database Save", "Notification Send", "Auto-Confirm after 12h"
-
-3. **Associate**: 
-   - Do **NOT** create separate nodes for these services
-   - Bind them to the Page Node identified in Stream 1
-   - Each logic rule must be associated with a specific user action
-
-4. **Structure Logic Rules**:
-   - For each trigger → process → outcome chain, create a LogicRule object
-   - Format: { trigger: "User Action", process: "Backend Logic", outcome: "Result" }
-
-5. **Storage**: Save this in \`logic\` field (Structured JSON)
+## Step 4: Structural Storage
+Store these findings strictly in:
+- \`businessContext\`: Domain, role, goal
+- \`events\`: Array of business events with processFlow
 
 # 🚫 Strict Constraints
 
-1. **No Ghost Nodes**: 
-   - The \`nodes\` array must **ONLY** contain Pages (type: "page")
-   - **NO** "Service Nodes", "Action Nodes", or "Logic Nodes"
-   - All logic must be stored in the \`logic\` field of the triggering Page Node
+1. **No Logic Loss**: Every process mentioned in the input doc (e.g., "Auto-Rename", "Permission Check", "Auto-Confirm after 12h") MUST be mapped to a specific Event on a specific Page.
 
-2. **Completeness**: 
-   - If the user input mentions "Auto-Confirm after 12h", this logic **MUST** be found in the \`logic\` object of the "Confirm Page", not lost
-   - If the user mentions "Routing Algorithm", it must be in the \`logic\` of the page that triggers routing
-   - Every backend service mentioned must be captured in a LogicRule
+2. **No Service Nodes**: Do not draw services as visual nodes. They are actions inside the processFlow of an event.
 
-3. **Generalization**: 
-   - This logic applies to **ANY domain** (E-commerce, SaaS, IoT, Logistics, etc.)
-   - Do not make domain-specific assumptions unless explicitly stated
+3. **Event-Driven Structure**: 
+   - Each event must have: id, name, trigger, type, processFlow (array of steps), outcome
+   - ProcessFlow steps must be sequential and specific
+   - Event types: UserAction, SystemTimer, ExternalCallback
 
-4. **Dual-Stream Guarantee**:
-   - **Every Page Node** must have BOTH:
-     - \`description\`: Visual representation and page description
-     - \`logic\`: Flow rules (if any interactions exist)
-   - If a page has no user interactions, \`logic\` can be empty or omitted
+4. **Visual Presentation**: The JSON output must support generating an "Event-Response Table" (ECA Table) in the final documentation.
 
-# Output Format
-Return JSON with nodes (pages only) and edges (navigation only). Each node must include \`description\` and \`logic\` fields.`;
+# Output Schema (Strict JSON)
+
+Return JSON with nodes (pages only) and edges (navigation only). Each node must include:
+- \`description\`: Page description
+- \`businessContext\`: Domain, role, goal
+- \`events\`: Array of business events with detailed processFlow`;
 
       // 构建用户提示词
       const userPrompt = input.prompt.trim() || '请生成项目结构';
@@ -227,11 +218,20 @@ Return JSON with nodes (pages only) and edges (navigation only). Each node must 
                 test: {
                   cases: [],
                 },
-                // 添加 logic artifact（双流抽取的核心）
-                logic: node.logic ? {
-                  description: node.logic.description,
-                  rules: node.logic.rules || [],
+                // 事件驱动模型（新）
+                businessContext: node.businessContext ? {
+                  domain: node.businessContext.domain,
+                  role: node.businessContext.role,
+                  goal: node.businessContext.goal,
                 } : undefined,
+                events: node.events ? node.events.map(event => ({
+                  id: event.id,
+                  name: event.name,
+                  trigger: event.trigger,
+                  type: event.type,
+                  processFlow: event.processFlow || [],
+                  outcome: event.outcome,
+                })) : undefined,
               },
               syncState: {
                 isSynced: false,
