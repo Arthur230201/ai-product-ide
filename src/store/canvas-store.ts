@@ -501,7 +501,11 @@ export const useCanvasStore = create<CanvasStore>()(
             test: data.artifacts.test
               ? { ...node.data.artifacts.test, ...data.artifacts.test }
               : node.data.artifacts.test,
-            // 事件驱动模型（新）
+            // 用户故事模型（新 - 核心）
+            userStories: data.artifacts.userStories !== undefined
+              ? data.artifacts.userStories
+              : node.data.artifacts.userStories,
+            // 兼容旧数据（可选）
             businessContext: data.artifacts.businessContext !== undefined
               ? (node.data.artifacts.businessContext
                   ? { ...node.data.artifacts.businessContext, ...data.artifacts.businessContext }

@@ -271,6 +271,14 @@ export interface PageNode {
   title: string;          // e.g., "订单列表页"
   uiPreview: string;      // Base64 图片
   sections: RequirementSection[]; // 动态需求章节列表
+  userStories?: Array<{   // 用户故事列表（用户故事模型 - 核心）
+    id: string;
+    role: string;
+    activity: string;
+    value: string;
+    acceptanceCriteria: string[];
+  }>;
+  // 兼容旧数据（可选）
   businessContext?: {    // 业务背景信息
     domain?: string;
     role?: string;
@@ -674,44 +682,65 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                       </div>
                     `;
                   
-                  // Build ECA Table (Event-Condition-Action Table) - 事件驱动模型
-                  const eventsHtml = node.events && node.events.length > 0
-                    ? `
-                      <div class="mb-6">
-                          <h3 class="text-lg font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">${nodeNum}.${sectionIdx++} 业务事件与流转逻辑</h3>
-                          <div class="overflow-x-auto">
-                              <table class="min-w-full border-collapse border border-slate-300 bg-white shadow-sm">
-                                  <thead>
-                                      <tr class="bg-slate-100">
-                                          <th class="border border-slate-300 px-4 py-3 text-left font-semibold text-slate-800">事件名称</th>
-                                          <th class="border border-slate-300 px-4 py-3 text-left font-semibold text-slate-800">触发条件</th>
-                                          <th class="border border-slate-300 px-4 py-3 text-left font-semibold text-slate-800">业务流转过程 (Logic Chain)</th>
-                                          <th class="border border-slate-300 px-4 py-3 text-left font-semibold text-slate-800">预期结果</th>
-                                      </tr>
-                                  </thead>
-                                  <tbody>
-                                      ${node.events.map((event, eventIdx) => {
-                                        const processFlowText = event.processFlow && event.processFlow.length > 0
-                                          ? event.processFlow.map(step => `${step.step}. ${step.action}：${step.desc}`).join('<br/>')
-                                          : '（暂无流转过程）';
-                                        const eventTypeLabel = event.type === 'UserAction' ? '用户动作' : event.type === 'SystemTimer' ? '系统定时' : '外部回调';
-                                        return `
-                                          <tr class="${eventIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}">
-                                              <td class="border border-slate-300 px-4 py-3 text-slate-700 font-medium">${event.name || '未命名事件'}</td>
-                                              <td class="border border-slate-300 px-4 py-3 text-slate-600">
-                                                  <span class="inline-block px-2 py-1 text-xs rounded bg-blue-100 text-blue-800 mr-2">${eventTypeLabel}</span>
-                                                  ${event.trigger || '（未指定）'}
-                                              </td>
-                                              <td class="border border-slate-300 px-4 py-3 text-slate-600 text-sm">${processFlowText}</td>
-                                              <td class="border border-slate-300 px-4 py-3 text-slate-600">${event.outcome || '（未指定）'}</td>
-                                          </tr>
-                                        `;
-                                      }).join('')}
-                                  </tbody>
-                              </table>
+                  // Build User Story Cards - 用户故事模型（核心）
+                  const userStoriesHtml = node.userStories && node.userStories.length > 0
+                    ? node.userStories.map((story, storyIdx) => {
+                        const storyNum = `${nodeNum}.${sectionIdx++}`;
+                        return `
+                          <div class="mb-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-500 shadow-sm">
+                              <div class="flex items-start justify-between mb-4">
+                                  <h3 class="text-lg font-semibold text-slate-800">【用户故事卡片 ${story.id || `US-${storyIdx + 1}`}】</h3>
+                                  <span class="text-xs text-slate-500 font-mono">${storyNum}</span>
+                              </div>
+                              
+                              <div class="space-y-3">
+                                  <div class="flex items-start">
+                                      <span class="text-2xl mr-2">🧑‍💻</span>
+                                      <div>
+                                          <span class="text-sm font-medium text-slate-600">角色：</span>
+                                          <span class="text-slate-800">${story.role || '（未指定）'}</span>
+                                      </div>
+                                  </div>
+                                  
+                                  <div class="flex items-start">
+                                      <span class="text-2xl mr-2">🚩</span>
+                                      <div>
+                                          <span class="text-sm font-medium text-slate-600">目标：</span>
+                                          <span class="text-slate-800">${story.activity || '（未指定）'}</span>
+                                      </div>
+                                  </div>
+                                  
+                                  <div class="flex items-start">
+                                      <span class="text-2xl mr-2">💎</span>
+                                      <div>
+                                          <span class="text-sm font-medium text-slate-600">价值：</span>
+                                          <span class="text-slate-800">${story.value || '（未指定）'}</span>
+                                      </div>
+                                  </div>
+                                  
+                                  <div class="mt-4 pt-4 border-t border-blue-200">
+                                      <div class="flex items-start mb-2">
+                                          <span class="text-xl mr-2">✅</span>
+                                          <span class="text-sm font-semibold text-slate-700">验收标准 (逻辑细节)：</span>
+                                      </div>
+                                      <ul class="ml-6 space-y-2">
+                                          ${story.acceptanceCriteria && story.acceptanceCriteria.length > 0
+                                            ? story.acceptanceCriteria.map((ac, acIdx) => {
+                                                const isLogic = ac.includes('[逻辑]');
+                                                return `
+                                                  <li class="text-sm text-slate-700 ${isLogic ? 'font-medium text-blue-700' : ''}">
+                                                      ${ac}
+                                                  </li>
+                                                `;
+                                              }).join('')
+                                            : '<li class="text-sm text-slate-400 italic">（暂无验收标准）</li>'
+                                          }
+                                      </ul>
+                                  </div>
+                              </div>
                           </div>
-                      </div>
-                    `
+                        `;
+                      }).join('')
                     : '';
                   
                   return `
@@ -752,7 +781,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                             <div class="markdown-body text-sm bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
                                 <div class="p-6">
                                     ${sectionsHtml}
-                                    ${eventsHtml}
+                                    ${userStoriesHtml}
                                 </div>
                             </div>
                         </div>
@@ -939,7 +968,9 @@ ${globalRules.dataTracking || '（待补充）'}
       }
     }
     
-    // 提取业务背景和事件数据（事件驱动模型）
+    // 提取用户故事数据（用户故事模型 - 核心）
+    const userStories = node.data?.artifacts?.userStories;
+    // 兼容旧数据（可选）
     const businessContext = node.data?.artifacts?.businessContext;
     const events = node.data?.artifacts?.events;
     
@@ -956,6 +987,15 @@ ${globalRules.dataTracking || '（待补充）'}
       title: spec?.title || node.data.label || '未命名页面',
       uiPreview,
       sections,
+      // 用户故事模型（新 - 核心）
+      userStories: userStories ? userStories.map(story => ({
+        id: story.id,
+        role: story.role,
+        activity: story.activity,
+        value: story.value,
+        acceptanceCriteria: story.acceptanceCriteria || [],
+      })) : undefined,
+      // 兼容旧数据（可选）
       businessContext: businessContext ? {
         domain: businessContext.domain,
         role: businessContext.role,

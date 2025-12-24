@@ -37,7 +37,18 @@ export const TestArtifactSchema = z.object({
 
 export type TestArtifact = z.infer<typeof TestArtifactSchema>;
 
-// Business Context: 业务背景信息
+// User Story: 用户故事（Agile/Scrum 标准格式）
+export const UserStorySchema = z.object({
+  id: z.string().describe('用户故事唯一标识符（如：US-001）'),
+  role: z.string().describe('角色（As a...，如：新闻协调部发起人、审批人）'),
+  activity: z.string().describe('动作（I want to...，如：发起重要宣传指令并选择总编室）'),
+  value: z.string().describe('价值（So that...，如：确保指令能够进入串行审批流）'),
+  acceptanceCriteria: z.array(z.string()).describe('验收标准（Acceptance Criteria，包含具体的UI规则、逻辑规则、数据规则）'),
+});
+
+export type UserStory = z.infer<typeof UserStorySchema>;
+
+// Business Context: 业务背景信息（保留以兼容）
 export const BusinessContextSchema = z.object({
   domain: z.string().optional().describe('业务领域（如：新闻指令业务、电商订单）'),
   role: z.string().optional().describe('用户角色（如：发起人、审批人、记者）'),
@@ -83,17 +94,18 @@ export const LogicArtifactSchema = z.object({
 export type LogicArtifact = z.infer<typeof LogicArtifactSchema>;
 
 /**
- * Node Artifacts - 所有维度的集合（支持事件驱动模型）
+ * Node Artifacts - 所有维度的集合（支持用户故事模型）
  */
 export const NodeArtifactsSchema = z.object({
   view: ViewArtifactSchema,
   spec: SpecArtifactSchema,
   impl: ImplArtifactSchema,
   test: TestArtifactSchema,
-  // 事件驱动模型（新）
-  businessContext: BusinessContextSchema.optional().describe('业务背景信息'),
-  events: z.array(BusinessEventSchema).optional().describe('业务事件列表（按事件保存的流程逻辑）'),
+  // 用户故事模型（新 - 核心）
+  userStories: z.array(UserStorySchema).optional().describe('用户故事列表（按用户故事保存逻辑，Agile/Scrum 标准格式）'),
   // 兼容旧数据（可选）
+  businessContext: BusinessContextSchema.optional().describe('业务背景信息（兼容）'),
+  events: z.array(BusinessEventSchema).optional().describe('业务事件列表（兼容旧格式）'),
   logic: LogicArtifactSchema.optional().describe('业务逻辑规则（Flow Logic，兼容旧格式）'),
 });
 

@@ -23,36 +23,22 @@ const GenerateGraphInputSchema = z.object({
   }).optional(),
 });
 
-// 定义 Business Event Schema（用于 AI 返回 - 事件驱动模型）
-const ProcessFlowStepSchema = z.object({
-  step: z.number().describe('步骤序号'),
-  action: z.string().describe('动作名称（如：权限校验、路由计算、状态变更）'),
-  desc: z.string().describe('动作描述'),
+// 定义 User Story Schema（用于 AI 返回 - 用户故事模型）
+const UserStorySchema = z.object({
+  id: z.string().describe('用户故事唯一标识符（如：US-001）'),
+  role: z.string().describe('角色（As a...，如：新闻协调部发起人、审批人）'),
+  activity: z.string().describe('动作（I want to...，如：发起重要宣传指令并选择总编室）'),
+  value: z.string().describe('价值（So that...，如：确保指令能够进入串行审批流）'),
+  acceptanceCriteria: z.array(z.string()).describe('验收标准（Acceptance Criteria，包含具体的UI规则、逻辑规则、数据规则）'),
 });
 
-const BusinessEventSchema = z.object({
-  id: z.string().describe('事件唯一标识符（如：EVT-001）'),
-  name: z.string().describe('事件名称（如：提交指令事件、自动保存草稿）'),
-  trigger: z.string().describe('触发条件（如：点击提交按钮、每30秒、系统定时任务）'),
-  type: z.enum(['UserAction', 'SystemTimer', 'ExternalCallback']).describe('事件类型：UserAction（用户动作）、SystemTimer（系统定时）、ExternalCallback（外部回调）'),
-  processFlow: z.array(ProcessFlowStepSchema).describe('具体的流转逻辑链（步骤序列）'),
-  outcome: z.string().describe('最终结果（如：跳转至列表页、发送通知、更新状态）'),
-});
-
-const BusinessContextSchema = z.object({
-  domain: z.string().optional().describe('业务领域（如：新闻指令业务、电商订单）'),
-  role: z.string().optional().describe('用户角色（如：发起人、审批人、记者）'),
-  goal: z.string().optional().describe('业务目标（如：发起任务、审批流程）'),
-});
-
-// 定义 AI 返回的节点结构 Schema（事件驱动模型）
+// 定义 AI 返回的节点结构 Schema（用户故事模型）
 const NodeSchema = z.object({
   id: z.string().describe('节点唯一标识符（简短有意义，如 "home_page", "user_profile"）'),
   label: z.string().describe('节点显示名称（中文）'),
   type: z.enum(['page']).describe('节点类型：page（页面），每个节点代表一个物理页面/屏幕'),
   description: z.string().optional().describe('页面详细描述，包含状态变化、角色权限等'),
-  businessContext: BusinessContextSchema.optional().describe('业务背景信息'),
-  events: z.array(BusinessEventSchema).optional().describe('业务事件列表（按事件保存的流程逻辑）'),
+  userStories: z.array(UserStorySchema).optional().describe('用户故事列表（按用户故事保存逻辑，Agile/Scrum 标准格式）'),
 });
 
 const EdgeSchema = z.object({
@@ -218,19 +204,13 @@ Return JSON with nodes (pages only) and edges (navigation only). Each node must 
                 test: {
                   cases: [],
                 },
-                // 事件驱动模型（新）
-                businessContext: node.businessContext ? {
-                  domain: node.businessContext.domain,
-                  role: node.businessContext.role,
-                  goal: node.businessContext.goal,
-                } : undefined,
-                events: node.events ? node.events.map(event => ({
-                  id: event.id,
-                  name: event.name,
-                  trigger: event.trigger,
-                  type: event.type,
-                  processFlow: event.processFlow || [],
-                  outcome: event.outcome,
+                // 用户故事模型（新 - 核心）
+                userStories: node.userStories ? node.userStories.map(story => ({
+                  id: story.id,
+                  role: story.role,
+                  activity: story.activity,
+                  value: story.value,
+                  acceptanceCriteria: story.acceptanceCriteria || [],
                 })) : undefined,
               },
               syncState: {
