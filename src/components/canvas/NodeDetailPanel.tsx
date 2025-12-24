@@ -167,11 +167,11 @@ export function NodeDetailPanel() {
       setIsLoading(true);
       
       // 获取现有的需求文档
-      const existingRequirements = data.artifacts.spec?.requirements;
+      const existingRequirements: unknown = data.artifacts.spec?.requirements;
       let existingRequirementsArray: string[] = [];
       if (existingRequirements) {
         if (Array.isArray(existingRequirements)) {
-          existingRequirementsArray = existingRequirements;
+          existingRequirementsArray = existingRequirements.filter((item): item is string => typeof item === 'string');
         } else if (typeof existingRequirements === 'string') {
           existingRequirementsArray = existingRequirements.split('\n').filter((l: string) => l.trim());
         }

@@ -230,7 +230,7 @@ export function PrdConfigDialog({
           {/* 业务价值 */}
           <div>
             <label className="block text-sm font-medium text-zinc-300 mb-2">
-              业务价值（用户故事中的"so that"部分）
+              业务价值（用户故事中的&ldquo;so that&rdquo;部分）
             </label>
             <textarea
               value={formData.businessValue}

@@ -6,7 +6,9 @@ import { openai } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { log, logError } from '@/lib/logger';
 import { getTextModel } from '@/lib/ai-config';
-import type { FractalNode, Edge } from '@/types/fractal';
+import type { FractalNode } from '@/types/fractal';
+import type { Edge } from 'reactflow';
+import { MarkerType } from 'reactflow';
 
 const GenerateGraphInputSchema = z.object({
   prompt: z.string(),
@@ -21,12 +23,25 @@ const GenerateGraphInputSchema = z.object({
   }).optional(),
 });
 
+// 定义 Logic Rule Schema（用于 AI 返回）
+const LogicRuleSchema = z.object({
+  trigger: z.string().describe('用户触发动作（如：点击提交按钮、选择下拉选项）'),
+  process: z.string().describe('后端处理逻辑（如：调用API、校验权限、计算数据）'),
+  outcome: z.string().describe('处理结果（如：跳转页面、显示Toast、更新状态）'),
+});
+
+const LogicArtifactSchema = z.object({
+  description: z.string().describe('逻辑的自然语言摘要描述'),
+  rules: z.array(LogicRuleSchema).describe('结构化逻辑规则列表'),
+});
+
 // 定义 AI 返回的节点结构 Schema
 const NodeSchema = z.object({
   id: z.string().describe('节点唯一标识符（简短有意义，如 "home_page", "user_profile"）'),
   label: z.string().describe('节点显示名称（中文）'),
-  type: z.enum(['page', 'service']).describe('节点类型：page（页面）或 service（服务）'),
-  description: z.string().optional().describe('节点描述'),
+  type: z.enum(['page']).describe('节点类型：page（页面），每个节点代表一个物理页面/屏幕'),
+  description: z.string().optional().describe('页面详细描述，包含状态变化、角色权限等'),
+  logic: LogicArtifactSchema.optional().describe('该页面触发的业务逻辑规则（Flow Logic）'),
 });
 
 const EdgeSchema = z.object({
@@ -66,36 +81,80 @@ export const generateGraph = createServerAction()
       const textModel = input.aiConfig?.textModel || getTextModel();
       log(`🤖 [generateGraph] 使用模型: ${textModel}`);
 
-      // 构建系统提示词
-      const systemPrompt = `你是一个专业的产品架构师。你的任务是根据用户的描述，分析并生成项目结构（节点和边）。
+      // 构建系统提示词 - 双流抽取机制
+      const systemPrompt = `# Role
+AI Application Core Engine (Business Analyst & UI Architect).
 
-**任务**：
-1. 分析用户描述，识别需要创建的页面/服务节点
-2. 识别节点之间的关系（页面跳转、服务调用等）
-3. 为每个节点生成合适的 ID、名称和类型
+# Task
+Process the User Input (Text/Image/Doc) and generate a **Structured Product JSON**.
+You must guarantee the extraction of two distinct layers: **Visual (Page)** and **Logical (Flow)**.
 
-**节点类型**：
-- \`page\`: 用户界面页面（如首页、登录页、个人中心等）
-- \`service\`: 后端服务（如 API 服务、数据服务等）
+# 🧠 Core Strategy: Dual-Stream Extraction
 
-**输出要求**：
-- 节点 ID 使用英文，简短有意义（如 "home_page", "user_profile", "api_service"）
-- 节点名称使用中文，清晰描述页面/服务功能
-- 如果用户明确要求创建多个页面（如"生成三个页面"），必须生成对应数量的节点
-- 如果用户描述中包含页面间的关系（如"首页跳转到登录页"），需要生成对应的边
+## Stream 1: Page Logic Extraction (The Container)
+**Goal**: Identify "Where" the user is operating.
 
-**示例**：
-用户输入："生成三个页面：首页、登录页、个人中心"
-输出：
-- nodes: [
-    { id: "home_page", label: "首页", type: "page" },
-    { id: "login_page", label: "登录页", type: "page" },
-    { id: "profile_page", label: "个人中心", type: "page" }
-  ]
-- edges: [
-    { source: "home_page", target: "login_page", label: "跳转" },
-    { source: "login_page", target: "profile_page", label: "登录后跳转" }
-  ]`;
+1. **Identify Screens**: Extract distinct physical screens (URL routes).
+   - Apply the "URL Test": Does this step trigger a page navigation?
+   - **YES** → Create a new Page Node
+   - **NO** → Merge into current Page Node's description
+
+2. **State & Role Variations**: 
+   - If the same URL shows different UI based on state/role, merge into ONE page node
+   - Describe variations in the \`description\` field
+
+3. **Infrastructure Pages**: 
+   - Identify missing entry points (Workbench, Dashboard, List Pages)
+   - Create these as separate Page Nodes
+
+4. **Storage**: Save page information in node structure
+
+## Stream 2: Flow Logic Extraction (The Rules)
+**Goal**: Identify "What" happens behind the scenes.
+
+1. **Extract Triggers**: 
+   - What does the user do? (e.g., "Click Submit", "Select Dropdown", "Open Modal")
+   - Identify ALL user interactions on this page
+
+2. **Extract Services**: 
+   - What invisible backend logic is triggered? 
+   - Examples: "Routing Algorithm", "Auto-Rename", "Permission Check", "API Call", "Database Save", "Notification Send", "Auto-Confirm after 12h"
+
+3. **Associate**: 
+   - Do **NOT** create separate nodes for these services
+   - Bind them to the Page Node identified in Stream 1
+   - Each logic rule must be associated with a specific user action
+
+4. **Structure Logic Rules**:
+   - For each trigger → process → outcome chain, create a LogicRule object
+   - Format: { trigger: "User Action", process: "Backend Logic", outcome: "Result" }
+
+5. **Storage**: Save this in \`logic\` field (Structured JSON)
+
+# 🚫 Strict Constraints
+
+1. **No Ghost Nodes**: 
+   - The \`nodes\` array must **ONLY** contain Pages (type: "page")
+   - **NO** "Service Nodes", "Action Nodes", or "Logic Nodes"
+   - All logic must be stored in the \`logic\` field of the triggering Page Node
+
+2. **Completeness**: 
+   - If the user input mentions "Auto-Confirm after 12h", this logic **MUST** be found in the \`logic\` object of the "Confirm Page", not lost
+   - If the user mentions "Routing Algorithm", it must be in the \`logic\` of the page that triggers routing
+   - Every backend service mentioned must be captured in a LogicRule
+
+3. **Generalization**: 
+   - This logic applies to **ANY domain** (E-commerce, SaaS, IoT, Logistics, etc.)
+   - Do not make domain-specific assumptions unless explicitly stated
+
+4. **Dual-Stream Guarantee**:
+   - **Every Page Node** must have BOTH:
+     - \`description\`: Visual representation and page description
+     - \`logic\`: Flow rules (if any interactions exist)
+   - If a page has no user interactions, \`logic\` can be empty or omitted
+
+# Output Format
+Return JSON with nodes (pages only) and edges (navigation only). Each node must include \`description\` and \`logic\` fields.`;
 
       // 构建用户提示词
       const userPrompt = input.prompt.trim() || '请生成项目结构';
@@ -124,69 +183,81 @@ export const generateGraph = createServerAction()
       });
 
       // 转换为 FractalNode 格式
-      const nodes: FractalNode[] = result.object.nodes.map((node, index) => {
-        // 计算节点位置（水平排列，每行最多3个）
-        const rowIndex = Math.floor(index / 3);
-        const colIndex = index % 3;
-        const spacingX = 400;
-        const spacingY = 250;
-        const startX = 100;
-        const startY = 200;
+      const nodes: FractalNode[] = result.object.nodes
+        .filter(node => node.type === 'page') // 只保留 page 类型
+        .map((node, index) => {
+          // 计算节点位置（水平排列，每行最多3个）
+          const rowIndex = Math.floor(index / 3);
+          const colIndex = index % 3;
+          const spacingX = 400;
+          const spacingY = 250;
+          const startX = 100;
+          const startY = 200;
 
-        return {
-          id: node.id,
-          type: node.type,
-          position: {
-            x: startX + colIndex * spacingX,
-            y: startY + rowIndex * spacingY,
-          },
-          data: {
-            label: node.label,
-            artifacts: {
-              view: {
-                code: `function App() {
+          return {
+            id: node.id,
+            type: 'page' as const, // 强制设置为 page
+            position: {
+              x: startX + colIndex * spacingX,
+              y: startY + rowIndex * spacingY,
+            },
+            data: {
+              label: node.label,
+              artifacts: {
+                view: {
+                  code: `function App() {
   return (
-    <div className="p-8">
+    <div className="p-8 bg-white">
       <h1 className="text-3xl font-bold text-gray-900">${node.label}</h1>
       <p className="mt-4 text-gray-600">这是 ${node.label} 页面</p>
     </div>
   );
 }`,
+                },
+                spec: {
+                  title: node.label,
+                  requirements: node.description 
+                    ? [`页面描述：${node.description}`]
+                    : [],
+                },
+                impl: {
+                  apiEndpoints: [],
+                  dbSchema: '-- 将在后续阶段生成',
+                },
+                test: {
+                  cases: [],
+                },
+                // 添加 logic artifact（双流抽取的核心）
+                logic: node.logic ? {
+                  description: node.logic.description,
+                  rules: node.logic.rules || [],
+                } : undefined,
               },
-              spec: {
-                title: node.label,
-                requirements: [],
+              syncState: {
+                isSynced: false,
+                lastSource: 'spec',
               },
-              impl: {
-                apiEndpoints: [],
-                dbSchema: '-- 将在后续阶段生成',
-              },
-              test: {
-                cases: [],
+              source: {
+                type: 'ai',
               },
             },
-            syncState: {
-              isSynced: false,
-              lastSource: 'view',
-            },
-            source: {
-              type: 'ai',
-            },
-          },
-        };
-      });
+          };
+        });
 
       // 转换为 Edge 格式
-      const edges: Edge[] = result.object.edges.map((edge, index) => ({
-        id: `edge-${edge.source}-${edge.target}-${index}`,
-        source: edge.source,
-        target: edge.target,
-        label: edge.label || '',
-        type: 'default',
-        markerEnd: {
-          type: 'arrowclosed' as const,
-        },
-      }));
+      const edges: Edge[] = (result.object.edges || []).map((edge, index) => {
+        const edgeObj: Edge = {
+          id: `edge-${edge.source}-${edge.target}-${index}`,
+          source: edge.source,
+          target: edge.target,
+          label: edge.label || '',
+          type: 'default',
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+          },
+        };
+        return edgeObj;
+      });
 
       const duration = Date.now() - startTime;
       log('✅ [generateGraph] 图结构生成完成:', {

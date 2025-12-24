@@ -17,6 +17,7 @@ export type ViewArtifact = z.infer<typeof ViewArtifactSchema>;
 export const SpecArtifactSchema = z.object({
   title: z.string().describe('需求标题'),
   requirements: z.array(z.string()).describe('结构化需求列表'),
+  prdConfig: z.any().optional().describe('PRD生成配置（PrdOptions）'),
 });
 
 export type SpecArtifact = z.infer<typeof SpecArtifactSchema>;
@@ -36,14 +37,31 @@ export const TestArtifactSchema = z.object({
 
 export type TestArtifact = z.infer<typeof TestArtifactSchema>;
 
+// Logic Artifact: 业务逻辑规则（从 Flow 提取）
+export const LogicRuleSchema = z.object({
+  trigger: z.string().describe('用户触发动作（如：点击提交按钮、选择下拉选项）'),
+  process: z.string().describe('后端处理逻辑（如：调用API、校验权限、计算数据）'),
+  outcome: z.string().describe('处理结果（如：跳转页面、显示Toast、更新状态）'),
+});
+
+export type LogicRule = z.infer<typeof LogicRuleSchema>;
+
+export const LogicArtifactSchema = z.object({
+  description: z.string().describe('逻辑的自然语言摘要描述'),
+  rules: z.array(LogicRuleSchema).describe('结构化逻辑规则列表'),
+});
+
+export type LogicArtifact = z.infer<typeof LogicArtifactSchema>;
+
 /**
- * Node Artifacts - 所有4个维度的集合
+ * Node Artifacts - 所有5个维度的集合（新增 logic 维度）
  */
 export const NodeArtifactsSchema = z.object({
   view: ViewArtifactSchema,
   spec: SpecArtifactSchema,
   impl: ImplArtifactSchema,
   test: TestArtifactSchema,
+  logic: LogicArtifactSchema.optional().describe('业务逻辑规则（Flow Logic）'),
 });
 
 export type NodeArtifacts = z.infer<typeof NodeArtifactsSchema>;
@@ -71,7 +89,7 @@ export type NodeSource = z.infer<typeof NodeSourceSchema>;
 /**
  * Fractal Node - 核心节点结构
  */
-export const FractalNodeTypeSchema = z.enum(['page', 'service']);
+export const FractalNodeTypeSchema = z.enum(['page']);
 
 export type FractalNodeType = z.infer<typeof FractalNodeTypeSchema>;
 

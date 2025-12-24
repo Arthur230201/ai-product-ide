@@ -501,6 +501,11 @@ export const useCanvasStore = create<CanvasStore>()(
             test: data.artifacts.test
               ? { ...node.data.artifacts.test, ...data.artifacts.test }
               : node.data.artifacts.test,
+            logic: data.artifacts.logic !== undefined
+              ? (node.data.artifacts.logic 
+                  ? { ...node.data.artifacts.logic, ...data.artifacts.logic }
+                  : data.artifacts.logic)
+              : node.data.artifacts.logic,
           };
         }
         
