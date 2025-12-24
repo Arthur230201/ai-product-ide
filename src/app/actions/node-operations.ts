@@ -2,13 +2,14 @@
 
 import { createServerAction } from 'zsa';
 import { z } from 'zod';
-import { createOpenAI, openai } from '@ai-sdk/openai';
+import { createOpenAI } from '@ai-sdk/openai';
 import { generateText } from 'ai';
 import { log, logError } from '@/lib/logger';
 import { getVisionModel, getTextModel } from '@/lib/ai-config';
 
 // 创建自定义 OpenAI 客户端，通过自定义 fetch 增加超时时间
 const openaiClient = createOpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
   fetch: async (url, options) => {
     // 创建带超时的 fetch
     const controller = new AbortController();
@@ -120,7 +121,7 @@ ${input.code}
     // 获取模型配置
     const textModel = getTextModel(input.aiConfig);
     const result = await generateText({
-      model: openai(textModel),
+      model: openaiClient(textModel),
       messages: [
         {
           role: 'system',

@@ -6,6 +6,7 @@ import { X } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvas-store';
 import { MermaidDiagram } from './MermaidDiagram';
 import { ArchitectureTopology } from './ArchitectureTopology';
+import { WordUploader } from './WordUploader';
 import { clsx } from 'clsx';
 
 interface ProjectBlueprintProps {
@@ -13,7 +14,7 @@ interface ProjectBlueprintProps {
   onClose: () => void;
 }
 
-type TabType = 'profile' | 'business' | 'interaction' | 'data' | 'topology' | 'rules';
+type TabType = 'profile' | 'business' | 'interaction' | 'data' | 'topology' | 'rules' | 'word';
 
 interface DataDictionaryField {
   fieldName: string;
@@ -427,6 +428,7 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
         { id: 'data' as TabType, label: '全局数据字典', icon: '📊' },
         { id: 'topology' as TabType, label: '架构拓扑图', icon: '🗺️' },
         { id: 'rules' as TabType, label: '全局规则', icon: '📋' },
+        { id: 'word' as TabType, label: 'Word 上传', icon: '📄' },
       ].map((tab) =>
         React.createElement('button', {
           key: tab.id,
@@ -555,6 +557,14 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
       activeTab === 'topology' && React.createElement('div', { className: 'space-y-4' },
         React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '上传架构拓扑图，自动解析并生成节点和连接关系。'),
         React.createElement(ArchitectureTopology)
+      ),
+      activeTab === 'word' && React.createElement('div', { className: 'space-y-4' },
+        React.createElement(WordUploader, {
+          onFileUploaded: (content: string, fileName: string) => {
+            // 可以在这里处理上传的 Word 内容
+            console.log('Word 文件上传:', fileName, content);
+          }
+        })
       ),
       activeTab === 'rules' && React.createElement('div', { className: 'space-y-6' },
         React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '定义项目的全局规则和非功能性需求（NFR）。'),

@@ -256,6 +256,24 @@ export const exportToWord = async (options: PRDExportOptions) => {
 };
 
 /**
+ * 页面节点中的需求章节
+ */
+export interface RequirementSection {
+  title: string;        // e.g., "功能列表", "核心业务逻辑"
+  type: 'table' | 'text'; // 'table' for Markdown table, 'text' for Markdown text
+  content: string;      // Markdown string
+}
+
+/**
+ * 页面节点（Rich Node Model）
+ */
+export interface PageNode {
+  title: string;          // e.g., "订单列表页"
+  uiPreview: string;      // Base64 图片
+  sections: RequirementSection[]; // 动态需求章节列表
+}
+
+/**
  * 全屏 PRD 文档数据接口
  */
 export interface FullPrdData {
@@ -279,11 +297,7 @@ export interface FullPrdData {
     globalRules: string; // Markdown
     dictionary: string; // Markdown Table
   };
-  nodes: Array<{
-    title: string;
-    uiPreview: string; // Base64 图片
-    prdTable: string; // Markdown 表格
-  }>;
+  nodes: PageNode[]; // 升级为 PageNode 数组
 }
 
 /**
@@ -311,29 +325,173 @@ export function generateFullPrdHtml(data: FullPrdData): string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${data.meta.name} - PRD</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ 
+        startOnLoad: true, 
+        theme: 'neutral', 
+        securityLevel: 'loose',
+        fontFamily: 'Inter, system-ui, sans-serif'
+      });
+    </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css">
     <style>
         body { font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; }
-        .sidebar { width: 280px; height: 100vh; position: fixed; left: 0; top: 0; overflow-y: auto; background: #0f172a; color: #94a3b8; }
+        .sidebar { 
+            width: 280px; 
+            height: 100vh; 
+            position: fixed; 
+            left: 0; 
+            top: 0; 
+            overflow-y: auto; 
+            background: #0f172a; 
+            color: #94a3b8;
+            scrollbar-width: thin;
+            scrollbar-color: #475569 #0f172a;
+        }
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .sidebar::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
         .main-content { margin-left: 280px; min-height: 100vh; background: #fff; }
         
         /* Typography & Tables */
         h1 { color: #0f172a; font-weight: 800; }
-        h2 { color: #1e293b; font-weight: 700; margin-top: 2rem; margin-bottom: 1rem; border-left: 4px solid #3b82f6; padding-left: 1rem; }
-        h3 { color: #334155; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.75rem; }
+        h2 { 
+            color: #1e293b; 
+            font-weight: 700; 
+            font-size: 1.75rem;
+            margin-top: 2rem; 
+            margin-bottom: 1rem; 
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #cbd5e1;
+        }
+        h3 { 
+            color: #475569; 
+            font-weight: 600; 
+            font-size: 1.125rem;
+            margin-top: 1.5rem; 
+            margin-bottom: 0.75rem; 
+        }
+        
+        /* Logic Block Styling (for business logic, data rules, etc.) */
+        .logic-block {
+            background-color: #f8fafc;
+            border-left: 4px solid #3b82f6;
+            padding: 1rem;
+            border-radius: 0 0.5rem 0.5rem 0;
+            margin-top: 0.5rem;
+        }
+        .logic-block p {
+            margin-bottom: 0.5rem;
+        }
+        .logic-block ul, .logic-block ol {
+            margin-left: 1.5rem;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .logic-block li {
+            margin-bottom: 0.25rem;
+        }
+        
+        /* Node Separator */
+        .node-separator {
+            border-top: 1px solid #cbd5e1;
+            margin: 2rem 0;
+        }
         
         /* Markdown Tables Override */
         .markdown-body table { display: table; width: 100%; }
         .markdown-body th { background-color: #f1f5f9; }
 
         /* Split View Sticky UI */
-        .sticky-ui { position: sticky; top: 2rem; }
-        .phone-mockup { border: 10px solid #1e293b; border-radius: 24px; overflow: hidden; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); background: #fff; }
+        .sticky-ui { 
+            position: sticky; 
+            top: 2rem; 
+            align-self: flex-start;
+            max-height: calc(100vh - 4rem);
+            overflow-y: auto;
+        }
+        .phone-mockup { 
+            border: 12px solid #1e293b; 
+            border-radius: 32px; 
+            overflow: hidden; 
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); 
+            background: #fff;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        .phone-mockup img {
+            width: 100%;
+            height: auto;
+            display: block;
+            transition: transform 0.2s ease;
+        }
+        .phone-mockup img:hover {
+            transform: scale(1.02);
+        }
+        
+        /* PRD Table Styling */
+        .markdown-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+        }
+        .markdown-body table th {
+            background-color: #f1f5f9;
+            color: #1e293b;
+            font-weight: 600;
+            padding: 0.75rem;
+            text-align: left;
+            border: 1px solid #e2e8f0;
+        }
+        .markdown-body table td {
+            padding: 0.75rem;
+            border: 1px solid #e2e8f0;
+            color: #334155;
+        }
+        .markdown-body table tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+        .markdown-body table tr:hover {
+            background-color: #f1f5f9;
+        }
 
         /* Lightbox */
-        #lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.95); z-index: 9999; justify-content: center; align-items: center; }
-        #lightbox img { max-width: 95%; max-height: 95%; object-fit: contain; }
+        #lightbox { 
+            display: none; 
+            position: fixed; 
+            inset: 0; 
+            background: rgba(0,0,0,0.95); 
+            z-index: 9999; 
+            justify-content: center; 
+            align-items: center; 
+            cursor: pointer;
+        }
+        #lightbox img { 
+            max-width: 95%; 
+            max-height: 95%; 
+            object-fit: contain; 
+            border-radius: 8px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        }
+        #lightbox::before {
+            content: '点击关闭或按 ESC 键';
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 14px;
+            opacity: 0.7;
+        }
 
         /* Print Optimization */
         @media print {
@@ -452,26 +610,108 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                 <h1>第 5 章：功能详述</h1>
                 <p class="text-gray-500 mb-8">本章节包含各个页面的 UI 原型图及详细的功能需求说明。</p>
 
-                ${data.nodes.map((node, idx) => `
-                <div id="node-${idx}" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20">
-                    <h2 class="text-2xl mb-6">5.${idx+1} ${node.title}</h2>
+                ${data.nodes.map((node, nodeIdx) => {
+                  // Automatic Numbering: Chapter 5, Node level (5.1, 5.2, ...)
+                  const nodeNum = `5.${nodeIdx + 1}`;
+                  
+                  // Ensure UI preview exists
+                  const uiPreview = node.uiPreview || '';
+                  const hasUIPreview = uiPreview && uiPreview.length > 0;
+                  
+                  // Section counter for this page (starts at 1 for UI preview)
+                  let sectionIdx = 1;
+                  
+                  // Build sections HTML
+                  const sectionsHtml = node.sections && node.sections.length > 0
+                    ? node.sections.map((section) => {
+                        const secNum = `${nodeNum}.${sectionIdx++}`;
+                        const parsedContent = marked.parse(section.content || '（暂无内容）');
+                        
+                        if (section.type === 'table') {
+                          return `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">${secNum} ${section.title}</h3>
+                                <div class="overflow-x-auto">
+                                    ${parsedContent}
+                                </div>
+                            </div>
+                          `;
+                        } else {
+                          // Text/Markdown content with logic-block styling
+                          return `
+                            <div class="mb-6">
+                                <h3 class="text-lg font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">${secNum} ${section.title}</h3>
+                                <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                                    ${parsedContent}
+                                </div>
+                            </div>
+                          `;
+                        }
+                      }).join('')
+                    : `
+                      <div class="mb-6">
+                          <h3 class="text-lg font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">${nodeNum}.${sectionIdx++} 功能需求说明</h3>
+                          <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                              <p class="text-slate-500 italic">（暂无功能需求说明）</p>
+                          </div>
+                      </div>
+                    `;
+                  
+                  return `
+                <div id="node-${nodeIdx}" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20">
+                    <!-- Page Title (H2) -->
+                    <h2 class="text-2xl mb-6 font-bold text-slate-900 pb-2 border-b-2 border-slate-300">${nodeNum} ${node.title || `功能模块 ${nodeIdx + 1}`}</h2>
                     
                     <div class="grid grid-cols-12 gap-8 items-start">
-                        <div class="col-span-4 sticky-ui">
-                            <div class="phone-mockup">
-                                <img src="${node.uiPreview}" class="w-full h-auto block" alt="UI Preview" />
+                        <!-- Left Column: UI Preview (Sticky) -->
+                        <div class="col-span-4">
+                            <div class="sticky-ui">
+                                <h3 class="text-lg font-semibold text-slate-700 mb-3">${nodeNum}.${sectionIdx++} 界面示意</h3>
+                                ${hasUIPreview ? `
+                                <div class="phone-mockup bg-white">
+                                    <img 
+                                        src="${uiPreview}" 
+                                        class="w-full h-auto block" 
+                                        alt="UI Preview - ${node.title || `功能模块 ${nodeIdx + 1}`}"
+                                        onclick="openLightbox('${uiPreview}')"
+                                        style="cursor: zoom-in;"
+                                    />
+                                </div>
+                                <p class="text-center text-xs text-slate-500 mt-3 font-mono">图 ${nodeNum}.${sectionIdx - 1} UI 示意（点击放大）</p>
+                                ` : `
+                                <div class="phone-mockup bg-slate-50 flex items-center justify-center" style="min-height: 400px;">
+                                    <div class="text-center text-slate-400">
+                                        <div class="text-4xl mb-2">📱</div>
+                                        <p class="text-sm">暂无 UI 预览</p>
+                                    </div>
+                                </div>
+                                <p class="text-center text-xs text-slate-400 mt-3">图 ${nodeNum}.${sectionIdx - 1} UI 示意（待生成）</p>
+                                `}
                             </div>
-                            <p class="text-center text-xs text-slate-400 mt-3 font-mono">图 5.${idx+1} UI 示意</p>
                         </div>
 
+                        <!-- Right Column: Requirement Sections -->
                         <div class="col-span-8">
-                            <div class="markdown-body text-sm bg-white rounded-lg border border-slate-200 p-1 shadow-sm">
-                                ${marked.parse(node.prdTable)}
+                            <div class="markdown-body text-sm bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                                <div class="p-6">
+                                    ${sectionsHtml}
+                                </div>
                             </div>
                         </div>
                     </div>
+                    
+                    <hr class="node-separator my-8 border-slate-300" />
                 </div>
-                `).join('')}
+                `;
+                }).join('')}
+                
+                ${data.nodes.length === 0 ? `
+                <div class="text-center py-16 text-slate-400">
+                    <div class="text-5xl mb-4">📄</div>
+                    <p class="text-lg">暂无功能模块</p>
+                    <p class="text-sm mt-2">请在项目蓝图中添加节点并生成需求文档</p>
+                </div>
+                ` : ''}
             </section>
 
         </div>
@@ -482,27 +722,72 @@ export function generateFullPrdHtml(data: FullPrdData): string {
     </div>
 
     <script>
-        // Init Mermaid
-        mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'loose' });
-
         // Lightbox Logic
         function openLightbox(src) {
             if(!src) return;
             const lb = document.getElementById('lightbox');
-            lb.querySelector('img').src = src;
-            lb.style.display = 'flex';
+            const img = lb.querySelector('img');
+            if (img) {
+                img.src = src;
+                lb.style.display = 'flex';
+            }
         }
+
+        // Close lightbox on click outside image
+        document.getElementById('lightbox')?.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.style.display = 'none';
+            }
+        });
+
+        // Close lightbox on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const lb = document.getElementById('lightbox');
+                if (lb) lb.style.display = 'none';
+            }
+        });
 
         // Sidebar Smooth Scroll
         document.querySelectorAll('nav a').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
                 const targetId = this.getAttribute('href');
-                document.querySelector(targetId).scrollIntoView({
-                    behavior: 'smooth'
-                });
+                const target = document.querySelector(targetId);
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
             });
         });
+
+        // Highlight active section in sidebar on scroll
+        const sections = document.querySelectorAll('section[id]');
+        const navLinks = document.querySelectorAll('nav a[href^="#"]');
+        
+        function updateActiveNav() {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.getBoundingClientRect().top;
+                if (sectionTop <= 100) {
+                    current = section.getAttribute('id') || '';
+                }
+            });
+            
+            navLinks.forEach(link => {
+                link.classList.remove('bg-slate-800', 'text-white');
+                link.classList.add('text-slate-400');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('bg-slate-800', 'text-white');
+                    link.classList.remove('text-slate-400');
+                }
+            });
+        }
+        
+        window.addEventListener('scroll', updateActiveNav);
+        updateActiveNav(); // Initial call
     </script>
 </body>
 </html>
@@ -545,35 +830,70 @@ ${globalRules.dataTracking || '（待补充）'}
   // 构建数据字典 Markdown（如果提供）
   const dictionaryMarkdown = dataDictionary || '| 字段名 | 类型 | 说明 |\n|--------|------|------|\n| （暂无数据字典） | - | - |';
 
-  // 转换节点数据
-  const nodeData = nodes.map((node) => {
+  // 转换节点数据为 PageNode 格式（Rich Node Model）
+  const nodeData: PageNode[] = nodes.map((node) => {
     const spec = node.data?.artifacts?.spec;
     const view = node.data?.artifacts?.view;
     
-    // 获取 PRD 表格（从 spec.requirements 生成）
-    let prdTable = '';
-    if (spec?.requirements) {
+    // 获取 UI 预览图
+    const uiPreview = view?.previewUrl || (view?.code ? 
+      'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==' :
+      'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==');
+    
+    // 构建需求章节数组
+    const sections: RequirementSection[] = [];
+    
+    // 检查是否有新的 sections 结构（Rich Node Model）
+    if (spec?.sections && Array.isArray(spec.sections)) {
+      // 使用新的 sections 结构
+      sections.push(...spec.sections.map((sec: any) => ({
+        title: sec.title || '未命名章节',
+        type: sec.type === 'table' ? 'table' : 'text',
+        content: sec.content || '（暂无内容）',
+      })));
+    } else if (spec?.requirements) {
+      // 兼容旧格式：从 requirements 生成 sections
       const requirements = Array.isArray(spec.requirements) 
         ? spec.requirements.join('\n') 
         : spec.requirements;
       
-      // 尝试解析为表格格式，如果不是表格则直接使用
-      if (requirements.includes('|') && requirements.includes('功能ID')) {
-        prdTable = requirements;
-      } else {
-        // 如果不是表格格式，转换为简单的列表
-        prdTable = `## ${spec.title || node.data.label}\n\n${requirements}`;
+      // 判断是否为表格格式
+      const isTable = requirements.includes('|') && (
+        requirements.includes('功能ID') || 
+        requirements.includes('UI区域') || 
+        requirements.includes('元素名称')
+      );
+      
+      if (isTable) {
+        // 作为表格章节
+        sections.push({
+          title: '功能列表',
+          type: 'table',
+          content: requirements,
+        });
+      } else if (requirements.trim().length > 0) {
+        // 作为文本章节
+        sections.push({
+          title: '功能需求说明',
+          type: 'text',
+          content: requirements,
+        });
       }
-    } else {
-      prdTable = `## ${spec?.title || node.data.label}\n\n（暂无功能需求说明）`;
+    }
+    
+    // 如果没有章节，添加一个占位章节
+    if (sections.length === 0) {
+      sections.push({
+        title: '功能需求说明',
+        type: 'text',
+        content: '（暂无功能需求说明）',
+      });
     }
 
     return {
       title: spec?.title || node.data.label || '未命名页面',
-      uiPreview: view?.previewUrl || view?.code ? 
-        (view.previewUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==') :
-        'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==',
-      prdTable,
+      uiPreview,
+      sections,
     };
   });
 

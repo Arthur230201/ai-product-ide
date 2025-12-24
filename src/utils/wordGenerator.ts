@@ -30,10 +30,13 @@ import {
   TableOfContents, ExternalHyperlink, InternalHyperlink, TabStopType, TabStopPosition
 } from "docx";
 import { marked } from "marked";
-import type { FullPrdData } from "./prdGenerator";
+import type { FullPrdData, PageNode, RequirementSection } from "./prdGenerator";
 
 // Helper: Convert Base64 to ImageRun
-const createImage = (base64Data: string, width = 500, height = 300): Paragraph => {
+// Width/Height are in EMU (English Metric Units): 1 inch = 914400 EMU, 1 cm = 360000 EMU
+// For A4 paper (21cm width, margins ~2.5cm each side): usable width ~16cm = ~5760000 EMU
+// Recommended image width: ~12cm = ~4320000 EMU (approx 450px at 96 DPI)
+const createImage = (base64Data: string, widthEmu = 4320000, heightEmu?: number): Paragraph => {
   if (!base64Data || base64Data.trim() === '') {
     return new Paragraph({
       children: [new TextRun({ text: "*[图片缺失]*", italics: true, color: "999999" })],
@@ -44,14 +47,26 @@ const createImage = (base64Data: string, width = 500, height = 300): Paragraph =
 
   try {
     // Strip prefix if present (data:image/png;base64,)
-    const cleanData = base64Data.replace(/^data:image\/(png|jpg|jpeg|gif|webp);base64,/, "");
+    let cleanData = base64Data.trim();
+    if (cleanData.includes(',')) {
+      cleanData = cleanData.split(',')[1];
+    }
+    
+    // Decode base64 to buffer
     const imageBuffer = Uint8Array.from(atob(cleanData), c => c.charCodeAt(0));
+    
+    // If height not specified, maintain aspect ratio (assuming mobile UI ~9:16 ratio)
+    // For mobile UI previews, use a reasonable height
+    const finalHeight = heightEmu || Math.round(widthEmu * 1.8); // ~9:16 ratio for mobile
     
     return new Paragraph({
       children: [
         new ImageRun({
           data: imageBuffer,
-          transformation: { width, height },
+          transformation: { 
+            width: widthEmu, 
+            height: finalHeight 
+          },
         }),
       ],
       alignment: AlignmentType.CENTER,
@@ -112,33 +127,75 @@ const parseText = (text: string): (TextRun | Paragraph)[] => {
 
 // Helper: Parse Markdown Table to Docx Table
 const parseMarkdownTable = (markdownTable: string): Table | null => {
-  if (!markdownTable || !markdownTable.includes('|')) {
+  if (!markdownTable || typeof markdownTable !== 'string') {
     return null;
   }
 
-  const lines = markdownTable.split('\n').filter(line => line.trim().startsWith('|'));
-  if (lines.length < 2) return null;
+  // Filter lines that look like table rows (contain |)
+  const lines = markdownTable
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.startsWith('|') && line.endsWith('|'));
+  
+  if (lines.length < 2) {
+    return null; // Need at least header and separator
+  }
 
-  // Parse header
+  // Find separator line (|---|---| or |:---|:---:|)
+  let separatorIndex = -1;
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    // Match separator patterns: |---|---| or |:---|:---:|---|
+    if (line.match(/^\|[\s\-:]+(\|[\s\-:]+)*\|$/)) {
+      separatorIndex = i;
+      break;
+    }
+  }
+
+  if (separatorIndex === -1) {
+    // No separator found, treat first line as header and second as first data row
+    separatorIndex = 1;
+  }
+
+  // Parse header (first line)
   const headerLine = lines[0];
-  const headers = headerLine.split('|').slice(1, -1).map(h => h.trim());
+  const headers = headerLine
+    .split('|')
+    .slice(1, -1)
+    .map(h => h.trim())
+    .filter(h => h.length > 0);
 
-  // Skip separator line (|---|---|)
-  const dataLines = lines.slice(2);
+  if (headers.length === 0) {
+    return null; // No valid headers
+  }
+
+  // Parse data rows (after separator)
+  const dataLines = lines.slice(separatorIndex + 1).filter(line => {
+    // Skip empty lines or lines that look like separators
+    const cells = line.split('|').slice(1, -1).map(c => c.trim());
+    return cells.some(c => c.length > 0 && !c.match(/^[\s\-:]+$/));
+  });
+
+  if (dataLines.length === 0) {
+    return null; // No data rows
+  }
 
   const rows: TableRow[] = [
-    // Header row
+    // Header row with proper styling
     new TableRow({
       tableHeader: true,
       children: headers.map(h => new TableCell({
         children: [new Paragraph({ 
-          text: h, 
-          style: "TableHeader",
+          children: [new TextRun({ 
+            text: h, 
+            bold: true,
+            size: 22, // 11pt
+          })],
           alignment: AlignmentType.CENTER 
         })],
         shading: { 
           type: ShadingType.SOLID,
-          color: "F3F4F6" // Light Gray
+          color: "F3F4F6" // Light Gray background
         },
         verticalAlign: VerticalAlign.CENTER,
         margins: { top: 100, bottom: 100, left: 100, right: 100 },
@@ -148,15 +205,37 @@ const parseMarkdownTable = (markdownTable: string): Table | null => {
 
   // Data rows
   dataLines.forEach(line => {
-    const cells = line.split('|').slice(1, -1).map(c => c.trim());
+    const cells = line
+      .split('|')
+      .slice(1, -1)
+      .map(c => c.trim());
+    
+    // Ensure cell count matches header count
+    while (cells.length < headers.length) {
+      cells.push('');
+    }
+    // Remove extra cells if any
+    cells.splice(headers.length);
+
     rows.push(new TableRow({
-      children: cells.map(cell => new TableCell({
-        children: parseText(cell),
-        verticalAlign: VerticalAlign.CENTER,
-        margins: { top: 100, bottom: 100, left: 100, right: 100 },
-      })),
+      children: cells.map((cell) => {
+        // Parse cell content (support markdown bold, etc.)
+        const cellContent = parseText(cell);
+        return new TableCell({
+          children: cellContent.length > 0 
+            ? (cellContent as Paragraph[])
+            : [new Paragraph({ children: [new TextRun({ text: cell || '-' })] })],
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 100, bottom: 100, left: 100, right: 100 },
+        });
+      }),
     }));
   });
+
+  if (rows.length === 1) {
+    // Only header row, no data
+    return null;
+  }
 
   return new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
@@ -380,46 +459,134 @@ export const generateEnterpriseWord = async (data: FullPrdData): Promise<Blob> =
     }),
   );
 
-  // Process each node
-  data.nodes.forEach((node, index) => {
+  // Process each node - Functional Specs Section (Rich Node Model)
+  data.nodes.forEach((node, nodeIdx) => {
+    // Automatic Numbering: Chapter 5, Node level (5.1, 5.2, ...)
+    const nodeNum = `5.${nodeIdx + 1}`;
+    
+    // Step 1: Add Heading 2 with node title
     children.push(
       new Paragraph({ 
-        text: `5.${index + 1} ${node.title}`, 
+        text: `${nodeNum} ${node.title || `功能模块 ${nodeIdx + 1}`}`, 
         heading: HeadingLevel.HEADING_2,
         spacing: { before: 400, after: 200 } 
       }),
     );
 
-    // UI Image (Vertical Layout: Image Top)
-    children.push(createImage(node.uiPreview, 300, 550)); // Phone ratio
+    // Step 2: UI Preview Section (Always 5.x.1)
+    let sectionIdx = 1;
+    const uiSectionNum = `${nodeNum}.${sectionIdx++}`;
+    
     children.push(new Paragraph({ 
-      text: `图 5.${index + 1} - UI 示意`, 
-      alignment: AlignmentType.CENTER,
-      style: "Normal",
-      italics: true,
-      color: "666666",
-      spacing: { after: 400 },
-    }));
-
-    // PRD Table (Vertical Layout: Table Bottom)
-    children.push(new Paragraph({ 
-      text: "功能需求列表：", 
+      text: `${uiSectionNum} 界面示意`, 
       heading: HeadingLevel.HEADING_3,
-      spacing: { before: 400, after: 200 } 
+      spacing: { before: 200, after: 200 } 
     }));
 
-    // Try to parse as table first
-    const prdTable = parseMarkdownTable(node.prdTable);
-    if (prdTable) {
-      children.push(prdTable);
+    // Embed UI Preview Image (Top)
+    const uiPreview = node.uiPreview || '';
+    if (uiPreview && uiPreview.length > 0) {
+      // Create image paragraph (width ~12cm = 4320000 EMU)
+      children.push(createImage(uiPreview, 4320000)); // ~12cm width, auto height
+      
+      // Add caption paragraph below image
+      children.push(new Paragraph({ 
+        children: [
+          new TextRun({ 
+            text: `图 ${uiSectionNum} ${node.title || `功能模块 ${nodeIdx + 1}`} UI 示意`, 
+            italics: true,
+            color: "666666",
+            size: 20, // 10pt
+          })
+        ],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 400 },
+      }));
     } else {
-      // Fallback to parsed text
-      children.push(...parseText(node.prdTable));
+      // No UI preview available
+      children.push(new Paragraph({
+        children: [
+          new TextRun({ 
+            text: "*[暂无 UI 预览图]*", 
+            italics: true, 
+            color: "999999" 
+          })
+        ],
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 400 },
+      }));
     }
 
-    // Page break between nodes (except last one)
-    if (index < data.nodes.length - 1) {
-      children.push(new Paragraph({ children: [new PageBreak()] }));
+    // Step 3: Dynamic Requirement Sections (5.x.2, 5.x.3, ...)
+    if (node.sections && node.sections.length > 0) {
+      node.sections.forEach((section) => {
+        const secNum = `${nodeNum}.${sectionIdx++}`;
+        
+        // Section Title (H3)
+        children.push(new Paragraph({ 
+          text: `${secNum} ${section.title}`, 
+          heading: HeadingLevel.HEADING_3,
+          spacing: { before: 400, after: 200 } 
+        }));
+
+        // Section Content
+        if (section.type === 'table') {
+          // Parse and render as table
+          const table = parseMarkdownTable(section.content);
+          if (table) {
+            children.push(table);
+            children.push(new Paragraph({ spacing: { after: 400 } }));
+          } else {
+            // Fallback to text if table parsing fails
+            children.push(...parseText(section.content));
+            children.push(new Paragraph({ spacing: { after: 400 } }));
+          }
+        } else {
+          // Text/Markdown content
+          const parsedText = parseText(section.content);
+          if (parsedText.length > 0) {
+            children.push(...parsedText);
+            children.push(new Paragraph({ spacing: { after: 400 } }));
+          } else {
+            children.push(new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: "（暂无内容）", 
+                  italics: true, 
+                  color: "999999" 
+                })
+              ],
+              spacing: { after: 400 },
+            }));
+          }
+        }
+      });
+    } else {
+      // No sections provided, add placeholder
+      const secNum = `${nodeNum}.${sectionIdx++}`;
+      children.push(new Paragraph({ 
+        text: `${secNum} 功能需求说明`, 
+        heading: HeadingLevel.HEADING_3,
+        spacing: { before: 400, after: 200 } 
+      }));
+      children.push(new Paragraph({
+        children: [
+          new TextRun({ 
+            text: "（暂无功能需求说明）", 
+            italics: true, 
+            color: "999999" 
+          })
+        ],
+        spacing: { after: 400 },
+      }));
+    }
+
+    // Step 4: Page break between nodes (except last one) for better readability
+    if (nodeIdx < data.nodes.length - 1) {
+      children.push(new Paragraph({ 
+        children: [new PageBreak()],
+        spacing: { after: 0 }
+      }));
     }
   });
 
