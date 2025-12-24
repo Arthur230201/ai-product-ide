@@ -581,7 +581,102 @@ export const generateEnterpriseWord = async (data: FullPrdData): Promise<Blob> =
       }));
     }
 
-    // Step 4: Page break between nodes (except last one) for better readability
+    // Step 4: User Stories Section (用户故事模型 - 核心)
+    if (node.userStories && node.userStories.length > 0) {
+      const userStoriesSectionNum = `${nodeNum}.${sectionIdx++}`;
+      children.push(new Paragraph({ 
+        text: `${userStoriesSectionNum} 用户故事`, 
+        heading: HeadingLevel.HEADING_3,
+        spacing: { before: 400, after: 200 } 
+      }));
+
+      node.userStories.forEach((story, storyIdx) => {
+        // User Story Card
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ 
+              text: `【用户故事卡片 ${story.id || `US-${storyIdx + 1}`}】`, 
+              bold: true,
+              size: 24, // 12pt
+            })
+          ],
+          spacing: { before: 200, after: 100 },
+        }));
+
+        // Role
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: "🧑‍💻 角色：", bold: true, size: 22 }),
+            new TextRun({ text: story.role || '（未指定）', size: 22 }),
+          ],
+          spacing: { after: 100 },
+        }));
+
+        // Activity
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: "🚩 目标：", bold: true, size: 22 }),
+            new TextRun({ text: story.activity || '（未指定）', size: 22 }),
+          ],
+          spacing: { after: 100 },
+        }));
+
+        // Value
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: "💎 价值：", bold: true, size: 22 }),
+            new TextRun({ text: story.value || '（未指定）', size: 22 }),
+          ],
+          spacing: { after: 200 },
+        }));
+
+        // Acceptance Criteria
+        children.push(new Paragraph({
+          children: [
+            new TextRun({ text: "✅ 验收标准 (逻辑细节)：", bold: true, size: 22 }),
+          ],
+          spacing: { after: 100 },
+        }));
+
+        if (story.acceptanceCriteria && story.acceptanceCriteria.length > 0) {
+          story.acceptanceCriteria.forEach((ac) => {
+            const isLogic = ac.includes('[逻辑]');
+            children.push(new Paragraph({
+              children: [
+                new TextRun({ 
+                  text: `  • ${ac}`, 
+                  size: 22,
+                  color: isLogic ? "0066CC" : "000000", // Blue for logic rules
+                  bold: isLogic,
+                }),
+              ],
+              spacing: { after: 80 },
+              indent: { left: 400 }, // Indent for list items
+            }));
+          });
+        } else {
+          children.push(new Paragraph({
+            children: [
+              new TextRun({ 
+                text: "  （暂无验收标准）", 
+                italics: true,
+                color: "999999",
+                size: 22,
+              }),
+            ],
+            spacing: { after: 200 },
+            indent: { left: 400 },
+          }));
+        }
+
+        // Spacing between stories
+        if (storyIdx < node.userStories.length - 1) {
+          children.push(new Paragraph({ spacing: { after: 300 } }));
+        }
+      });
+    }
+
+    // Step 5: Page break between nodes (except last one) for better readability
     if (nodeIdx < data.nodes.length - 1) {
       children.push(new Paragraph({ 
         children: [new PageBreak()],
@@ -815,33 +910,98 @@ ${globalRules.dataTracking || '（待补充）'}
   // Build data dictionary Markdown
   const dictionaryMarkdown = dataDictionary || '| 字段名 | 类型 | 说明 |\n|--------|------|------|\n| （暂无数据字典） | - | - |';
 
-  // Convert node data
-  const nodeData = nodes.map((node) => {
+  // Convert node data (使用与 exportToFullPrdHtml 相同的逻辑)
+  const nodeData: PageNode[] = nodes.map((node) => {
     const spec = node.data?.artifacts?.spec;
     const view = node.data?.artifacts?.view;
     
-    // Get PRD table
-    let prdTable = '';
-    if (spec?.requirements) {
+    // 获取 UI 预览图
+    const uiPreview = view?.previewUrl || (view?.code ? 
+      'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==' :
+      'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==');
+    
+    // 构建需求章节数组
+    const sections: RequirementSection[] = [];
+    
+    // 检查是否有新的 sections 结构（Rich Node Model）
+    if (spec?.sections && Array.isArray(spec.sections)) {
+      // 使用新的 sections 结构
+      sections.push(...spec.sections.map((sec: any) => ({
+        title: sec.title || '未命名章节',
+        type: sec.type === 'table' ? 'table' : 'text',
+        content: sec.content || '（暂无内容）',
+      })));
+    } else if (spec?.requirements) {
+      // 兼容旧格式：从 requirements 生成 sections
       const requirements = Array.isArray(spec.requirements) 
         ? spec.requirements.join('\n') 
         : spec.requirements;
       
-      // Check if it's already a table format
-      if (requirements.includes('|') && requirements.includes('功能ID')) {
-        prdTable = requirements;
-      } else {
-        // Convert to simple text
-        prdTable = `## ${spec.title || node.data.label}\n\n${requirements}`;
+      // 判断是否为表格格式
+      const isTable = requirements.includes('|') && (
+        requirements.includes('功能ID') || 
+        requirements.includes('UI区域') || 
+        requirements.includes('元素名称')
+      );
+      
+      if (isTable) {
+        // 作为表格章节
+        sections.push({
+          title: '功能列表',
+          type: 'table',
+          content: requirements,
+        });
+      } else if (requirements.trim().length > 0) {
+        // 作为文本章节
+        sections.push({
+          title: '功能需求说明',
+          type: 'text',
+          content: requirements,
+        });
       }
-    } else {
-      prdTable = `## ${spec?.title || node.data.label}\n\n（暂无功能需求说明）`;
     }
+    
+    // 如果没有章节，添加一个占位章节
+    if (sections.length === 0) {
+      sections.push({
+        title: '功能需求说明',
+        type: 'text',
+        content: '（暂无功能需求说明）',
+      });
+    }
+
+    // 提取用户故事数据（用户故事模型 - 核心）
+    const userStories = node.data?.artifacts?.userStories;
+    // 兼容旧数据（可选）
+    const businessContext = node.data?.artifacts?.businessContext;
+    const events = node.data?.artifacts?.events;
 
     return {
       title: spec?.title || node.data.label || '未命名页面',
-      uiPreview: view?.previewUrl || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==',
-      prdTable,
+      uiPreview,
+      sections,
+      // 用户故事模型（新 - 核心）
+      userStories: userStories ? userStories.map(story => ({
+        id: story.id,
+        role: story.role,
+        activity: story.activity,
+        value: story.value,
+        acceptanceCriteria: story.acceptanceCriteria || [],
+      })) : undefined,
+      // 兼容旧数据（可选）
+      businessContext: businessContext ? {
+        domain: businessContext.domain,
+        role: businessContext.role,
+        goal: businessContext.goal,
+      } : undefined,
+      events: events ? events.map(event => ({
+        id: event.id,
+        name: event.name,
+        trigger: event.trigger,
+        type: event.type,
+        processFlow: event.processFlow || [],
+        outcome: event.outcome,
+      })) : undefined,
     };
   });
 
