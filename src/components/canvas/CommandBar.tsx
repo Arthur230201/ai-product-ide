@@ -8,6 +8,7 @@ import { updateNodeArtifacts, generateUIFromImage, generateUIFromText, generateA
 import { useCanvasStore } from '@/store/canvas-store';
 import { toast } from 'sonner';
 import { log, logError, logWarn } from '@/lib/logger';
+import { ClarificationDialog } from './ClarificationDialog';
 
 type MediaType = 'image' | 'video' | null;
 type AttachmentType = 'media' | 'text' | null;
@@ -44,6 +45,20 @@ export function CommandBar() {
 
   // 输入框聚焦状态 - 必须在所有其他 hooks 之前定义
   const [isFocused, setIsFocused] = useState(false);
+  
+  // 澄清对话框状态
+  const [clarificationDialog, setClarificationDialog] = useState<{
+    isOpen: boolean;
+    message: string;
+    question: string;
+    options: Array<{
+      id: string;
+      label: string;
+      desc: string;
+      example: string;
+    }>;
+    originalPrompt: string;
+  } | null>(null);
 
   // 自动调整textarea高度的函数
   const adjustTextareaHeight = useCallback(() => {
@@ -73,24 +88,17 @@ export function CommandBar() {
         resultString: JSON.stringify(result).substring(0, 500),
         // 直接检查 result.data 的内容
         dataExists: !!(result as any)?.data,
-        dataType: typeof (result as any)?.data,
+        dataValueType: typeof (result as any)?.data,
         dataKeys: (result as any)?.data && typeof (result as any).data === 'object' ? Object.keys((result as any).data) : [],
-        dataNodesExists: !!(result as any)?.data?.nodes,
-        dataNodesType: typeof (result as any)?.data?.nodes,
-        dataNodesIsArray: Array.isArray((result as any)?.data?.nodes),
-        dataNodesLength: Array.isArray((result as any)?.data?.nodes) ? (result as any).data.nodes.length : 'N/A',
-        dataEdgesExists: !!(result as any)?.data?.edges,
-        dataEdgesType: typeof (result as any)?.data?.edges,
-        dataEdgesIsArray: Array.isArray((result as any)?.data?.edges),
-        dataEdgesLength: Array.isArray((result as any)?.data?.edges) ? (result as any).data.edges.length : 'N/A',
+        dataResultType: (result as any)?.data?.type,
         // 完整的数据结构（限制长度）
         fullDataString: (result as any)?.data ? JSON.stringify((result as any).data).substring(0, 1000) : 'N/A',
       });
 
       // 处理 zsa-react 的返回格式
       // zsa-react 的 useServerAction 返回格式：result 直接是 handler 的返回值
-      // 所以 result 应该是 { data: { nodes, edges } }
-      let resultData: { data?: { nodes?: any[]; edges?: any[] } } | null = null;
+      // 所以 result 应该是 { data: { type: 'clarification_needed' | 'graph_generated', ... } }
+      let resultData: { data?: { type?: string; [key: string]: any } } | null = null;
 
       if (Array.isArray(result)) {
         // 数组格式：[data, error]
@@ -108,133 +116,79 @@ export function CommandBar() {
         return;
       }
 
-      // 详细记录 resultData 的结构
-      log('🔍 [CommandBar] resultData 详细结构:', {
-        hasResultData: !!resultData,
-        resultDataKeys: resultData ? Object.keys(resultData) : [],
-        hasData: !!(resultData as any)?.data,
-        dataKeys: (resultData as any)?.data ? Object.keys((resultData as any).data) : [],
-        dataNodesType: typeof (resultData as any)?.data?.nodes,
-        dataNodesIsArray: Array.isArray((resultData as any)?.data?.nodes),
-        dataNodesLength: Array.isArray((resultData as any)?.data?.nodes) ? (resultData as any).data.nodes.length : 'N/A',
-        dataNodesValue: (resultData as any)?.data?.nodes ? JSON.stringify((resultData as any).data.nodes).substring(0, 200) : 'N/A',
-        dataEdgesType: typeof (resultData as any)?.data?.edges,
-        dataEdgesIsArray: Array.isArray((resultData as any)?.data?.edges),
-        dataEdgesLength: Array.isArray((resultData as any)?.data?.edges) ? (resultData as any).data.edges.length : 'N/A',
-        // 尝试直接访问 nodes 和 edges（不在 data 下）
-        hasDirectNodes: !!(resultData as any)?.nodes,
-        directNodesType: typeof (resultData as any)?.nodes,
-        directNodesIsArray: Array.isArray((resultData as any)?.nodes),
-        hasDirectEdges: !!(resultData as any)?.edges,
-        directEdgesType: typeof (resultData as any)?.edges,
-        directEdgesIsArray: Array.isArray((resultData as any)?.edges),
-        // 完整结构预览（限制长度）
-        fullStructure: JSON.stringify(resultData).substring(0, 1000),
-      });
-
-      // 提取 nodes 和 edges
-      // 尝试多种可能的路径
-      let nodes: any[] | undefined;
-      let edges: any[] | undefined;
-
-      // 优先尝试 resultData.data.nodes 和 resultData.data.edges
-      // 同时也尝试直接从 result.data 访问（以防 zsa-react 改变了结构）
+      // 检查返回类型：clarification_needed 或 graph_generated
       let data: any = null;
       if ((resultData as any)?.data) {
         data = (resultData as any).data;
       } else if ((result as any)?.data) {
-        // 如果 resultData.data 不存在，直接使用 result.data
         data = (result as any).data;
         log('⚠️ [CommandBar] resultData.data 不存在，使用 result.data');
       }
-      
-      if (data) {
-        const dataKeys = Object.keys(data);
-        log('🔍 [CommandBar] 检查 data 对象:', {
-          dataType: typeof data,
-          dataKeys: dataKeys,
-          dataKeysCount: dataKeys.length,
-          // 显示第一个键的详细信息（因为只有一个键）
-          firstKey: dataKeys[0],
-          firstKeyValue: dataKeys[0] ? data[dataKeys[0]] : 'N/A',
-          firstKeyValueType: dataKeys[0] ? typeof data[dataKeys[0]] : 'N/A',
-          firstKeyValueIsArray: dataKeys[0] ? Array.isArray(data[dataKeys[0]]) : false,
-          firstKeyValueKeys: dataKeys[0] && typeof data[dataKeys[0]] === 'object' && data[dataKeys[0]] !== null 
-            ? Object.keys(data[dataKeys[0]]) 
-            : 'N/A',
-          // 检查第一个键的值中是否包含 nodes 和 edges
-          firstKeyHasNodes: dataKeys[0] && typeof data[dataKeys[0]] === 'object' && data[dataKeys[0]] !== null
-            ? 'nodes' in data[dataKeys[0]]
-            : false,
-          firstKeyHasEdges: dataKeys[0] && typeof data[dataKeys[0]] === 'object' && data[dataKeys[0]] !== null
-            ? 'edges' in data[dataKeys[0]]
-            : false,
-          hasNodes: 'nodes' in data,
-          hasEdges: 'edges' in data,
-          nodesValue: data.nodes,
-          nodesType: typeof data.nodes,
-          nodesIsArray: Array.isArray(data.nodes),
-          edgesValue: data.edges,
-          edgesType: typeof data.edges,
-          edgesIsArray: Array.isArray(data.edges),
-          // 完整 data 对象的结构（限制长度）
-          fullDataString: JSON.stringify(data).substring(0, 1000),
+
+      // 检查是否是澄清请求
+      if (data && data.type === 'clarification_needed') {
+        log('💬 [CommandBar] 收到澄清请求，显示澄清对话框');
+        setIsProcessingVideo(false);
+        clearLoadingTimers();
+        
+        // 显示澄清对话框（保留原始输入）
+        const clarificationData = data.data;
+        setClarificationDialog({
+          isOpen: true,
+          message: clarificationData.message,
+          question: clarificationData.question,
+          options: clarificationData.options,
+          originalPrompt: prompt.trim(), // 保留原始输入
         });
-        
-        // 如果 data 中只有一个键，且这个键的值是对象，尝试从这个对象中提取 nodes 和 edges
-        if (dataKeys.length === 1 && typeof data[dataKeys[0]] === 'object' && data[dataKeys[0]] !== null) {
-          const firstKeyValue = data[dataKeys[0]];
-          log('🔍 [CommandBar] 检测到 data 只有一个键，尝试从该键的值中提取 nodes 和 edges:', {
-            key: dataKeys[0],
-            valueType: typeof firstKeyValue,
-            valueKeys: Object.keys(firstKeyValue),
-            hasNodes: 'nodes' in firstKeyValue,
-            hasEdges: 'edges' in firstKeyValue,
-            nodesValue: firstKeyValue.nodes,
-            nodesIsArray: Array.isArray(firstKeyValue.nodes),
-            edgesValue: firstKeyValue.edges,
-            edgesIsArray: Array.isArray(firstKeyValue.edges),
-          });
-          
-          // 如果这个对象中有 nodes 和 edges，使用它们
-          if (Array.isArray(firstKeyValue.nodes) && !nodes) {
-            nodes = firstKeyValue.nodes;
-            log('✅ [CommandBar] 从 data 的第一个键的值中提取到节点:', { count: nodes?.length || 0 });
-          }
-          if (Array.isArray(firstKeyValue.edges) && !edges) {
-            edges = firstKeyValue.edges;
-            log('✅ [CommandBar] 从 data 的第一个键的值中提取到边:', { count: edges?.length || 0 });
-          }
-        }
-        
-        if (!nodes && Array.isArray(data.nodes)) {
+
+        // 不重置状态，保留用户输入
+        setIsTimeoutOverride(false);
+        return; // 提前返回，不处理图结构
+      }
+
+      // 详细记录 resultData 的结构（仅对graph_generated类型）
+      log('🔍 [CommandBar] resultData 详细结构:', {
+        hasResultData: !!resultData,
+        resultDataKeys: resultData ? Object.keys(resultData) : [],
+        hasData: !!data,
+        dataType: data?.type,
+        dataKeys: data ? Object.keys(data) : [],
+        dataNodesType: typeof data?.nodes,
+        dataNodesIsArray: Array.isArray(data?.nodes),
+        dataNodesLength: Array.isArray(data?.nodes) ? data.nodes.length : 'N/A',
+        dataEdgesType: typeof data?.edges,
+        dataEdgesIsArray: Array.isArray(data?.edges),
+        dataEdgesLength: Array.isArray(data?.edges) ? data.edges.length : 'N/A',
+        // 完整结构预览（限制长度）
+        fullStructure: JSON.stringify(resultData).substring(0, 1000),
+      });
+
+      // 提取 nodes 和 edges（仅当type为graph_generated时）
+      let nodes: any[] | undefined;
+      let edges: any[] | undefined;
+
+      // 从graph_generated类型的数据中提取nodes和edges
+      if (data && data.type === 'graph_generated') {
+        if (Array.isArray(data.nodes)) {
           nodes = data.nodes;
-          log('✅ [CommandBar] 从 resultData.data.nodes 提取到节点:', { count: nodes?.length || 0 });
-        } else if (!nodes) {
-          const nodesStringified = data.nodes !== undefined ? JSON.stringify(data.nodes).substring(0, 200) : 'undefined';
-          logWarn('⚠️ [CommandBar] resultData.data.nodes 不是数组:', {
+          log('✅ [CommandBar] 从 data.nodes 提取到节点:', { count: nodes?.length || 0 });
+        } else {
+          logWarn('⚠️ [CommandBar] data.nodes 不是数组:', {
             type: typeof data.nodes,
             value: data.nodes,
-            isUndefined: data.nodes === undefined,
-            isNull: data.nodes === null,
-            stringified: nodesStringified,
           });
         }
         
-        if (!edges && Array.isArray(data.edges)) {
+        if (Array.isArray(data.edges)) {
           edges = data.edges;
-          log('✅ [CommandBar] 从 resultData.data.edges 提取到边:', { count: edges?.length || 0 });
-        } else if (!edges) {
-          const edgesStringified = data.edges !== undefined ? JSON.stringify(data.edges).substring(0, 200) : 'undefined';
-          logWarn('⚠️ [CommandBar] resultData.data.edges 不是数组:', {
+          log('✅ [CommandBar] 从 data.edges 提取到边:', { count: edges?.length || 0 });
+        } else {
+          logWarn('⚠️ [CommandBar] data.edges 不是数组:', {
             type: typeof data.edges,
             value: data.edges,
-            isUndefined: data.edges === undefined,
-            isNull: data.edges === null,
-            stringified: edgesStringified,
           });
         }
-      } else {
+      } else if (!data) {
         logWarn('⚠️ [CommandBar] resultData.data 和 result.data 都不存在:', {
           hasResultData: !!resultData,
           resultDataKeys: resultData ? Object.keys(resultData) : [],
@@ -350,88 +304,16 @@ export function CommandBar() {
       if (finalNodesCount > nodesBeforeAdd) {
         log('🔄 [CommandBar] 节点已成功添加，重置状态');
         
-        // 检查是否有图片附件，如果没有，为每个节点生成UI代码
-        const hasImage = attachment?.type === 'media' && 
-                        (attachment?.mimeType?.startsWith('image/') || 
-                         (attachment?.preview && attachment.mimeType !== 'application/pdf'));
-        
-        if (!hasImage && nodes && Array.isArray(nodes) && nodes.length > 0) {
-          log('🎨 [CommandBar] 没有图片附件，开始为每个节点生成UI代码');
-          setLoadingStep('🎨 正在为节点生成UI代码...');
-          setProgress(20);
-          
-          // 保存原始 prompt，用于生成UI
-          const originalPrompt = prompt;
-          
-          // 为每个节点异步生成UI代码（使用立即执行的异步函数）
-          (async () => {
-            try {
-              const generateUIPromises = nodes.map(async (node, index) => {
-                try {
-                  log(`🎨 [CommandBar] 开始为节点 ${index + 1}/${nodes.length} 生成UI: ${node.data?.label}`);
-                  setLoadingStep(`🎨 正在为"${node.data?.label}"生成UI代码... (${index + 1}/${nodes.length})`);
-                  setProgress(20 + (index + 1) * 60 / nodes.length);
-                  
-                  // 构建节点特定的提示词
-                  const nodePrompt = originalPrompt 
-                    ? `${originalPrompt}\n\n请为"${node.data?.label}"页面生成完整的UI代码。`
-                    : `请为"${node.data?.label}"页面生成完整的React组件代码，包含现代化的UI设计和完整的交互功能。`;
-                  
-                  const uiResult = await executeUIText({
-                    prompt: nodePrompt,
-                    nodeLabel: node.data?.label || node.id,
-                    projectMeta: useCanvasStore.getState().projectMeta,
-                    themeConfig: currentTheme,
-                    aiConfig: aiConfig,
-                  });
-                  
-                  // 处理返回结果
-                  let uiCode = '';
-                  if (Array.isArray(uiResult)) {
-                    uiCode = uiResult[0]?.code || uiResult[0] || '';
-                  } else if (uiResult && typeof uiResult === 'object') {
-                    uiCode = (uiResult as any).code || '';
-                  }
-                  
-                  if (uiCode && uiCode.length > 50) {
-                    // 更新节点的 view.code
-                    updateNodeData(node.id, {
-                      artifacts: {
-                        view: {
-                          code: uiCode,
-                        },
-                      },
-                    });
-                    log(`✅ [CommandBar] 节点 ${index + 1}/${nodes.length} UI代码生成成功: ${node.data?.label}`);
-                  } else {
-                    logWarn(`⚠️ [CommandBar] 节点 ${index + 1}/${nodes.length} UI代码生成失败或为空: ${node.data?.label}`);
-                  }
-                } catch (error) {
-                  logError(`❌ [CommandBar] 节点 ${index + 1}/${nodes.length} UI代码生成失败: ${node.data?.label}`, error);
-                }
-              });
-              
-              // 等待所有UI生成完成
-              await Promise.all(generateUIPromises);
-              log('✅ [CommandBar] 所有节点的UI代码生成完成');
-              setLoadingStep('✅ UI代码生成完成');
-              setProgress(100);
-              toast.success('节点和UI代码生成完成', {
-                description: `已生成 ${nodes.length} 个节点及其UI代码`,
-                duration: 3000,
-              });
-            } catch (error) {
-              logError('❌ [CommandBar] 部分节点的UI代码生成失败:', error);
-              toast.warning('部分UI代码生成失败', {
-                description: '部分节点的UI代码可能未生成，请手动生成',
-                duration: 5000,
-              });
-            } finally {
-              setIsProcessingVideo(false);
-              clearLoadingTimers();
-            }
-          })();
-        }
+        // 不再自动为每个节点生成UI代码
+        // UI代码需要用户在相应的页面节点中手动生成
+        const newNodesCount = finalNodesCount - nodesBeforeAdd;
+        log('✅ [CommandBar] 节点生成完成，UI代码将在用户选择节点后手动生成');
+        setLoadingStep('✅ 节点生成完成');
+        setProgress(100);
+        toast.success('节点生成完成', {
+          description: `已生成 ${newNodesCount} 个页面节点，请在节点详情面板中手动生成UI代码`,
+          duration: 3000,
+        });
         
         setPrompt('');
         setAttachment(null);
@@ -530,8 +412,26 @@ export function CommandBar() {
   // 编辑模式的 action（必须在所有使用它的函数之前定义）
   const { execute: executeUpdate, isPending: isUpdating } = useServerAction(updateNodeArtifacts, {
     onSuccess: (result) => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/c096b492-56e2-47cd-8056-6165bca2659e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CommandBar.tsx:533',message:'executeUpdate onSuccess entry',data:{hasResult:!!result,hasData:!!result?.data,selectedNodeId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      log('🔍 [CommandBar] executeUpdate onSuccess:', { hasResult: !!result, hasData: !!result?.data, selectedNodeId });
+      // #endregion
+      
       // zsa-react 的 useServerAction 返回格式：result 直接是 handler 的返回值
       const artifacts = result?.data || result;
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/c096b492-56e2-47cd-8056-6165bca2659e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CommandBar.tsx:537',message:'artifacts extracted',data:{hasArtifacts:!!artifacts,hasView:!!artifacts?.view,hasSpec:!!artifacts?.spec,viewCodeLength:artifacts?.view?.code?.length||0,specTitle:artifacts?.spec?.title,specRequirementsCount:Array.isArray(artifacts?.spec?.requirements)?artifacts.spec.requirements.length:'N/A'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      log('🔍 [CommandBar] artifacts extracted:', {
+        hasArtifacts: !!artifacts,
+        hasView: !!artifacts?.view,
+        hasSpec: !!artifacts?.spec,
+        viewCodeLength: artifacts?.view?.code?.length || 0,
+        specTitle: artifacts?.spec?.title,
+        specRequirementsCount: Array.isArray(artifacts?.spec?.requirements) ? artifacts.spec.requirements.length : 'N/A',
+      });
+      // #endregion
+      
       if (selectedNodeId && artifacts) {
         
         // 处理 requirements 字段：如果是字符串，转换为数组（按换行符分割）
@@ -555,10 +455,35 @@ export function CommandBar() {
         }
         
         // 更新节点的 artifacts（部分更新）
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/c096b492-56e2-47cd-8056-6165bca2659e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CommandBar.tsx:558',message:'calling updateNodeData',data:{selectedNodeId,hasProcessedArtifacts:!!processedArtifacts,processedArtifactsKeys:processedArtifacts?Object.keys(processedArtifacts):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        log('🔍 [CommandBar] calling updateNodeData:', {
+          selectedNodeId,
+          hasProcessedArtifacts: !!processedArtifacts,
+          processedArtifactsKeys: processedArtifacts ? Object.keys(processedArtifacts) : [],
+        });
+        // #endregion
+        
         updateNodeData(selectedNodeId, {
           artifacts: processedArtifacts,
         });
+        
+        // #region agent log
+        setTimeout(() => {
+          const updatedNode = useCanvasStore.getState().nodes.find(n => n.id === selectedNodeId);
+          fetch('http://127.0.0.1:7242/ingest/c096b492-56e2-47cd-8056-6165bca2659e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CommandBar.tsx:565',message:'updateNodeData verification',data:{nodeFound:!!updatedNode,hasArtifacts:!!updatedNode?.data?.artifacts,artifactsViewCodeLength:updatedNode?.data?.artifacts?.view?.code?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+          log('🔍 [CommandBar] updateNodeData verification:', {
+            nodeFound: !!updatedNode,
+            hasArtifacts: !!updatedNode?.data?.artifacts,
+            artifactsViewCodeLength: updatedNode?.data?.artifacts?.view?.code?.length || 0,
+          });
+        }, 100);
+        // #endregion
       } else {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/c096b492-56e2-47cd-8056-6165bca2659e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CommandBar.tsx:571',message:'updateNodeArtifacts success but no data',data:{selectedNodeId,hasResult:!!result,resultKeys:result?Object.keys(result):[]},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        log('⚠️ [CommandBar] updateNodeArtifacts success but no data:', { selectedNodeId, hasResult: !!result, resultKeys: result ? Object.keys(result) : [] });
+        // #endregion
         logWarn('Update node success but no data:', { selectedNodeId, result });
       }
       // 重置状态
@@ -1668,15 +1593,40 @@ Generate the complete .tsx code now.`;
       });
 
       try {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/c096b492-56e2-47cd-8056-6165bca2659e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CommandBar.tsx:1671',message:'calling executeUpdate',data:{nodeId:selectedNode.id,hasNodeTitle:!!selectedNode.data.label,hasUserPrompt:!!prompt.trim(),attachmentsCount:attachments.length,hasCurrentArtifacts:!!currentArtifacts},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        log('🔍 [CommandBar] calling executeUpdate:', {
+          nodeId: selectedNode.id,
+          hasNodeTitle: !!selectedNode.data.label,
+          hasUserPrompt: !!prompt.trim(),
+          attachmentsCount: attachments.length,
+          hasCurrentArtifacts: !!currentArtifacts,
+        });
+        // #endregion
+        
         await executeUpdate({
           nodeId: selectedNode.id,
-          nodeTitle: selectedNode.data.label,
+          nodeTitle: selectedNode.data.label || undefined,
           currentArtifacts,
-          userPrompt: prompt.trim() || '',
-          attachments,
+          userPrompt: prompt.trim() || undefined,
+          attachments: attachments.length > 0 ? attachments : undefined,
         });
+        
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/c096b492-56e2-47cd-8056-6165bca2659e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CommandBar.tsx:1678',message:'executeUpdate completed successfully',data:{nodeId:selectedNode.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        log('✅ [CommandBar] executeUpdate completed successfully');
+        // #endregion
+        
         log('✅ [CommandBar] executeUpdate completed');
       } catch (error) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/c096b492-56e2-47cd-8056-6165bca2659e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'CommandBar.tsx:1680',message:'executeUpdate error caught',data:{errorMessage:error instanceof Error?error.message:String(error),errorType:error?.constructor?.name||typeof error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        log('❌ [CommandBar] executeUpdate error caught:', {
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorType: error?.constructor?.name || typeof error,
+        });
+        // #endregion
+        
         logError('❌ [CommandBar] executeUpdate error:', error);
         throw error;
       }
@@ -1985,6 +1935,42 @@ Generate the complete .tsx code now.`;
           </div>
         )}
       </div>
+
+      {/* 澄清对话框 */}
+      {clarificationDialog && (
+        <ClarificationDialog
+          isOpen={clarificationDialog.isOpen}
+          onClose={() => setClarificationDialog(null)}
+          message={clarificationDialog.message}
+          question={clarificationDialog.question}
+          options={clarificationDialog.options}
+          originalPrompt={clarificationDialog.originalPrompt}
+          onSelectOption={(option) => {
+            // 编辑描述：将场景信息填充到输入框
+            const enhancedPrompt = `${clarificationDialog.originalPrompt}\n\n我选择的是：${option.label}\n${option.desc}\n功能示例：${option.example}`;
+            setPrompt(enhancedPrompt);
+            setClarificationDialog(null);
+            // 聚焦到输入框
+            setTimeout(() => {
+              textareaRef.current?.focus();
+            }, 100);
+          }}
+          onUseScenario={(option) => {
+            // 快速生成：直接基于场景生成
+            const scenarioPrompt = `${option.label}：${option.desc}\n功能示例：${option.example}`;
+            setPrompt(scenarioPrompt);
+            setClarificationDialog(null);
+            
+            // 自动提交
+            setTimeout(() => {
+              const form = textareaRef.current?.closest('form');
+              if (form) {
+                form.requestSubmit();
+              }
+            }, 100);
+          }}
+        />
+      )}
     </div>
   );
 }
