@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { openai } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { log, logError, logWarn } from '@/lib/logger';
-import { getTextModel } from '@/lib/ai-config';
+import { getTextModel, getVisionModel } from '@/lib/ai-config';
 import type { FractalNode } from '@/types/fractal';
 import type { Edge } from 'reactflow';
 
@@ -163,49 +163,130 @@ const ConditionalResultSchema = z.discriminatedUnion('type', [
 // 分析输入模糊度的辅助函数
 async function analyzeInputClarity(
   prompt: string,
-  textModel: string
+  textModel: string,
+  aiConfig?: { visionModel?: string; textModel?: string },
+  attachmentContent?: string,
+  mediaBase64?: string,
+  mediaType?: 'image' | 'video'
 ): Promise<z.infer<typeof InputClarityAnalysisSchema>> {
+  // 构建包含文件内容的分析内容
+  let analysisContent = prompt.trim() || '用户输入为空';
+  let hasFileContent = false;
+  
+  if (attachmentContent) {
+    analysisContent += `\n\n附件内容：\n${attachmentContent}`;
+    hasFileContent = true;
+  }
+  
+  if (mediaBase64) {
+    const mediaTypeText = mediaType === 'image' ? '图片' : '视频';
+    // 对于图片，在文本中说明有图片，但图片本身会作为视觉输入
+    // 对于视频，只能通过文本说明
+    if (mediaType === 'image') {
+      analysisContent += `\n\n用户上传了${mediaTypeText}文件（图片内容将作为视觉输入进行分析）。`;
+    } else {
+      analysisContent += `\n\n用户上传了${mediaTypeText}文件，请结合文件内容进行分析。`;
+    }
+    hasFileContent = true;
+  }
+  
   const clarityAnalysisPrompt = `# Role
 AI Product Consultant & Requirement Analyst.
 
 # Task
-Analyze the user input to determine if it contains enough context to generate a specific Product Site Map.
+Analyze the user input (including any uploaded files) to determine if it contains enough context to generate a specific Product Site Map.
 
 # 🧠 Core Logic: The Ambiguity Filter
 
 ## Context Analysis Criteria
-Analyze the input depth. Ask yourself: *Do I know the specific **Business Object** (e.g., Paint, Reimbursement, Customer) and the **Core Action** (e.g., Stocktaking, Approving, Selling)?*
+Analyze the input depth. Consider BOTH the text description AND any uploaded file content (images, documents, flowcharts, etc.).
+Ask yourself: *Do I know the specific **Business Object** (e.g., Paint, Reimbursement, Customer) and the **Core Action** (e.g., Stocktaking, Approving, Selling)?*
+
+**Important**: If the user has uploaded files (images, documents, etc.), analyze the content of those files as well. Files may contain detailed requirements, flowcharts, specifications, or other context that makes the input more specific.
 
 ### Vague Input Indicators (Confidence < 60%):
 - Generic terms: "enterprise app", "management system", "tool for my team"
-- No specific business object mentioned
-- No specific workflow or action described
+- No specific business object mentioned (in text OR files)
+- No specific workflow or action described (in text OR files)
 - Too high-level or abstract
+- Uploaded files don't contain enough detail to clarify the business scenario
 
 ### Specific Input Indicators (Confidence >= 60%):
 - Specific business objects: "Paint inventory", "Reimbursement approval", "CRM for real estate"
 - Clear workflows: "approval process", "order management", "customer tracking"
 - Specific domain context: "material collection", "news coordination"
+- Uploaded files (images/documents) contain detailed requirements, flowcharts, or specifications that clarify the business scenario
 
 ## Output Requirements
-- **confidence**: A number between 0-100 representing how specific the input is
+- **confidence**: A number between 0-100 representing how specific the input is (considering BOTH text and files)
 - **isVague**: true if confidence < 60, false otherwise
-- **detectedDomain**: Extract the high-level domain if detectable
-- **detectedBusinessObject**: Extract the specific business object if mentioned
-- **detectedAction**: Extract the core action/workflow if mentioned
+- **detectedDomain**: Extract the high-level domain if detectable (from text or files)
+- **detectedBusinessObject**: Extract the specific business object if mentioned (from text or files)
+- **detectedAction**: Extract the core action/workflow if mentioned (from text or files)
 
-Analyze the following input: "${prompt}"`;
+Analyze the following input: "${analysisContent}"`;
+
+  // 如果有图片，需要使用 vision 模型
+  const useVisionModel = mediaBase64 && mediaType === 'image';
+  const model = useVisionModel 
+    ? openai(getVisionModel(aiConfig))
+    : openai(textModel);
+  
+  log('🔍 [analyzeInputClarity] 开始分析输入模糊度', {
+    hasText: !!prompt,
+    hasAttachment: !!attachmentContent,
+    hasMedia: !!mediaBase64,
+    mediaType,
+    useVisionModel,
+    model: useVisionModel ? getVisionModel(aiConfig) : textModel,
+  });
+  
+  // 构建消息内容
+  const messages: any[] = [];
+  
+  if (useVisionModel && mediaBase64) {
+    // 对于图片，使用多模态消息格式
+    // 处理 base64 格式：可能是 data URL 格式（data:image/...;base64,xxx）或纯 base64
+    let base64Data = mediaBase64;
+    if (mediaBase64.includes(',')) {
+      base64Data = mediaBase64.split(',')[1];
+      log('📝 [analyzeInputClarity] 检测到 data URL 格式，已提取 base64 部分');
+    } else {
+      log('📝 [analyzeInputClarity] 检测到纯 base64 格式');
+    }
+    
+    messages.push({
+      role: 'user' as const,
+      content: [
+        { type: 'text', text: clarityAnalysisPrompt },
+        { 
+          type: 'image', 
+          image: base64Data
+        },
+      ],
+    });
+  } else {
+    // 对于纯文本或视频，使用文本消息
+    messages.push({
+      role: 'user' as const,
+      content: clarityAnalysisPrompt,
+    });
+  }
 
   const result = await generateObject({
-    model: openai(textModel),
+    model,
     schema: InputClarityAnalysisSchema,
-    messages: [
-      {
-        role: 'user',
-        content: clarityAnalysisPrompt,
-      },
-    ],
+    messages,
     temperature: 0.3,
+  });
+
+  log('📊 [analyzeInputClarity] 模糊度分析完成', {
+    confidence: result.object.confidence,
+    isVague: result.object.isVague,
+    detectedDomain: result.object.detectedDomain,
+    detectedBusinessObject: result.object.detectedBusinessObject,
+    detectedAction: result.object.detectedAction,
+    hasFileContent,
   });
 
   return result.object;
@@ -300,13 +381,20 @@ export const generateGraph = createServerAction()
       log(`🤖 [generateGraph] 使用模型: ${textModel}`);
 
       // Step 1: 分析输入模糊度
-      // 优化：即使有媒体/附件，也分析文本提示词的明确度
-      // 如果文本提示词模糊，仍然需要澄清（媒体可能也不够具体）
-      const shouldAnalyzeClarity = input.prompt.trim().length > 0;
+      // 现在会同时分析文本提示词和上传的文件内容
+      const shouldAnalyzeClarity = input.prompt.trim().length > 0 || !!input.mediaBase64 || !!input.attachmentContent;
+      const hasMediaOrAttachment = !!input.mediaBase64 || !!input.attachmentContent;
       
       if (shouldAnalyzeClarity) {
-        log('🔍 [generateGraph] 开始分析输入模糊度...');
-        const clarityAnalysis = await analyzeInputClarity(input.prompt.trim(), textModel);
+        log('🔍 [generateGraph] 开始分析输入模糊度（包含文件内容）...');
+        const clarityAnalysis = await analyzeInputClarity(
+          input.prompt.trim(),
+          textModel,
+          input.aiConfig,
+          input.attachmentContent,
+          input.mediaBase64,
+          input.mediaType
+        );
         
         log('📊 [generateGraph] 模糊度分析结果:', {
           confidence: clarityAnalysis.confidence,
@@ -318,11 +406,18 @@ export const generateGraph = createServerAction()
           hasAttachment: !!input.attachmentContent,
         });
 
-        if (clarityAnalysis.isVague) {
-          log('⚠️ [generateGraph] 输入过于模糊，生成澄清请求');
+        // 现在 analyzeInputClarity 已经考虑了文件内容，所以直接使用分析结果
+        // 不再需要额外的调整逻辑，因为文件内容已经在分析时被考虑了
+        const adjustedIsVague = clarityAnalysis.isVague;
+
+        if (adjustedIsVague) {
+          log('⚠️ [generateGraph] 输入过于模糊，生成澄清请求', {
+            originalIsVague: clarityAnalysis.isVague,
+            adjustedIsVague,
+            hasMediaOrAttachment,
+            confidence: clarityAnalysis.confidence,
+          });
           
-          // 如果有媒体/附件，传递给生成函数以便生成更合适的提示
-          const hasMediaOrAttachment = !!input.mediaBase64 || !!input.attachmentContent;
           const clarificationRequest = await generateClarificationRequest(
             clarityAnalysis, 
             textModel,
@@ -334,7 +429,11 @@ export const generateGraph = createServerAction()
           };
         }
         
-        log('✅ [generateGraph] 输入足够具体，继续生成图结构');
+        if (hasMediaOrAttachment && !clarityAnalysis.isVague) {
+          log('✅ [generateGraph] 输入足够具体，且有附件支持，继续生成图结构');
+        } else {
+          log('✅ [generateGraph] 输入足够具体，继续生成图结构');
+        }
       } else {
         log('⏭️ [generateGraph] 没有文本输入，直接生成图结构');
       }
@@ -545,8 +644,29 @@ Return JSON with the following structure:
    - View pages SHOULD have \`consumesEvent\` (if they display event results)
 4. **Traceability**: Every node MUST have \`traceability\` object with journey and event mappings`;
 
-      // 构建用户提示词
-      const userPrompt = input.prompt.trim() || '请生成项目结构';
+      // 构建用户提示词（包含附件内容）
+      let userPrompt = input.prompt.trim() || '请生成项目结构';
+      
+      // 如果有附件内容，将其添加到提示词中
+      if (input.attachmentContent) {
+        const attachmentInfo = input.attachmentType === 'text' 
+          ? `\n\n附件内容（${input.mimeType || '文本文件'}）：\n${input.attachmentContent}`
+          : `\n\n附件已上传（${input.mimeType || '媒体文件'}），请参考附件内容进行分析。`;
+        userPrompt += attachmentInfo;
+        
+        log('📎 [generateGraph] 已包含附件内容到提示词:', {
+          attachmentType: input.attachmentType,
+          mimeType: input.mimeType,
+          contentLength: input.attachmentContent.length,
+          contentPreview: input.attachmentContent.substring(0, 200),
+        });
+      }
+      
+      // 如果有媒体文件，在系统提示词中添加说明
+      if (input.mediaBase64) {
+        const mediaInfo = `\n\n注意：用户上传了${input.mediaType === 'image' ? '图片' : '视频'}文件，请结合图片/视频内容进行分析。`;
+        userPrompt += mediaInfo;
+      }
 
       // 调用 AI 生成图结构
       const result = await generateObject({

@@ -6,15 +6,17 @@ import { X } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvas-store';
 import { MermaidDiagram } from './MermaidDiagram';
 import { ArchitectureTopology } from './ArchitectureTopology';
-import { WordUploader } from './WordUploader';
 import { clsx } from 'clsx';
+import type { ProjectMeta } from '@/types/fractal';
 
 interface ProjectBlueprintProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: TabType; // 初始标签页
+  initialData?: Partial<ProjectMeta>; // 需要自动填充的数据
 }
 
-type TabType = 'profile' | 'business' | 'interaction' | 'data' | 'topology' | 'rules' | 'word';
+type TabType = 'profile' | 'business' | 'interaction' | 'data' | 'topology' | 'rules' | 'events' | 'userStories';
 
 interface DataDictionaryField {
   fieldName: string;
@@ -101,15 +103,22 @@ const parseDbSchema = (schema: string): Array<{
   return fields;
 };
 
-export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
+export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: ProjectBlueprintProps) {
   const { nodes, edges, projectMeta, globalRules, updateProjectMeta, updateGlobalRules } = useCanvasStore();
-  const [activeTab, setActiveTab] = useState<TabType>('profile');
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab || 'profile');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     return () => setMounted(false);
   }, []);
+
+  // 当 isOpen 变化时，重置 activeTab（如果传入了 initialTab）
+  useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
   
   // 项目画像本地状态 - 提供默认值防止 undefined
   const defaultProjectMeta = {
@@ -121,7 +130,7 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
   };
   const [localProjectMeta, setLocalProjectMeta] = useState(projectMeta || defaultProjectMeta);
   
-  // 同步 store 中的 projectMeta 到本地状态
+  // 同步 store 中的 projectMeta 到本地状态，并在打开时应用初始数据
   useEffect(() => {
     if (projectMeta) {
       setLocalProjectMeta(projectMeta);
@@ -129,6 +138,22 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
       setLocalProjectMeta(defaultProjectMeta);
     }
   }, [projectMeta]);
+
+  // 当组件打开且有初始数据时，自动填充到项目画像（只执行一次）
+  const initialDataAppliedRef = React.useRef(false);
+  useEffect(() => {
+    if (isOpen && initialData && Object.keys(initialData).length > 0 && !initialDataAppliedRef.current) {
+      // 只在首次打开且有初始数据时应用
+      const mergedMeta = { ...localProjectMeta, ...initialData };
+      setLocalProjectMeta(mergedMeta);
+      updateProjectMeta(initialData);
+      initialDataAppliedRef.current = true;
+    }
+    // 当关闭时重置标志
+    if (!isOpen) {
+      initialDataAppliedRef.current = false;
+    }
+  }, [isOpen, initialData, localProjectMeta, updateProjectMeta]);
 
   // 生成交互拓扑图（页面导航结构）
   const interactionFlowDiagram = useMemo(() => {
@@ -167,12 +192,12 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
     const lines: string[] = ['sequenceDiagram'];
     const participants = new Map<string, string>(); // node ID -> role label
     const participantOrder: string[] = []; // 保持participant的顺序
-
+    
     // 第一步：收集所有参与者（从edges中提取角色或使用节点标签）
     edges.forEach((edge) => {
-      const sourceNode = nodes.find(n => n.id === edge.source);
-      const targetNode = nodes.find(n => n.id === edge.target);
-      
+        const sourceNode = nodes.find(n => n.id === edge.source);
+        const targetNode = nodes.find(n => n.id === edge.target);
+        
       if (!sourceNode || !targetNode) return;
 
       const label = String(edge.label || '');
@@ -249,9 +274,9 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
     });
 
     // 第三步：生成交互序列
-    edges.forEach((edge) => {
-      const sourceNode = nodes.find(n => n.id === edge.source);
-      const targetNode = nodes.find(n => n.id === edge.target);
+      edges.forEach((edge) => {
+        const sourceNode = nodes.find(n => n.id === edge.source);
+        const targetNode = nodes.find(n => n.id === edge.target);
       
       if (!sourceNode || !targetNode) return;
 
@@ -290,15 +315,205 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
       }
       
       lines.push(`    ${sourceSafeId}->>${targetSafeId}: ${safeAction}`);
-    });
+      });
 
-    return lines.join('\n');
+      return lines.join('\n');
   };
 
   // 生成业务泳道图（基于角色）
   const businessProcessDiagram = useMemo(() => {
     return generateSwimlaneCode();
   }, [nodes, edges]);
+
+  // 生成用户旅程图数据（用于表格和图表）
+  const generateUserJourneyTable = useMemo(() => {
+    const allUserStories: Array<{
+      nodeId: string;
+      nodeLabel: string;
+      story: {
+        id: string;
+        role: string;
+        activity: string;
+        value: string;
+        acceptanceCriteria?: string[];
+      };
+    }> = [];
+
+    nodes.forEach((node) => {
+      const userStories = node.data.artifacts?.userStories || [];
+      userStories.forEach((story) => {
+        allUserStories.push({
+          nodeId: node.id,
+          nodeLabel: node.data.label || node.id,
+          story: {
+            id: story.id,
+            role: story.role,
+            activity: story.activity,
+            value: story.value,
+            acceptanceCriteria: story.acceptanceCriteria,
+          },
+        });
+      });
+    });
+
+    if (allUserStories.length === 0) return null;
+
+    // 按角色分组，然后按节点分组
+    const roleGroups = new Map<string, typeof allUserStories>();
+    allUserStories.forEach((item) => {
+      const role = item.story.role;
+      if (!roleGroups.has(role)) {
+        roleGroups.set(role, []);
+      }
+      roleGroups.get(role)!.push(item);
+    });
+
+    return { roleGroups, allUserStories };
+  }, [nodes]);
+
+  // 生成用户旅程图 Mermaid 图表
+  const generateUserJourneyDiagram = useMemo(() => {
+    if (!generateUserJourneyTable || generateUserJourneyTable.allUserStories.length === 0) {
+      return '';
+    }
+
+    const lines: string[] = ['journey'];
+    
+    // 获取第一个用户故事的角色作为旅程标题
+    const firstStory = generateUserJourneyTable.allUserStories[0];
+    const journeyTitle = `${firstStory.story.role}的完整旅程`;
+    lines.push(`    title ${journeyTitle}`);
+    
+    // 按节点分组用户故事，每个节点作为一个 section
+    const storiesByNode = new Map<string, typeof generateUserJourneyTable.allUserStories>();
+    generateUserJourneyTable.allUserStories.forEach((item) => {
+      if (!storiesByNode.has(item.nodeId)) {
+        storiesByNode.set(item.nodeId, []);
+      }
+      storiesByNode.get(item.nodeId)!.push(item);
+    });
+
+    // 按节点顺序生成旅程步骤
+    nodes.forEach((node) => {
+      const nodeStories = storiesByNode.get(node.id) || [];
+      if (nodeStories.length > 0) {
+        const nodeLabel = (node.data.label || node.id).replace(/"/g, '&quot;').substring(0, 30);
+        lines.push(`    section ${nodeLabel}`);
+        
+        // 为每个用户故事添加步骤
+        nodeStories.forEach((item) => {
+          const stepLabel = item.story.activity.replace(/"/g, '&quot;').substring(0, 40);
+          const satisfaction = 75; // 默认满意度
+          const role = item.story.role.replace(/"/g, '&quot;').substring(0, 20);
+          lines.push(`      ${stepLabel}: ${satisfaction}: ${role}`);
+        });
+      }
+    });
+
+    return lines.join('\n');
+  }, [generateUserJourneyTable, nodes]);
+
+  // 为单个用户故事生成Mermaid序列图（基于业务事件）
+  const generateStorySequenceDiagram = (nodeId: string, storyId: string): string => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (!node) return '';
+
+    const events = node.data.artifacts?.events || [];
+    const story = node.data.artifacts?.userStories?.find(s => s.id === storyId);
+    if (!story || events.length === 0) return '';
+
+    const nodeLabel = node.data.label || node.id;
+    const safeNodeId = nodeLabel.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_]/g, '_');
+    
+    const lines: string[] = ['sequenceDiagram'];
+    lines.push(`    participant User as 用户`);
+    lines.push(`    participant ${safeNodeId} as ${nodeLabel}`);
+    
+    // 收集所有需要的服务参与者
+    const allServices = new Set<string>();
+    events.forEach((event) => {
+      event.processFlow.forEach((step) => {
+        // 提取服务名称（从action中提取，或使用通用服务）
+        let serviceName = '业务逻辑服务';
+        if (step.action.includes('服务') || step.action.includes('Service')) {
+          const match = step.action.match(/([^，,。.\n]+(?:服务|Service))/);
+          if (match) serviceName = match[1];
+        } else if (step.action.includes('API') || step.action.includes('接口')) {
+          serviceName = 'API服务';
+        } else if (step.action.includes('校验') || step.action.includes('验证')) {
+          serviceName = '校验服务';
+        } else if (step.action.includes('计算') || step.action.includes('处理')) {
+          serviceName = '计算服务';
+        } else if (step.action.includes('更新') || step.action.includes('保存')) {
+          serviceName = '数据服务';
+        }
+        allServices.add(serviceName);
+      });
+    });
+
+    // 为每个服务添加participant
+    const serviceIds = new Map<string, string>();
+    Array.from(allServices).forEach((serviceName, idx) => {
+      const safeServiceId = `Service${idx + 1}`;
+      serviceIds.set(serviceName, safeServiceId);
+      lines.push(`    participant ${safeServiceId} as ${serviceName}`);
+    });
+
+    // 为每个业务事件生成序列
+    events.forEach((event, eventIdx) => {
+      if (eventIdx > 0) {
+        lines.push(`    Note over User,${safeNodeId}: --- 事件: ${event.name} ---`);
+      }
+
+      // 生成触发事件
+      lines.push(`    User->>${safeNodeId}: ${event.trigger}`);
+      
+      // 生成流程步骤
+      let lastServiceId: string | null = null;
+      event.processFlow.forEach((step, stepIdx) => {
+        // 确定当前步骤使用的服务
+        let serviceName = '业务逻辑服务';
+        if (step.action.includes('服务') || step.action.includes('Service')) {
+          const match = step.action.match(/([^，,。.\n]+(?:服务|Service))/);
+          if (match) serviceName = match[1];
+        } else if (step.action.includes('API') || step.action.includes('接口')) {
+          serviceName = 'API服务';
+        } else if (step.action.includes('校验') || step.action.includes('验证')) {
+          serviceName = '校验服务';
+        } else if (step.action.includes('计算') || step.action.includes('处理')) {
+          serviceName = '计算服务';
+        } else if (step.action.includes('更新') || step.action.includes('保存')) {
+          serviceName = '数据服务';
+        }
+        
+        const serviceId = serviceIds.get(serviceName) || 'Service1';
+        
+        if (stepIdx === 0) {
+          // 第一步：从页面到服务
+          lines.push(`    ${safeNodeId}->>${serviceId}: ${step.action}`);
+          lastServiceId = serviceId;
+        } else {
+          // 后续步骤
+          if (lastServiceId && lastServiceId !== serviceId) {
+            // 切换服务，先返回再调用新服务
+            lines.push(`    ${lastServiceId}-->>${safeNodeId}: 完成`);
+            lines.push(`    ${safeNodeId}->>${serviceId}: ${step.action}`);
+          } else {
+            // 同一服务内的连续操作
+            lines.push(`    ${serviceId}->>${serviceId}: ${step.action}`);
+          }
+          lastServiceId = serviceId;
+        }
+      });
+
+      // 最后一步返回给用户
+      const finalServiceId = lastServiceId || 'Service1';
+      lines.push(`    ${finalServiceId}-->>${safeNodeId}: ${event.outcome}`);
+      lines.push(`    ${safeNodeId}-->>User: 完成`);
+    });
+
+    return lines.join('\n');
+  };
 
   // 生成全局数据字典（聚合所有节点的数据定义）
   const dataDictionary = useMemo((): DataDictionaryField[] => {
@@ -408,10 +623,13 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
     },
     React.createElement('div', {
       className: 'relative w-full max-w-6xl h-[90vh] bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl overflow-hidden flex flex-col',
-      onClick: (e: React.MouseEvent) => e.stopPropagation()
+      onClick: (e: React.MouseEvent) => e.stopPropagation(),
+      style: { display: 'flex', flexDirection: 'column' }
     },
-    // Header
-    React.createElement('div', { className: 'flex items-center justify-between p-4 border-b border-zinc-800' },
+    // Header - 确保始终可见
+    React.createElement('div', { 
+      className: 'flex items-center justify-between p-4 border-b border-zinc-800 flex-shrink-0' 
+    },
       React.createElement('h2', { className: 'text-xl font-semibold text-zinc-100' }, '📘 项目蓝图'),
       React.createElement('button', {
         onClick: onClose,
@@ -419,25 +637,29 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
         title: '关闭'
       }, React.createElement(X, { className: 'w-5 h-5 text-zinc-400' }))
     ),
-    // Tabs
-    React.createElement('div', { className: 'flex border-b border-zinc-800 bg-zinc-900/30 overflow-x-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent' },
+    // Tabs - 确保始终可见
+    React.createElement('div', { 
+      className: 'flex border-b border-zinc-800 bg-zinc-900/30 overflow-x-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent flex-shrink-0',
+      style: { zIndex: 10 }
+    },
       [
         { id: 'profile' as TabType, label: '项目画像', icon: '🎭' },
+        { id: 'userStories' as TabType, label: '用户故事', icon: '📖' },
         { id: 'business' as TabType, label: '业务泳道图', icon: '🏊' },
+        { id: 'events' as TabType, label: '业务事件与流转', icon: '⚡' },
         { id: 'interaction' as TabType, label: '交互拓扑图', icon: '🔄' },
         { id: 'data' as TabType, label: '全局数据字典', icon: '📊' },
         { id: 'topology' as TabType, label: '架构拓扑图', icon: '🗺️' },
         { id: 'rules' as TabType, label: '全局规则', icon: '📋' },
-        { id: 'word' as TabType, label: 'Word 上传', icon: '📄' },
       ].map((tab) =>
         React.createElement('button', {
           key: tab.id,
           onClick: () => setActiveTab(tab.id),
           className: clsx(
             "flex-shrink-0 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-colors whitespace-nowrap",
-            activeTab === tab.id
-              ? "border-blue-500 text-blue-400 bg-blue-500/5"
-              : "border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+                  activeTab === tab.id
+                    ? "border-blue-500 text-blue-400 bg-blue-500/5"
+                    : "border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
           )
         },
         React.createElement('span', {}, tab.icon),
@@ -445,9 +667,24 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
         )
       )
     ),
-    // Content
-    React.createElement('div', { className: 'flex-1 overflow-y-auto p-6' },
+    // Content - 确保可以滚动
+    React.createElement('div', { 
+      className: 'flex-1 overflow-y-auto p-6',
+      style: { minHeight: 0, maxHeight: '100%' }
+    },
       activeTab === 'profile' && React.createElement('div', { className: 'space-y-6' },
+        // 如果有初始数据，显示提示信息
+        initialData && React.createElement('div', { 
+          className: 'bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-4' 
+        },
+          React.createElement('div', { className: 'flex items-start gap-3' },
+            React.createElement('div', { className: 'flex-shrink-0 w-5 h-5 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-xs font-medium text-blue-400 mt-0.5' }, '!'),
+            React.createElement('div', { className: 'flex-1' },
+              React.createElement('p', { className: 'text-sm font-medium text-zinc-200 mb-1' }, '需要更多信息'),
+              React.createElement('p', { className: 'text-xs text-zinc-400' }, '请完善以下项目画像信息，以便我们更好地理解您的需求并生成准确的产品结构。')
+            )
+          )
+        ),
         React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '定义项目的基本信息和目标用户画像。'),
         React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-6' },
           React.createElement('div', { className: 'flex flex-col' },
@@ -495,7 +732,7 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
               }
             })
           ),
-          React.createElement('div', { className: 'flex flex-col' },
+          React.createElement('div', { className: 'flex flex-col md:col-span-2' },
             React.createElement('label', { htmlFor: 'description', className: 'text-sm font-medium text-zinc-300 mb-2' }, '项目简介'),
             React.createElement('textarea', {
               id: 'description',
@@ -506,6 +743,91 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
                 const newMeta = { ...localProjectMeta, description: e.target.value };
                 setLocalProjectMeta(newMeta);
                 updateProjectMeta({ description: e.target.value });
+              }
+            })
+          ),
+          // 扩展字段 - 用于信息补充
+          React.createElement('div', { className: 'flex flex-col md:col-span-2' },
+            React.createElement('label', { htmlFor: 'applicationScope', className: 'text-sm font-medium text-zinc-300 mb-2' }, '所属行业与应用范围'),
+            React.createElement('textarea', {
+              id: 'applicationScope',
+              className: 'w-full h-24 bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 resize-y',
+              placeholder: '例如：城市应急、园区运维、快运、家电维保等',
+              value: localProjectMeta.applicationScope || '',
+              onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                const newMeta = { ...localProjectMeta, applicationScope: e.target.value };
+                setLocalProjectMeta(newMeta);
+                updateProjectMeta({ applicationScope: e.target.value });
+              }
+            })
+          ),
+          React.createElement('div', { className: 'flex flex-col md:col-span-2' },
+            React.createElement('label', { htmlFor: 'coreObjectScale', className: 'text-sm font-medium text-zinc-300 mb-2' }, '核心对象规模'),
+            React.createElement('textarea', {
+              id: 'coreObjectScale',
+              className: 'w-full h-24 bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 resize-y',
+              placeholder: '例如：每日事件/工单量、车辆/技师数量、站点/设备数量、覆盖城市/区域',
+              value: localProjectMeta.coreObjectScale || '',
+              onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                const newMeta = { ...localProjectMeta, coreObjectScale: e.target.value };
+                setLocalProjectMeta(newMeta);
+                updateProjectMeta({ coreObjectScale: e.target.value });
+              }
+            })
+          ),
+          React.createElement('div', { className: 'flex flex-col md:col-span-2' },
+            React.createElement('label', { htmlFor: 'keyRequiredFunctions', className: 'text-sm font-medium text-zinc-300 mb-2' }, '关键必需功能'),
+            React.createElement('textarea', {
+              id: 'keyRequiredFunctions',
+              className: 'w-full h-24 bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 resize-y',
+              placeholder: '例如：GIS定位、路线优化、跨部门联动、移动端表单、SLA/KPI、语音/对讲、IoT/车载终端接入',
+              value: localProjectMeta.keyRequiredFunctions || '',
+              onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                const newMeta = { ...localProjectMeta, keyRequiredFunctions: e.target.value };
+                setLocalProjectMeta(newMeta);
+                updateProjectMeta({ keyRequiredFunctions: e.target.value });
+              }
+            })
+          ),
+          React.createElement('div', { className: 'flex flex-col md:col-span-2' },
+            React.createElement('label', { htmlFor: 'integratedSystems', className: 'text-sm font-medium text-zinc-300 mb-2' }, '需要对接的系统与数据源'),
+            React.createElement('textarea', {
+              id: 'integratedSystems',
+              className: 'w-full h-24 bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 resize-y',
+              placeholder: '例如：地图服务、CRM/ERP、车载OBD/北斗、消息/视频平台',
+              value: localProjectMeta.integratedSystems || '',
+              onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                const newMeta = { ...localProjectMeta, integratedSystems: e.target.value };
+                setLocalProjectMeta(newMeta);
+                updateProjectMeta({ integratedSystems: e.target.value });
+              }
+            })
+          ),
+          React.createElement('div', { className: 'flex flex-col md:col-span-2' },
+            React.createElement('label', { htmlFor: 'complianceConstraints', className: 'text-sm font-medium text-zinc-300 mb-2' }, '合规与约束'),
+            React.createElement('textarea', {
+              id: 'complianceConstraints',
+              className: 'w-full h-24 bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 resize-y',
+              placeholder: '例如：数据安全等级、值班制度、留痕审计、报表与监管口径',
+              value: localProjectMeta.complianceConstraints || '',
+              onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                const newMeta = { ...localProjectMeta, complianceConstraints: e.target.value };
+                setLocalProjectMeta(newMeta);
+                updateProjectMeta({ complianceConstraints: e.target.value });
+              }
+            })
+          ),
+          React.createElement('div', { className: 'flex flex-col md:col-span-2' },
+            React.createElement('label', { htmlFor: 'rolesAndPermissions', className: 'text-sm font-medium text-zinc-300 mb-2' }, '角色与权限'),
+            React.createElement('textarea', {
+              id: 'rolesAndPermissions',
+              className: 'w-full h-24 bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50 resize-y',
+              placeholder: '例如：调度员、值班长、现场人员、第三方协作单位',
+              value: localProjectMeta.rolesAndPermissions || '',
+              onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                const newMeta = { ...localProjectMeta, rolesAndPermissions: e.target.value };
+                setLocalProjectMeta(newMeta);
+                updateProjectMeta({ rolesAndPermissions: e.target.value });
               }
             })
           )
@@ -557,14 +879,6 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
       activeTab === 'topology' && React.createElement('div', { className: 'space-y-4' },
         React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '上传架构拓扑图，自动解析并生成节点和连接关系。'),
         React.createElement(ArchitectureTopology)
-      ),
-      activeTab === 'word' && React.createElement('div', { className: 'space-y-4' },
-        React.createElement(WordUploader, {
-          onFileUploaded: (content: string, fileName: string) => {
-            // 可以在这里处理上传的 Word 内容
-            console.log('Word 文件上传:', fileName, content);
-          }
-        })
       ),
       activeTab === 'rules' && React.createElement('div', { className: 'space-y-6' },
         React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '定义项目的全局规则和非功能性需求（NFR）。'),
@@ -620,6 +934,143 @@ export function ProjectBlueprint({ isOpen, onClose }: ProjectBlueprintProps) {
             })
           )
           )
+        )
+      ),
+      // Business Events & Flow Logic Tab
+      activeTab === 'events' && React.createElement('div', { className: 'space-y-6' },
+        React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '展示所有节点的业务事件与流转逻辑。'),
+        nodes.length === 0 ? React.createElement('div', { className: 'bg-zinc-900/50 rounded-lg border border-zinc-800 p-8 text-center' },
+          React.createElement('div', { className: 'text-zinc-500 text-sm' }, '暂无业务事件')
+        ) : React.createElement('div', { className: 'space-y-6' },
+          nodes.map((node) => {
+            const events = node.data.artifacts?.events || [];
+            if (events.length === 0) return null;
+            
+            return React.createElement('div', { key: node.id, className: 'bg-zinc-900/50 rounded-lg border border-zinc-800 p-6' },
+              React.createElement('h3', { className: 'text-lg font-semibold text-zinc-200 mb-4' }, 
+                React.createElement('span', { className: 'text-blue-400' }, '📄 '),
+                node.data.label || node.id
+              ),
+              React.createElement('div', { className: 'space-y-4' },
+                events.map((event, eventIndex) => 
+                  React.createElement('div', { key: eventIndex, className: 'bg-zinc-950 rounded-lg border border-zinc-700 p-4' },
+                    React.createElement('div', { className: 'flex items-start justify-between mb-3' },
+                      React.createElement('div', { className: 'flex-1' },
+                        React.createElement('div', { className: 'flex items-center gap-2 mb-2' },
+                          React.createElement('span', { className: 'text-xs font-medium px-2 py-1 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30' }, event.id),
+                          React.createElement('span', { className: 'text-sm font-semibold text-zinc-200' }, event.name)
+                        ),
+                        React.createElement('div', { className: 'text-xs text-zinc-400 space-y-1' },
+                          React.createElement('div', null, 
+                            React.createElement('span', { className: 'text-zinc-500' }, '触发条件: '),
+                            React.createElement('span', { className: 'text-zinc-300' }, event.trigger)
+                          ),
+                          React.createElement('div', null,
+                            React.createElement('span', { className: 'text-zinc-500' }, '事件类型: '),
+                            React.createElement('span', { className: 'text-zinc-300' }, 
+                              event.type === 'UserAction' ? '用户动作' : 
+                              event.type === 'SystemTimer' ? '系统定时' : 
+                              '外部回调'
+                            )
+                          ),
+                          React.createElement('div', null,
+                            React.createElement('span', { className: 'text-zinc-500' }, '最终结果: '),
+                            React.createElement('span', { className: 'text-zinc-300' }, event.outcome)
+                          )
+                        )
+                      )
+                    ),
+                    React.createElement('div', { className: 'mt-3 pt-3 border-t border-zinc-700' },
+                      React.createElement('div', { className: 'text-xs font-medium text-zinc-400 mb-2' }, '流转逻辑:'),
+                      React.createElement('div', { className: 'space-y-2' },
+                        event.processFlow.map((step, stepIndex) =>
+                          React.createElement('div', { key: stepIndex, className: 'flex items-start gap-3 text-sm' },
+                            React.createElement('div', { className: 'flex-shrink-0 w-6 h-6 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-xs font-medium text-blue-400' }, step.step),
+                            React.createElement('div', { className: 'flex-1' },
+                              React.createElement('div', { className: 'font-medium text-zinc-200' }, step.action),
+                              React.createElement('div', { className: 'text-xs text-zinc-400 mt-0.5' }, step.desc)
+                            )
+                          )
+                        )
+                      )
+                    )
+                  )
+                )
+              )
+            );
+          }).filter(Boolean)
+        )
+      ),
+      // User Stories Tab
+      activeTab === 'userStories' && React.createElement('div', { className: 'space-y-6' },
+        React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '展示所有节点的用户故事和用户旅程图。'),
+        nodes.length === 0 ? React.createElement('div', { className: 'bg-zinc-900/50 rounded-lg border border-zinc-800 p-8 text-center' },
+          React.createElement('div', { className: 'text-zinc-500 text-sm' }, '暂无用户故事')
+        ) : React.createElement('div', { className: 'space-y-6' },
+          // Section 1: High-Level User Journey Map (Mermaid Diagram)
+          generateUserJourneyTable && generateUserJourneyTable.allUserStories.length > 0 && generateUserJourneyDiagram && React.createElement('div', { className: 'bg-zinc-900/50 rounded-lg border border-zinc-800 p-6' },
+            React.createElement('h3', { className: 'text-lg font-semibold text-zinc-200 mb-4' },
+              React.createElement('span', { className: 'text-blue-400' }, '🗺️ '),
+              '用户旅程图'
+            ),
+            React.createElement('div', { className: 'bg-zinc-950 rounded-lg p-4 border border-zinc-800' },
+              React.createElement(MermaidDiagram, { code: generateUserJourneyDiagram })
+            )
+          ),
+          // Section 2: User Story Details with Sequence Diagrams
+          nodes.map((node) => {
+            const userStories = node.data.artifacts?.userStories || [];
+            if (userStories.length === 0) return null;
+            
+            return React.createElement('div', { key: node.id, className: 'bg-zinc-900/50 rounded-lg border border-zinc-800 p-6' },
+              React.createElement('h3', { className: 'text-lg font-semibold text-zinc-200 mb-4' },
+                React.createElement('span', { className: 'text-blue-400' }, '📄 '),
+                node.data.label || node.id
+              ),
+              React.createElement('div', { className: 'space-y-4' },
+                userStories.map((story, storyIndex) => {
+                  const sequenceDiagram = generateStorySequenceDiagram(node.id, story.id);
+                  
+                  return React.createElement('div', { key: storyIndex, className: 'bg-zinc-950 rounded-lg border border-zinc-700 p-4' },
+                    React.createElement('div', { className: 'flex items-start justify-between mb-3' },
+                      React.createElement('div', { className: 'flex-1' },
+                        React.createElement('div', { className: 'flex items-center gap-2 mb-2' },
+                          React.createElement('span', { className: 'text-xs font-medium px-2 py-1 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30' }, story.id),
+                        ),
+                        React.createElement('div', { className: 'text-sm text-zinc-300 space-y-2' },
+                          React.createElement('div', null,
+                            React.createElement('span', { className: 'text-zinc-500' }, '作为 '),
+                            React.createElement('span', { className: 'font-medium text-zinc-200' }, story.role),
+                            React.createElement('span', { className: 'text-zinc-500' }, '，我想要 '),
+                            React.createElement('span', { className: 'font-medium text-zinc-200' }, story.activity),
+                            React.createElement('span', { className: 'text-zinc-500' }, '，以便 '),
+                            React.createElement('span', { className: 'font-medium text-zinc-200' }, story.value)
+                          )
+                        )
+                      )
+                    ),
+                    // 验收标准
+                    story.acceptanceCriteria && story.acceptanceCriteria.length > 0 && React.createElement('div', { className: 'mt-3 pt-3 border-t border-zinc-700' },
+                      React.createElement('div', { className: 'text-xs font-medium text-zinc-400 mb-2' }, '验收标准:'),
+                      React.createElement('ul', { className: 'space-y-1' },
+                        story.acceptanceCriteria.map((criterion, critIndex) =>
+                          React.createElement('li', { key: critIndex, className: 'text-sm text-zinc-300 flex items-start gap-2' },
+                            React.createElement('span', { className: 'text-green-400 mt-1 flex-shrink-0' }, '✓'),
+                            React.createElement('span', { className: 'flex-1' }, criterion)
+                          )
+                        )
+                      )
+                    ),
+                    // Mermaid Sequence Diagram for Business Flow
+                    sequenceDiagram && React.createElement('div', { className: 'mt-4 pt-4 border-t border-zinc-700' },
+                      React.createElement('div', { className: 'text-xs font-medium text-zinc-400 mb-3' }, '业务流转逻辑:'),
+                      React.createElement(MermaidDiagram, { code: sequenceDiagram })
+                    )
+                  );
+                })
+              )
+            );
+          }).filter(Boolean)
         )
       )
     )

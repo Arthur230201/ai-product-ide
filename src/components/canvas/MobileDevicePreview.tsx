@@ -51,32 +51,32 @@ export function MobileDevicePreview({
             height: 'calc(100% - 6px)',
           }}
         >
-          {/* 屏幕内容区域 */}
+        {/* 屏幕内容区域 */}
           <div className="w-full h-full overflow-hidden relative">
-            {code ? (
+          {code ? (
               <div className="w-full h-full overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-transparent">
-                <div className="w-full min-h-full max-w-full break-words">
-                  <LivePreview code={code} zoom={1} />
-                </div>
+              <div className="w-full min-h-full max-w-full break-words">
+                <LivePreview code={code} zoom={1} />
               </div>
-            ) : imageUrl ? (
-              <img 
-                src={imageUrl} 
-                alt="Preview" 
-                className="w-full h-full object-contain"
-                loading="lazy"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                }}
-              />
-            ) : (
-              <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 text-gray-400">
-                <div className="text-4xl mb-3 opacity-50">📱</div>
-                <p className="text-sm font-medium">暂无预览</p>
-                <p className="text-xs mt-1 opacity-60">生成 UI 代码后将显示在这里</p>
-              </div>
-            )}
+            </div>
+          ) : imageUrl ? (
+            <img 
+              src={imageUrl} 
+              alt="Preview" 
+              className="w-full h-full object-contain"
+              loading="lazy"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 text-gray-400">
+              <div className="text-4xl mb-3 opacity-50">📱</div>
+              <p className="text-sm font-medium">暂无预览</p>
+              <p className="text-xs mt-1 opacity-60">生成 UI 代码后将显示在这里</p>
+            </div>
+          )}
           </div>
         </div>
       </div>

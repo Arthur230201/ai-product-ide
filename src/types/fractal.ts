@@ -77,6 +77,27 @@ export const BusinessEventSchema = z.object({
 
 export type BusinessEvent = z.infer<typeof BusinessEventSchema>;
 
+// Data Query: 数据查询需求（用于View类型页面）
+export const DataQuerySchema = z.object({
+  id: z.string().describe('查询唯一标识符（如：Q-001）'),
+  description: z.string().describe('查询描述（如：查询活跃任务按优先级排序）'),
+  sorting: z.string().optional().describe('排序规则（如：按优先级降序、按创建时间升序）'),
+  filtering: z.string().optional().describe('过滤逻辑（如：只显示状态为"进行中"的任务）'),
+  dataSource: z.string().optional().describe('数据源定义（如：从任务表查询、从API获取）'),
+});
+
+export type DataQuery = z.infer<typeof DataQuerySchema>;
+
+// Traceability: 页面与全局架构的可追溯性映射
+export const TraceabilitySchema = z.object({
+  implementsJourney: z.string().optional().describe('实现的用户旅程ID（如：JOURNEY_01）'),
+  journeyStep: z.string().optional().describe('在旅程中的步骤（如：Initiate、Approve）'),
+  triggersEvent: z.array(z.string()).optional().describe('触发的全局事件ID列表（仅用于Action页面）'),
+  consumesEvent: z.array(z.string()).optional().describe('消费的全局事件ID列表（仅用于View页面，显示事件结果）'),
+});
+
+export type Traceability = z.infer<typeof TraceabilitySchema>;
+
 // 保留 Logic Artifact 以兼容旧数据（可选）
 export const LogicRuleSchema = z.object({
   trigger: z.string().describe('用户触发动作（如：点击提交按钮、选择下拉选项）'),
@@ -94,7 +115,7 @@ export const LogicArtifactSchema = z.object({
 export type LogicArtifact = z.infer<typeof LogicArtifactSchema>;
 
 /**
- * Node Artifacts - 所有维度的集合（支持用户故事模型）
+ * Node Artifacts - 所有维度的集合（支持用户故事模型和逻辑分类）
  */
 export const NodeArtifactsSchema = z.object({
   view: ViewArtifactSchema,
@@ -105,7 +126,9 @@ export const NodeArtifactsSchema = z.object({
   userStories: z.array(UserStorySchema).optional().describe('用户故事列表（按用户故事保存逻辑，Agile/Scrum 标准格式）'),
   // 兼容旧数据（可选）
   businessContext: BusinessContextSchema.optional().describe('业务背景信息（兼容）'),
-  events: z.array(BusinessEventSchema).optional().describe('业务事件列表（兼容旧格式）'),
+  events: z.array(BusinessEventSchema).optional().describe('业务事件列表（仅用于Action类型页面，View类型页面禁止）'),
+  dataQueries: z.array(DataQuerySchema).optional().describe('数据查询需求列表（仅用于View类型页面，Action类型页面禁止）'),
+  traceability: TraceabilitySchema.optional().describe('页面与全局架构的可追溯性映射'),
   logic: LogicArtifactSchema.optional().describe('业务逻辑规则（Flow Logic，兼容旧格式）'),
 });
 
@@ -198,6 +221,13 @@ export interface ProjectMeta {
   targetAudience: string; // e.g., "B2B Enterprise", "Gen Z Gamers", "Healthcare Professionals"
   description: string; // 项目简介
   version: string; // 版本号
+  // 扩展字段 - 用于信息补充
+  applicationScope?: string; // 所属行业与应用范围（如城市应急、园区运维、快运、家电维保等）
+  coreObjectScale?: string; // 核心对象规模（每日事件/工单量、车辆/技师数量、站点/设备数量、覆盖城市/区域）
+  keyRequiredFunctions?: string; // 关键必需功能（如GIS定位、路线优化、跨部门联动、移动端表单、SLA/KPI、语音/对讲、IoT/车载终端接入）
+  integratedSystems?: string; // 需要对接的系统与数据源（如地图服务、CRM/ERP、车载OBD/北斗、消息/视频平台）
+  complianceConstraints?: string; // 合规与约束（数据安全等级、值班制度、留痕审计、报表与监管口径）
+  rolesAndPermissions?: string; // 角色与权限（调度员、值班长、现场人员、第三方协作单位）
 }
 
 /**

@@ -130,8 +130,20 @@ export function PrdConfigDialog({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-zinc-900 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto border border-zinc-800">
+    <div 
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/90 backdrop-blur-sm"
+      onClick={(e) => {
+        // 点击遮罩层关闭对话框
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+      style={{ pointerEvents: 'auto' }}
+    >
+      <div 
+        className="bg-zinc-900 rounded-lg shadow-2xl max-w-4xl w-full mx-4 max-h-[95vh] overflow-y-auto border border-zinc-800"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
           <div>

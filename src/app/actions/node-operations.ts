@@ -879,7 +879,7 @@ ${designSystemEnforcement}
       
       throw new Error(`UI代码生成失败: ${errorMessage}`);
     }
-  });
+});
 
 export const generateAnalysisFromCode = createServerAction()
   .input(GenerateAnalysisFromCodeInputSchema)
@@ -975,13 +975,13 @@ Professional, non-technical. Make it look like a manual, not a code comment. Use
 # Additional Requirements
 - **所有内容必须使用中文**，确保非技术人员也能轻松理解
 - **易读性要求**：
-  - 功能描述要清晰具体，避免技术术语，使用通俗易懂的语言
-  - 交互逻辑要说明用户操作和系统响应
+   - 功能描述要清晰具体，避免技术术语，使用通俗易懂的语言
+   - 交互逻辑要说明用户操作和系统响应
   - 展示规范要说明视觉样式、默认状态、占位文本等
-  - 每个功能点独立一行，便于阅读和追踪
+   - 每个功能点独立一行，便于阅读和追踪
 - **分析要求**：
-  - 仔细分析代码中的所有UI元素、交互逻辑、状态管理
-  - 识别所有可交互的组件（按钮、输入框、卡片、菜单等）
+   - 仔细分析代码中的所有UI元素、交互逻辑、状态管理
+   - 识别所有可交互的组件（按钮、输入框、卡片、菜单等）
   - 识别所有只读元素（标题、标签、状态指示器等）
   - 识别所有视觉样式和默认状态
 - **如果提供了现有需求**，必须在保持原有表格格式和内容的基础上，补充新增的需求`;
@@ -1071,7 +1071,7 @@ ${!hasExistingRequirements ? `**输出要求：**
 
       return {
         markdown,
-    };
+      };
     } catch (error) {
       logError('❌ [generateAnalysisFromCode] Error:', error);
       const errorMessage = error instanceof Error ? error.message : 'PRD生成失败，请检查API配置和网络连接';

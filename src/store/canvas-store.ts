@@ -24,9 +24,15 @@ import { getLayoutedElements } from '@/lib/layout';
 import type { UIThemeConfig } from '@/types/theme';
 import { defaultTheme } from '@/types/theme';
 
+type BlueprintTabType = 'profile' | 'business' | 'interaction' | 'data' | 'topology' | 'rules' | 'events' | 'userStories';
+
 interface CanvasStore extends CanvasState {
   // Detail Panel State
   isDetailPanelOpen: boolean;
+  // Project Blueprint State
+  isBlueprintOpen: boolean;
+  blueprintInitialTab?: BlueprintTabType;
+  blueprintInitialData?: Partial<ProjectMeta>;
   // Actions
   addNode: (node: FractalNode) => void;
   addNodes: (nodes: FractalNode[]) => void;
@@ -60,6 +66,9 @@ interface CanvasStore extends CanvasState {
   updateProjectMeta: (meta: Partial<ProjectMeta>) => void;
   // AI Config Management
   updateAIConfig: (config: Partial<AIConfig>) => void;
+  // Project Blueprint Management
+  openBlueprint: (initialTab?: BlueprintTabType, initialData?: Partial<ProjectMeta>) => void;
+  closeBlueprint: () => void;
 }
 
 /**
@@ -127,6 +136,9 @@ export const useCanvasStore = create<CanvasStore>()(
           edges: [],
           selectedNodeId: null,
           isDetailPanelOpen: false,
+          isBlueprintOpen: false,
+          blueprintInitialTab: undefined,
+          blueprintInitialData: undefined,
           addNode: () => {},
           addNodes: () => {},
           addEdges: () => {},
@@ -150,6 +162,9 @@ export const useCanvasStore = create<CanvasStore>()(
           setTheme: () => {},
           updateGlobalRules: () => {},
           updateProjectMeta: () => {},
+          updateAIConfig: () => {},
+          openBlueprint: () => {},
+          closeBlueprint: () => {},
           currentTheme: defaultTheme,
           projectMeta: {
             projectName: '未命名项目',
@@ -169,7 +184,7 @@ export const useCanvasStore = create<CanvasStore>()(
             visionModel: 'gpt-5-2025-08-07',
             textModel: 'gpt-5-2025-08-07',
           },
-        };
+        } as unknown as CanvasStore;
       }
 
       // 初始化项目画像和全局规则（在函数开始处定义，以便在错误处理中使用）
@@ -195,12 +210,55 @@ export const useCanvasStore = create<CanvasStore>()(
         textModel: process.env.NEXT_PUBLIC_AI_TEXT_MODEL || 'gpt-5-2025-08-07',
       };
 
+      // 从 localStorage 恢复状态
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('canvas-store') : null;
+      let initialState: CanvasState;
+      
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          initialState = {
+            nodes: parsed.nodes || [],
+            edges: parsed.edges || [],
+            selectedNodeId: parsed.selectedNodeId || null,
+            currentTheme: parsed.currentTheme || defaultTheme,
+            projectMeta: parsed.projectMeta || initialProjectMeta,
+            globalRules: parsed.globalRules || initialGlobalRules,
+            aiConfig: parsed.aiConfig || initialAIConfig,
+          };
+        } catch (e) {
+          console.error('Failed to parse stored state:', e);
+          initialState = {
+            nodes: [],
+            edges: [],
+            selectedNodeId: null,
+            currentTheme: defaultTheme,
+            projectMeta: initialProjectMeta,
+            globalRules: initialGlobalRules,
+            aiConfig: initialAIConfig,
+          };
+        }
+      } else {
+        initialState = {
+          nodes: [],
+          edges: [],
+          selectedNodeId: null,
+          currentTheme: defaultTheme,
+          projectMeta: initialProjectMeta,
+          globalRules: initialGlobalRules,
+          aiConfig: initialAIConfig,
+        };
+      }
+
       return {
         // Initial state with mock data
         nodes: [createMockNode()],
         edges: [],
         selectedNodeId: null,
         isDetailPanelOpen: false,
+        isBlueprintOpen: false,
+        blueprintInitialTab: undefined,
+        blueprintInitialData: undefined,
         currentTheme: defaultTheme,
         projectMeta: initialProjectMeta,
         globalRules: initialGlobalRules,
@@ -239,7 +297,7 @@ export const useCanvasStore = create<CanvasStore>()(
               type: 'smart',
               animated: true,
               markerEnd: {
-                type: MarkerType.ArrowClosed,
+                type: 'arrowclosed' as const,
               },
               label: 'Action',
               labelStyle: {
@@ -274,6 +332,56 @@ export const useCanvasStore = create<CanvasStore>()(
         return state;
       }
       
+      // 验证并规范化节点数据
+      const validatedNodes = newNodes.map((node) => {
+        // 确保节点有 type 字段，默认为 'page'
+        let nodeType = node.type;
+        if (!nodeType || (nodeType !== 'page' && nodeType !== 'service')) {
+          console.warn(`⚠️ [canvas-store] 节点 ${node.id} 的类型无效: ${nodeType}，设置为 'page'`);
+          nodeType = 'page';
+        }
+        
+        // 确保节点有必需的 data 字段
+        if (!node.data) {
+          console.error(`❌ [canvas-store] 节点 ${node.id} 缺少 data 字段，创建默认 data`);
+          return {
+            ...node,
+            type: nodeType as 'page' | 'service',
+            data: {
+              label: node.id,
+              artifacts: {
+                view: { code: '' },
+                spec: { title: node.id, requirements: [] },
+                impl: { apiEndpoints: [], dbSchema: '' },
+                test: { cases: [] },
+              },
+              syncState: { isSynced: false, lastSource: 'view' as const },
+              source: { type: 'ai' as const },
+            },
+          };
+        }
+        
+        // 创建新的 data 对象，确保所有必需字段都存在
+        const validatedData = {
+          ...node.data,
+          label: node.data.label || node.id,
+          source: node.data.source || { type: 'ai' as const },
+          syncState: node.data.syncState || { isSynced: false, lastSource: 'view' as const },
+          artifacts: node.data.artifacts || {
+            view: { code: '' },
+            spec: { title: node.data.label || node.id, requirements: [] },
+            impl: { apiEndpoints: [], dbSchema: '' },
+            test: { cases: [] },
+          },
+        };
+        
+        return {
+          ...node,
+          type: nodeType as 'page' | 'service',
+          data: validatedData,
+        };
+      });
+
       // 计算新节点的位置，避免与现有节点重叠
       const existingNodes = state.nodes;
       const nodeWidth = 300; // 节点宽度
@@ -317,7 +425,7 @@ export const useCanvasStore = create<CanvasStore>()(
       // 为每个新节点分配位置，避免重叠
       const positionedNodes: FractalNode[] = [];
       
-      newNodes.forEach((node, index) => {
+      validatedNodes.forEach((node, index) => {
         let finalX: number;
         let finalY: number;
         
@@ -373,16 +481,29 @@ export const useCanvasStore = create<CanvasStore>()(
           }
         }
         
-        positionedNodes.push({
+        const positionedNode = {
           ...node,
           position: {
             x: finalX,
             y: finalY,
           },
-        });
+        };
+        
+        // 验证节点结构
+        if (!positionedNode.type) {
+          console.error(`❌ [canvas-store] 节点 ${positionedNode.id} 在定位后仍然缺少 type 字段`);
+        }
+        if (!positionedNode.data) {
+          console.error(`❌ [canvas-store] 节点 ${positionedNode.id} 在定位后仍然缺少 data 字段`);
+        }
+        
+        positionedNodes.push(positionedNode);
       });
       
       // Nodes positioned successfully
+      console.log(`✅ [canvas-store] addNodes: 成功处理 ${positionedNodes.length} 个节点`, {
+        nodeTypes: positionedNodes.map(n => ({ id: n.id, type: n.type, label: n.data?.label })),
+      });
       
       return {
         nodes: [...existingNodes, ...positionedNodes],
@@ -763,7 +884,7 @@ export const useCanvasStore = create<CanvasStore>()(
               type: 'smart',
               animated: true,
               markerEnd: {
-                type: MarkerType.ArrowClosed,
+                type: 'arrowclosed' as const,
               },
               label: 'Action',
               labelStyle: {
@@ -1067,6 +1188,23 @@ export const useCanvasStore = create<CanvasStore>()(
       },
     }));
   },
+
+  // Project Blueprint Management
+  openBlueprint: (initialTab?: BlueprintTabType, initialData?: Partial<ProjectMeta>) => {
+    set({
+      isBlueprintOpen: true,
+      blueprintInitialTab: initialTab,
+      blueprintInitialData: initialData,
+    });
+  },
+
+  closeBlueprint: () => {
+    set({
+      isBlueprintOpen: false,
+      blueprintInitialTab: undefined,
+      blueprintInitialData: undefined,
+    });
+  },
       }
     },
     {
@@ -1189,19 +1327,19 @@ export const useCanvasStore = create<CanvasStore>()(
             persistedState.currentTheme = defaultTheme;
           }
         }
-          
-          return persistedState;
-        } catch (error) {
-          console.error('Migration error, using defaults:', error);
-          return {
-            nodes: [createMockNode()],
-            edges: [],
-            selectedNodeId: null,
-            isDetailPanelOpen: false,
+        
+        return persistedState;
+      } catch (error) {
+        console.error('Migration error, using defaults:', error);
+        return {
+          nodes: [createMockNode()],
+          edges: [],
+          selectedNodeId: null,
+          isDetailPanelOpen: false,
           currentTheme: defaultTheme,
-          };
-        }
-      },
-    }
+        };
+      }
+    },
+  }
   )
 );

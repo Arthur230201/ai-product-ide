@@ -34,6 +34,8 @@ import type { FractalNode as FractalNodeType } from '@/types/fractal';
 const nodeTypes: NodeTypes = {
   page: FractalNode,
   service: FractalNode,
+  // 添加默认节点类型，防止节点类型不匹配时使用 React Flow 的默认菱形节点
+  default: FractalNode,
 };
 
 // 注册自定义边类型（必须在组件外部定义，避免每次渲染重新创建）

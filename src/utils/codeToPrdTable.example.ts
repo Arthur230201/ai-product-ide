@@ -81,7 +81,7 @@ const fullPrd = generatePageLevelPrd(
   fullPageCode,
   'InstructionExample.tsx',
   'InstructionExample',
-  '指令流'
+  { pageTitle: '指令流' }
 );
 
 console.log(fullPrd);

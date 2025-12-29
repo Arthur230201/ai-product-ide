@@ -344,7 +344,7 @@ export function generatePrdTableFromCode(
   const detectedComponentName = componentMatch ? componentMatch[1] : componentName;
 
   // 提取 props 接口
-  const propsInterfaceMatch = code.match(/interface\s+(\w+Props)[^{]*\{([^}]+)\}/s);
+  const propsInterfaceMatch = code.match(/interface\s+(\w+Props)[^{]*\{([^}]+)\}/);
   const propsFields: string[] = [];
   if (propsInterfaceMatch) {
     const propsContent = propsInterfaceMatch[2];

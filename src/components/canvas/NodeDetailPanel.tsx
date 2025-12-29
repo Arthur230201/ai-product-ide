@@ -810,22 +810,22 @@ export function NodeDetailPanel() {
           <div 
             className="flex-1 overflow-hidden flex justify-center items-start pt-2 pb-2 px-2 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] relative"
           >
-            <div style={{ 
-              width: '375px', 
-              height: '812px', 
-              maxWidth: '100%', 
-              maxHeight: '100%',
-              transform: `scale(${zoom})`,
-              transformOrigin: 'top center',
-              transition: 'transform 0.2s ease',
-            }}>
-              <MobileDevicePreview 
-                imageUrl={data.artifacts.view.previewUrl} 
-                zoom={1}
-                width={375}
-                height={812}
-              />
-            </div>
+              <div style={{ 
+                width: '375px', 
+                height: '812px', 
+                maxWidth: '100%', 
+                maxHeight: '100%',
+                transform: `scale(${zoom})`,
+                transformOrigin: 'top center',
+                transition: 'transform 0.2s ease',
+              }}>
+                <MobileDevicePreview 
+                  imageUrl={data.artifacts.view.previewUrl} 
+                  zoom={1}
+                  width={375}
+                  height={812}
+                />
+              </div>
           </div>
         </div>
 

@@ -233,7 +233,7 @@ export const LivePreview = ({
             ${allDeclarations}
             
             // 执行编译后的代码（此时所有变量都已初始化并可用）
-            ${compiledCode}
+          ${compiledCode}
           })();
           `
         );

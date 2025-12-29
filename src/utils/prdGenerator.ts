@@ -270,6 +270,8 @@ export interface RequirementSection {
 export interface PageNode {
   title: string;          // e.g., "订单列表页"
   uiPreview: string;      // Base64 图片
+  uiCode?: string;        // React 组件代码（用于交互式 UI）
+  nodeId?: string;        // 节点唯一标识符（用于生成挂载点 ID）
   sections: RequirementSection[]; // 动态需求章节列表
   userStories?: Array<{   // 用户故事列表（用户故事模型 - 核心）
     id: string;
@@ -349,6 +351,10 @@ export function generateFullPrdHtml(data: FullPrdData): string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${data.meta.name} - PRD</title>
+    <!-- React Runtime -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module">
       import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
@@ -753,7 +759,13 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                         <div class="col-span-4">
                             <div class="sticky-ui">
                                 <h3 class="text-lg font-semibold text-slate-700 mb-3">${nodeNum}.${sectionIdx++} 界面示意</h3>
-                                ${hasUIPreview ? `
+                                ${node.uiCode ? `
+                                <!-- React 交互式 UI 容器 -->
+                                <div class="phone-mockup bg-white" style="min-height: 400px;">
+                                    <div id="root-${node.nodeId || `node-${nodeIdx}`}" style="width: 100%; min-height: 400px;"></div>
+                                </div>
+                                <p class="text-center text-xs text-slate-500 mt-3 font-mono">图 ${nodeNum}.${sectionIdx - 1} 交互式 UI 原型</p>
+                                ` : hasUIPreview ? `
                                 <div class="phone-mockup bg-white">
                                     <img 
                                         src="${uiPreview}" 
@@ -816,8 +828,8 @@ export function generateFullPrdHtml(data: FullPrdData): string {
             const img = lb.querySelector('img');
             if (img) {
                 img.src = src;
-                lb.style.display = 'flex';
-            }
+            lb.style.display = 'flex';
+        }
         }
 
         // Close lightbox on click outside image
@@ -845,7 +857,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                     target.scrollIntoView({
                         behavior: 'smooth',
                         block: 'start'
-                    });
+                });
                 }
             });
         });
@@ -875,6 +887,266 @@ export function generateFullPrdHtml(data: FullPrdData): string {
         
         window.addEventListener('scroll', updateActiveNav);
         updateActiveNav(); // Initial call
+
+        // ============================================================================
+        // React Component Mounting Logic
+        // ============================================================================
+        
+        // Wait for React and ReactDOM to be loaded
+        function waitForReact(callback, maxRetries = 20, delay = 200) {
+          const hasReact = typeof window.React !== 'undefined';
+          const hasReactDOM = typeof window.ReactDOM !== 'undefined';
+          const hasBabel = typeof window.Babel !== 'undefined';
+          
+          console.log('🔍 [waitForReact] Checking dependencies:', {
+            React: hasReact,
+            ReactDOM: hasReactDOM,
+            Babel: hasBabel,
+            retriesLeft: maxRetries
+          });
+          
+          if (hasReact && hasReactDOM && hasBabel) {
+            console.log('✅ [waitForReact] All dependencies loaded, calling callback');
+            callback();
+          } else if (maxRetries > 0) {
+            setTimeout(() => waitForReact(callback, maxRetries - 1, delay), delay);
+          } else {
+            console.error('❌ [waitForReact] React/ReactDOM/Babel failed to load after timeout');
+            console.error('💡 [waitForReact] Final status:', {
+              React: hasReact,
+              ReactDOM: hasReactDOM,
+              Babel: hasBabel
+            });
+          }
+        }
+
+        // Mount React components
+        function mountComponents() {
+          console.log('🔧 [mountComponents] Starting component mounting...');
+          
+          const nodesWithCode = ${JSON.stringify(
+            data.nodes
+              .filter((node) => node.uiCode)
+              .map((node, idx) => ({
+                nodeId: node.nodeId || `node-${idx}`,
+                uiCode: node.uiCode || '',
+                title: node.title || '未命名页面',
+              }))
+          )};
+
+          console.log('📊 [mountComponents] Found ' + nodesWithCode.length + ' nodes with UI code');
+          
+          if (nodesWithCode.length === 0) {
+            console.warn('⚠️ [mountComponents] No nodes with UI code found');
+            return;
+          }
+
+          // Log available containers
+          const allContainers = document.querySelectorAll('[id^="root-"]');
+          console.log('🔍 [mountComponents] Available containers:', Array.from(allContainers).map(el => el.id));
+
+          nodesWithCode.forEach((nodeData, index) => {
+            const containerId = 'root-' + nodeData.nodeId;
+            const container = document.getElementById(containerId);
+            
+            console.log('🎯 [mountComponents] Processing node:', nodeData.title, 'Container ID:', containerId);
+            
+            if (!container) {
+              console.warn('⚠️ Container ' + containerId + ' not found for node: ' + nodeData.title);
+              console.warn('💡 Available containers:', Array.from(document.querySelectorAll('[id^="root-"]')).map(el => el.id));
+              return;
+            }
+            
+            if (!nodeData.uiCode || nodeData.uiCode.trim().length === 0) {
+              console.warn('⚠️ Node ' + nodeData.title + ' has empty UI code');
+              container.innerHTML = '<div style="padding: 20px; color: #9ca3af; text-align: center;">暂无 UI 代码</div>';
+              return;
+            }
+
+            try {
+              console.log('🔄 [mountComponents] Transforming code for:', nodeData.title);
+              
+              // Transform component code: ensure it's a valid React component
+              let componentCode = nodeData.uiCode;
+              
+              console.log('📝 [mountComponents] Original code length:', componentCode.length);
+              
+              // Step 1: Remove TypeScript type definitions and annotations (Babel can't handle TS)
+              // Remove type definitions using a more robust approach that handles multi-line and nested braces
+              // First, remove simple single-line type definitions: type X = Y;
+              componentCode = componentCode.replace(/^\s*type\s+\w+\s*=\s*[^;{]+;?\s*$/gm, '');
+              
+              // Then, remove multi-line type definitions: type X = { ... } (handles nested braces)
+              // This regex matches: type NAME = { ... } where ... can contain nested braces
+              let typeRegex = /^\s*type\s+\w+\s*=\s*\{/gm;
+              let match;
+              while ((match = typeRegex.exec(componentCode)) !== null) {
+                let start = match.index;
+                let braceCount = 0;
+                let i = match.index + match[0].length - 1;
+                let foundEnd = false;
+                
+                while (i < componentCode.length) {
+                  if (componentCode[i] === '{') braceCount++;
+                  if (componentCode[i] === '}') {
+                    braceCount--;
+                    if (braceCount === 0) {
+                      // Found the end of the type definition
+                      let end = i + 1;
+                      // Also remove trailing semicolon if present
+                      if (componentCode[end] === ';') end++;
+                      // Remove the entire type definition
+                      componentCode = componentCode.substring(0, start) + componentCode.substring(end);
+                      foundEnd = true;
+                      break;
+                    }
+                  }
+                  i++;
+                }
+                
+                if (!foundEnd) {
+                  // If we didn't find the end, just remove from start to end of line
+                  let lineEnd = componentCode.indexOf('\n', start);
+                  if (lineEnd === -1) lineEnd = componentCode.length;
+                  componentCode = componentCode.substring(0, start) + componentCode.substring(lineEnd);
+                }
+                
+                // Reset regex lastIndex to avoid infinite loop
+                typeRegex.lastIndex = start;
+              }
+              
+              // Remove interface definitions: interface X { ... }
+              componentCode = componentCode.replace(/^\s*interface\s+\w+[^{]*\{[^}]*\}\s*;?\s*$/gm, '');
+              // Remove type annotations from variables: const x: Type = ...
+              componentCode = componentCode.replace(/:\s*[A-Z][a-zA-Z0-9<>\[\]|&\s,]*(\s*=\s*)/g, '$1');
+              // Remove type annotations from function parameters: (x: Type) => ...
+              componentCode = componentCode.replace(/\(([^)]*)\)/g, function(match, params) {
+                return '(' + params.replace(/:\s*[A-Z][a-zA-Z0-9<>\[\]|&\s,]*/g, '').replace(/,\s*,/g, ',').replace(/^,\s*|,\s*$/g, '') + ')';
+              });
+              // Remove generic type parameters: <T> or <T extends ...>
+              componentCode = componentCode.replace(/<[A-Z][a-zA-Z0-9<>\[\]|&\s,=.]*>/g, '');
+              // Remove 'as' type assertions: x as Type
+              componentCode = componentCode.replace(/\s+as\s+[A-Z][a-zA-Z0-9<>\[\]|&\s,]*/g, '');
+              // Remove import type statements: import type { ... } from ...
+              componentCode = componentCode.replace(/import\s+type\s+[^;]+;?\s*/g, '');
+              
+              // Step 2: Remove Markdown code blocks if present
+              const backtick = String.fromCharCode(96);
+              componentCode = componentCode.replace(new RegExp(backtick + backtick + backtick + 'tsx|' + backtick + backtick + backtick + 'jsx|' + backtick + backtick + backtick + 'javascript|' + backtick + backtick + backtick + 'typescript|' + backtick + backtick + backtick, 'g'), '').trim();
+              
+              // Step 3: Remove export statements
+              componentCode = componentCode.replace(/^export\s+.*?;?\s*$/gm, '');
+              componentCode = componentCode.replace(/export\s+default\s+/g, '');
+              
+              // Step 4: Remove import statements (we'll handle dependencies separately if needed)
+              componentCode = componentCode.replace(/^import\s+.*?from\s+['"].*?['"];?\s*$/gm, '');
+              
+              // Step 5: Replace function App with const App_[safeId] = () => {
+              const safeId = nodeData.nodeId.replace(/[^a-zA-Z0-9]/g, '_');
+              const componentName = 'App_' + safeId;
+              
+              // Handle different component definition patterns
+              componentCode = componentCode.replace(
+                /(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:function\s+App|const\s+App\s*=\s*\(.*?\)\s*=>|export\s+default\s+function\s+App)\s*(?:\(\))?\s*\{/g,
+                'const ' + componentName + ' = () => {'
+              );
+
+              console.log('🔧 [mountComponents] Component name:', componentName);
+              console.log('📝 [mountComponents] Cleaned code length:', componentCode.length);
+              
+              // Wrap in Babel transform
+              if (!window.Babel) {
+                throw new Error('Babel is not loaded');
+              }
+              
+              console.log('⚙️ [mountComponents] Transforming with Babel...');
+              const transformedCode = window.Babel.transform(componentCode, {
+                presets: ['react'],
+                plugins: []
+              }).code;
+              
+              console.log('✅ [mountComponents] Babel transformation successful');
+              console.log('📝 [mountComponents] Transformed code length:', transformedCode.length);
+
+              // Create component function
+              console.log('🏭 [mountComponents] Creating component function...');
+              const componentFn = new Function('React', 'ReactDOM', 
+                transformedCode + '\\nreturn ' + componentName + ';'
+              );
+
+              console.log('🎨 [mountComponents] Executing component function...');
+              const Component = componentFn(window.React, window.ReactDOM);
+              
+              if (!Component) {
+                throw new Error('Component function returned undefined');
+              }
+              
+              console.log('✅ [mountComponents] Component created successfully');
+              
+              // Clear container and mount
+              container.innerHTML = '';
+              console.log('🎯 [mountComponents] Mounting component to container:', containerId);
+              
+              const root = window.ReactDOM.createRoot(container);
+              root.render(window.React.createElement(Component));
+              
+              console.log('✅ [mountComponents] Successfully mounted component for ' + nodeData.title + ' in ' + containerId);
+            } catch (error) {
+              console.error('❌ Failed to mount component for ' + nodeData.title + ':', error);
+              container.innerHTML = '<div style="padding: 20px; color: #ef4444; text-align: center;">' +
+                '<p>⚠️ UI 组件加载失败</p>' +
+                '<p style="font-size: 12px; margin-top: 8px;">' + (error.message || '未知错误') + '</p>' +
+              '</div>';
+            }
+          });
+        }
+
+        // Initialize React components after page load
+        console.log('🚀 [init] Starting React component initialization...');
+        
+        // Also try on DOMContentLoaded
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', function() {
+            console.log('📄 [init] DOMContentLoaded fired');
+            waitForReact(() => {
+              mountComponents();
+              setTimeout(mountComponents, 500);
+              setTimeout(mountComponents, 1500);
+              setTimeout(mountComponents, 3000);
+            });
+          });
+        }
+        
+        // And on window load
+        window.addEventListener('load', function() {
+          console.log('🌐 [init] Window load fired');
+          waitForReact(() => {
+            mountComponents();
+            setTimeout(mountComponents, 500);
+            setTimeout(mountComponents, 1500);
+            setTimeout(mountComponents, 3000);
+          });
+        });
+        
+        // Also try immediately (in case scripts are already loaded)
+        waitForReact(() => {
+          console.log('⚡ [init] Immediate mount attempt');
+          mountComponents();
+          
+          // Retry after delays (in case Babel compilation takes time)
+          setTimeout(() => {
+            console.log('🔄 [init] Retry mount (500ms)');
+            mountComponents();
+          }, 500);
+          setTimeout(() => {
+            console.log('🔄 [init] Retry mount (1500ms)');
+            mountComponents();
+          }, 1500);
+          setTimeout(() => {
+            console.log('🔄 [init] Retry mount (3000ms)');
+            mountComponents();
+          }, 3000);
+        });
     </script>
 </body>
 </html>
@@ -931,14 +1203,8 @@ ${globalRules.dataTracking || '（待补充）'}
     const sections: RequirementSection[] = [];
     
     // 检查是否有新的 sections 结构（Rich Node Model）
-    if (spec?.sections && Array.isArray(spec.sections)) {
-      // 使用新的 sections 结构
-      sections.push(...spec.sections.map((sec: any) => ({
-        title: sec.title || '未命名章节',
-        type: sec.type === 'table' ? 'table' : 'text',
-        content: sec.content || '（暂无内容）',
-      })));
-    } else if (spec?.requirements) {
+    // 注意：sections 不在 spec 中，而是在 PageNode 中，这里只处理 requirements
+    if (spec?.requirements) {
       // 兼容旧格式：从 requirements 生成 sections
       const requirements = Array.isArray(spec.requirements) 
         ? spec.requirements.join('\n') 
@@ -986,6 +1252,8 @@ ${globalRules.dataTracking || '（待补充）'}
     return {
       title: spec?.title || node.data.label || '未命名页面',
       uiPreview,
+      uiCode: view?.code, // 保存 React 组件代码
+      nodeId: (node as any).id || (node.data as any).id || node.data.label || 'node', // 保存节点 ID
       sections,
       // 用户故事模型（新 - 核心）
       userStories: userStories ? userStories.map(story => ({

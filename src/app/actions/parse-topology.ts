@@ -7,7 +7,7 @@ import { generateObject } from 'ai';
 import { log, logError } from '@/lib/logger';
 import { getVisionModel } from '@/lib/ai-config';
 import type { FractalNode } from '@/types/fractal';
-import { Edge, MarkerType } from 'reactflow';
+// 注意：parse-topology 不返回 Edge 类型，只返回拓扑图数据，所以不需要导入 reactflow
 
 /**
  * 拓扑图节点 Schema

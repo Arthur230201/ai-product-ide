@@ -63,11 +63,11 @@ const createImage = (base64Data: string, widthEmu = 4320000, heightEmu?: number)
       children: [
         new ImageRun({
           data: imageBuffer,
-          transformation: { 
-            width: widthEmu, 
-            height: finalHeight 
+          transformation: {
+            width: widthEmu,
+            height: finalHeight,
           },
-        }),
+        } as any), // Type assertion to handle docx library type mismatch
       ],
       alignment: AlignmentType.CENTER,
       spacing: { after: 200 },
@@ -83,12 +83,12 @@ const createImage = (base64Data: string, widthEmu = 4320000, heightEmu?: number)
 };
 
 // Helper: Simple Markdown Parser (Bold + Text + Line Breaks)
-const parseText = (text: string): (TextRun | Paragraph)[] => {
-  if (!text) return [new TextRun({ text: "（暂无内容）", italics: true, color: "999999" })];
+const parseText = (text: string): Paragraph[] => {
+  if (!text) return [new Paragraph({ children: [new TextRun({ text: "（暂无内容）", italics: true, color: "999999" })] })];
   
   // Split by line breaks first
   const lines = text.split(/\n/);
-  const result: (TextRun | Paragraph)[] = [];
+  const result: Paragraph[] = [];
   
   lines.forEach((line, lineIndex) => {
     if (line.trim() === '') {
@@ -275,7 +275,7 @@ const createTableHeader = (headers: string[]): TableRow => {
  * 生成企业级 Word 文档
  */
 export const generateEnterpriseWord = async (data: FullPrdData): Promise<Blob> => {
-  const children: (Paragraph | Table | PageBreak)[] = [];
+  const children: (Paragraph | Table)[] = [];
 
   // --- COVER PAGE ---
   children.push(
@@ -331,12 +331,16 @@ export const generateEnterpriseWord = async (data: FullPrdData): Promise<Blob> =
 
   // --- TOC ---
   children.push(
-    new Paragraph({ text: "目录", heading: HeadingLevel.HEADING_1 }),
+    new Paragraph({ children: [new TextRun({ text: "目录" })], heading: HeadingLevel.HEADING_1 }),
     new Paragraph({ 
-      text: "（请在 Word 中右键点击此区域，选择“更新域”以生成目录）", 
+      children: [
+        new TextRun({ 
+          text: "（请在 Word 中右键点击此区域，选择\"更新域\"以生成目录）", 
+          italics: true,
+          color: "999999",
+        })
+      ],
       style: "Normal",
-      italics: true,
-      color: "999999",
       spacing: { after: 400 },
     }),
     new Paragraph({ children: [new PageBreak()] }),
@@ -344,8 +348,8 @@ export const generateEnterpriseWord = async (data: FullPrdData): Promise<Blob> =
 
   // --- CHAPTER 1: OVERVIEW ---
   children.push(
-    new Paragraph({ text: "第 1 章：项目综述", heading: HeadingLevel.HEADING_1 }),
-    new Paragraph({ text: "1.1 项目背景", heading: HeadingLevel.HEADING_2 }),
+    new Paragraph({ children: [new TextRun({ text: "第 1 章：项目综述" })], heading: HeadingLevel.HEADING_1 }),
+    new Paragraph({ children: [new TextRun({ text: "1.1 项目背景" })], heading: HeadingLevel.HEADING_2 }),
     ...parseText(data.meta.desc || "（暂无项目背景描述）"),
     new Paragraph({ text: "1.2 目标用户", heading: HeadingLevel.HEADING_2 }),
     ...parseText(`核心用户群体：${data.meta.targetUser || "通用用户"}`),
@@ -379,11 +383,15 @@ export const generateEnterpriseWord = async (data: FullPrdData): Promise<Blob> =
   if (data.images.architecture) {
     children.push(createImage(data.images.architecture, 500, 400));
     children.push(new Paragraph({
-      text: "（点击放大查看）",
+      children: [
+        new TextRun({ 
+          text: "（点击放大查看）", 
+          italics: true,
+          color: "666666",
+        })
+      ],
       alignment: AlignmentType.CENTER,
       style: "Normal",
-      italics: true,
-      color: "666666",
       spacing: { after: 400 },
     }));
   } else {
@@ -582,15 +590,16 @@ export const generateEnterpriseWord = async (data: FullPrdData): Promise<Blob> =
     }
 
     // Step 4: User Stories Section (用户故事模型 - 核心)
-    if (node.userStories && node.userStories.length > 0) {
+    const userStories = node.userStories;
+    if (userStories && userStories.length > 0) {
       const userStoriesSectionNum = `${nodeNum}.${sectionIdx++}`;
       children.push(new Paragraph({ 
-        text: `${userStoriesSectionNum} 用户故事`, 
+        children: [new TextRun({ text: `${userStoriesSectionNum} 用户故事` })],
         heading: HeadingLevel.HEADING_3,
         spacing: { before: 400, after: 200 } 
       }));
 
-      node.userStories.forEach((story, storyIdx) => {
+      userStories.forEach((story, storyIdx) => {
         // User Story Card
         children.push(new Paragraph({
           children: [
@@ -670,7 +679,7 @@ export const generateEnterpriseWord = async (data: FullPrdData): Promise<Blob> =
         }
 
         // Spacing between stories
-        if (storyIdx < node.userStories.length - 1) {
+        if (storyIdx < userStories.length - 1) {
           children.push(new Paragraph({ spacing: { after: 300 } }));
         }
       });
@@ -799,7 +808,7 @@ export const generateEnterpriseWord = async (data: FullPrdData): Promise<Blob> =
             width: 11906, // A4 width in TWIPs (1 inch = 1440 TWIPs)
             height: 16838, // A4 height in TWIPs
           },
-          margins: {
+          margin: {
             top: 1440, // 1 inch
             right: 1440,
             bottom: 1440,
@@ -833,10 +842,10 @@ export const generateEnterpriseWord = async (data: FullPrdData): Promise<Blob> =
             new Paragraph({
               alignment: AlignmentType.CENTER,
               children: [
-                new TextRun("Page "),
-                PageNumber.CURRENT,
-                new TextRun(" of "),
-                PageNumber.TOTAL_PAGES,
+                new TextRun({ text: "Page " }),
+                PageNumber.CURRENT as any,
+                new TextRun({ text: " of " }),
+                PageNumber.TOTAL_PAGES as any,
               ],
               style: "Normal",
             }),
@@ -916,7 +925,8 @@ ${globalRules.dataTracking || '（待补充）'}
     const view = node.data?.artifacts?.view;
     
     // 获取 UI 预览图
-    const uiPreview = view?.previewUrl || (view?.code ? 
+    const viewWithCode = view as { previewUrl?: string; code?: string } | undefined;
+    const uiPreview = viewWithCode?.previewUrl || (viewWithCode?.code ? 
       'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==' :
       'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==');
     
@@ -924,11 +934,12 @@ ${globalRules.dataTracking || '（待补充）'}
     const sections: RequirementSection[] = [];
     
     // 检查是否有新的 sections 结构（Rich Node Model）
-    if (spec?.sections && Array.isArray(spec.sections)) {
+    const specWithSections = spec as { sections?: RequirementSection[]; title?: string; requirements?: string | string[] } | undefined;
+    if (specWithSections?.sections && Array.isArray(specWithSections.sections)) {
       // 使用新的 sections 结构
-      sections.push(...spec.sections.map((sec: any) => ({
+      sections.push(...specWithSections.sections.map((sec: any) => ({
         title: sec.title || '未命名章节',
-        type: sec.type === 'table' ? 'table' : 'text',
+        type: (sec.type === 'table' ? 'table' : 'text') as 'text' | 'table',
         content: sec.content || '（暂无内容）',
       })));
     } else if (spec?.requirements) {
@@ -971,17 +982,18 @@ ${globalRules.dataTracking || '（待补充）'}
     }
 
     // 提取用户故事数据（用户故事模型 - 核心）
-    const userStories = node.data?.artifacts?.userStories;
+    const artifacts = node.data?.artifacts as any;
+    const userStories = artifacts?.userStories;
     // 兼容旧数据（可选）
-    const businessContext = node.data?.artifacts?.businessContext;
-    const events = node.data?.artifacts?.events;
+    const businessContext = artifacts?.businessContext;
+    const events = artifacts?.events;
 
     return {
       title: spec?.title || node.data.label || '未命名页面',
       uiPreview,
       sections,
       // 用户故事模型（新 - 核心）
-      userStories: userStories ? userStories.map(story => ({
+      userStories: userStories ? userStories.map((story: any) => ({
         id: story.id,
         role: story.role,
         activity: story.activity,
@@ -994,7 +1006,7 @@ ${globalRules.dataTracking || '（待补充）'}
         role: businessContext.role,
         goal: businessContext.goal,
       } : undefined,
-      events: events ? events.map(event => ({
+      events: events ? events.map((event: any) => ({
         id: event.id,
         name: event.name,
         trigger: event.trigger,

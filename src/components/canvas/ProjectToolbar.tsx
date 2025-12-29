@@ -5,7 +5,7 @@ import { FilePlus, Save, FolderOpen, PlusSquare, BookOpen, Download, ChevronDown
 import { useCanvasStore } from '@/store/canvas-store';
 import { ProjectBlueprint } from './ProjectBlueprint';
 import { toast } from 'sonner';
-import { exportToHtml, exportToWord } from '@/utils/prdGenerator';
+import { exportToFullPrdHtml, exportToWord } from '@/utils/prdGenerator';
 
 export function ProjectToolbar() {
   const { clearCanvas, exportProject, loadProject, addBlankNode, isDetailPanelOpen, nodes, edges, projectMeta, globalRules } = useCanvasStore();
@@ -162,18 +162,22 @@ export function ProjectToolbar() {
   const handleExportToHtml = async () => {
     setIsExportMenuOpen(false);
     try {
-      const markdown = await generatePRDMarkdown();
-      await exportToHtml({
+      // 使用 exportToFullPrdHtml 而不是 exportToHtml
+      await exportToFullPrdHtml({
         projectMeta,
-        markdownContent: markdown,
+        globalRules,
         nodes,
         edges,
-        globalRules,
+        // 这些是可选的，如果项目中有可以从 store 获取
+        architectureImage: undefined,
+        topologyImage: undefined,
+        swimlaneChart: undefined,
+        dataDictionary: undefined,
       });
-      toast.success('HTML 导出成功！');
+      toast.success('Full PRD HTML 导出成功！');
     } catch (error) {
-      console.error('Export to HTML error:', error);
-      toast.error('导出 HTML 失败', {
+      console.error('Export to Full PRD HTML error:', error);
+      toast.error('导出 Full PRD HTML 失败', {
         description: error instanceof Error ? error.message : '未知错误',
       });
     }
