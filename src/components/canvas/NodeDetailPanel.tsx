@@ -276,8 +276,17 @@ export function NodeDetailPanel() {
       const fileName = `${data.label || 'Component'}.tsx`;
       const componentName = data.label;
       
-      // 生成完整 PRD
-      const fullPrd = generatePageLevelPrd(code, fileName, componentName, options);
+      // 获取已有的需求文档，用于提取功能表格
+      const existingRequirements = data.artifacts.spec?.requirements;
+      
+      // 生成完整 PRD，传入已有需求文档以便提取功能表格
+      const fullPrd = generatePageLevelPrd(
+        code, 
+        fileName, 
+        componentName, 
+        options,
+        existingRequirements // 传入已有需求文档
+      );
       
       // 保存 PRD 和配置到节点数据
       // 将完整 PRD 保存为数组的单个元素（保持 Markdown 格式完整）
@@ -350,6 +359,11 @@ export function NodeDetailPanel() {
 
   // 生成测试用例
   const handleGenerateTests = async () => {
+    if (!selectedNode || !selectedNodeId) {
+      toast.error('请先选择一个节点');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const requirements = Array.isArray(data.artifacts.spec.requirements) 
@@ -358,6 +372,7 @@ export function NodeDetailPanel() {
       
       if (requirements.length === 0) {
         toast.error('请先完善需求文档');
+        setIsLoading(false);
         return;
       }
 
@@ -374,10 +389,11 @@ export function NodeDetailPanel() {
           }
         }
       });
-      toast.success('测试用例生成完成');
+      toast.success(`测试用例生成完成，共生成 ${result.cases.length} 个测试用例`);
     } catch (e) {
       console.error('Generate test cases error:', e);
-      toast.error('生成失败，请稍后重试');
+      const errorMessage = e instanceof Error ? e.message : '生成失败，请稍后重试';
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -486,10 +502,12 @@ export function NodeDetailPanel() {
       </div>
 
       {/* 2. Main Body (Three-Column Grid Layout) - 优化空间分配：压缩左右两侧，扩大中间文档区域 */}
-      <div className="flex-1 grid grid-cols-[minmax(150px,12%)_1fr_minmax(200px,25%)] overflow-hidden h-full">
+      <div className="flex-1 grid grid-cols-[minmax(200px,15%)_1fr_minmax(200px,25%)] overflow-hidden h-full">
         
-        {/* LEFT COLUMN: Node Tree (20%) */}
-        <NodeTree />
+        {/* LEFT COLUMN: Node Tree (15%) */}
+        <div className="flex flex-col h-full overflow-hidden">
+          <NodeTree />
+        </div>
 
         {/* MIDDLE COLUMN: Editor / Docs (1fr) */}
         <div className="flex flex-col border-r border-zinc-800 relative overflow-hidden">

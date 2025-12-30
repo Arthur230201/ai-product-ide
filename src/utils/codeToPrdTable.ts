@@ -361,26 +361,34 @@ export function generatePrdTableFromCode(
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    const trimmedLine = line.trim();
     
-    // 检测区域变化
-    if (line.includes('Header') || line.includes('header') || line.includes('顶部')) {
+    // 跳过注释和空行
+    if (trimmedLine.startsWith('//') || trimmedLine.startsWith('/*') || trimmedLine.startsWith('*') || trimmedLine === '') {
+      continue;
+    }
+    
+    // 检测区域变化（更宽松的匹配）
+    const lowerLine = line.toLowerCase();
+    if (lowerLine.includes('header') || lowerLine.includes('顶部') || lowerLine.includes('navbar') || lowerLine.includes('nav-bar')) {
       currentZone = '顶部导航栏';
-    } else if (line.includes('Footer') || line.includes('footer') || line.includes('底部')) {
+    } else if (lowerLine.includes('footer') || lowerLine.includes('底部') || lowerLine.includes('bottom')) {
       currentZone = '底部操作栏';
-    } else if (line.includes('Sidebar') || line.includes('aside') || line.includes('侧边')) {
+    } else if (lowerLine.includes('sidebar') || lowerLine.includes('aside') || lowerLine.includes('侧边') || lowerLine.includes('menu')) {
       currentZone = '侧边菜单区';
-    } else if (line.includes('Modal') || line.includes('Dialog') || line.includes('弹窗')) {
+    } else if (lowerLine.includes('modal') || lowerLine.includes('dialog') || lowerLine.includes('弹窗') || lowerLine.includes('popup')) {
       currentZone = '弹窗/浮层';
-    } else if (line.includes('.map(') || line.includes('List') || line.includes('Card')) {
+    } else if (lowerLine.includes('.map(') || lowerLine.includes('list') || lowerLine.includes('card') || lowerLine.includes('grid')) {
       currentZone = '内容列表区';
     }
 
-    // 提取关键元素
-    const buttonMatch = line.match(/<button[^>]*>([^<]*)<\/button>|<Button[^>]*>([^<]*)<\/Button>/i);
+    // 提取关键元素 - 改进正则匹配，支持更多格式
+    // Button: 支持自闭合标签、多行标签、带children的标签
+    const buttonMatch = line.match(/<button[^>]*>([^<]*)<\/button>|<Button[^>]*>([^<]*)<\/Button>|<button[^>]*\/>|<Button[^>]*\/>/i);
     if (buttonMatch) {
-      const text = buttonMatch[1] || buttonMatch[2] || '';
-      const classNameMatch = line.match(/className="([^"]+)"/);
-      const onClickMatch = line.match(/onClick={([^}]+)}/);
+      const text = (buttonMatch[1] || buttonMatch[2] || '').trim();
+      const classNameMatch = line.match(/className=["']([^"']+)["']/);
+      const onClickMatch = line.match(/onClick\s*=\s*\{([^}]+)\}/);
       
       rows.push({
         id: `${prefix}${String(index).padStart(3, '0')}`,
@@ -392,12 +400,13 @@ export function generatePrdTableFromCode(
       index++;
     }
 
+    // Input: 支持单引号和双引号
     const inputMatch = line.match(/<input[^>]*\/?>|<Input[^>]*\/?>/i);
     if (inputMatch) {
-      const placeholderMatch = line.match(/placeholder="([^"]+)"/);
-      const typeMatch = line.match(/type="([^"]+)"/);
-      const classNameMatch = line.match(/className="([^"]+)"/);
-      const onChangeMatch = line.match(/onChange={([^}]+)}/);
+      const placeholderMatch = line.match(/placeholder=["']([^"']+)["']/);
+      const typeMatch = line.match(/type=["']([^"']+)["']/);
+      const classNameMatch = line.match(/className=["']([^"']+)["']/);
+      const onChangeMatch = line.match(/onChange\s*=\s*\{([^}]+)\}/);
       
       rows.push({
         id: `${prefix}${String(index).padStart(3, '0')}`,
@@ -418,10 +427,11 @@ export function generatePrdTableFromCode(
       index++;
     }
 
+    // Select: 支持单引号和双引号
     const selectMatch = line.match(/<select[^>]*>|<Select[^>]*>/i);
     if (selectMatch) {
-      const classNameMatch = line.match(/className="([^"]+)"/);
-      const onChangeMatch = line.match(/onChange={([^}]+)}/);
+      const classNameMatch = line.match(/className=["']([^"']+)["']/);
+      const onChangeMatch = line.match(/onChange\s*=\s*\{([^}]+)\}/);
       
       rows.push({
         id: `${prefix}${String(index).padStart(3, '0')}`,
@@ -433,11 +443,12 @@ export function generatePrdTableFromCode(
       index++;
     }
 
-    // 提取图标
-    const iconMatch = line.match(/<(\w+Icon)[^>]*\/?>|<(\w+)\s+className="[^"]*icon[^"]*"/i);
+    // 提取图标 - 改进匹配，支持更多格式
+    const iconMatch = line.match(/<(\w+Icon)[^>]*\/?>|<(\w+)\s+className=["'][^"']*icon[^"']*["']/i) || 
+                      line.match(/from\s+['"]lucide-react['"]/i) && line.match(/(\w+)\s*=/);
     if (iconMatch) {
-      const iconName = iconMatch[1] || iconMatch[2];
-      const classNameMatch = line.match(/className="([^"]+)"/);
+      const iconName = iconMatch[1] || iconMatch[2] || iconMatch[3] || 'Icon';
+      const classNameMatch = line.match(/className=["']([^"']+)["']/);
       
       rows.push({
         id: `${prefix}${String(index).padStart(3, '0')}`,
@@ -449,11 +460,12 @@ export function generatePrdTableFromCode(
       index++;
     }
 
-    // 提取标签/徽章
-    const badgeMatch = line.match(/<span[^>]*className="[^"]*(badge|tag|label)[^"]*">([^<]+)<\/span>/i);
+    // 提取标签/徽章 - 支持单引号和双引号
+    const badgeMatch = line.match(/<span[^>]*className=["'][^"']*(badge|tag|label)[^"']*["'][^>]*>([^<]+)<\/span>/i) ||
+                      line.match(/<div[^>]*className=["'][^"']*(badge|tag|label)[^"']*["'][^>]*>([^<]+)<\/div>/i);
     if (badgeMatch) {
-      const text = badgeMatch[2];
-      const classNameMatch = line.match(/className="([^"]+)"/);
+      const text = (badgeMatch[2] || '').trim();
+      const classNameMatch = line.match(/className=["']([^"']+)["']/);
       
       rows.push({
         id: `${prefix}${String(index).padStart(3, '0')}`,
@@ -464,12 +476,36 @@ export function generatePrdTableFromCode(
       });
       index++;
     }
+    
+    // 提取其他常见元素：div、span、p等（如果包含交互或重要内容）
+    const divMatch = line.match(/<div[^>]*onClick[^>]*>|<div[^>]*className=["'][^"']*(card|container|wrapper|box)[^"']*["'][^>]*>/i);
+    if (divMatch && !badgeMatch) {
+      const onClickMatch = line.match(/onClick\s*=\s*\{([^}]+)\}/);
+      const classNameMatch = line.match(/className=["']([^"']+)["']/);
+      const textMatch = line.match(/>([^<]+)</);
+      
+      if (onClickMatch || classNameMatch?.[1]?.includes('card') || classNameMatch?.[1]?.includes('container')) {
+        rows.push({
+          id: `${prefix}${String(index).padStart(3, '0')}`,
+          zone: currentZone,
+          element: translateElementName('Container', { onClick: onClickMatch ? true : false }, textMatch?.[1]?.trim() || ''),
+          function: generateFunctionDescription('Container', { onClick: onClickMatch ? true : false }, textMatch?.[1]?.trim() || ''),
+          display: translateDisplaySpecs(classNameMatch?.[1] || '', 'Container', {}),
+        });
+        index++;
+      }
+    }
   }
 
   // 生成 Markdown 表格
   const tableRows = rows.map(row => 
     `| ${row.id} | ${row.zone} | ${row.element} | ${row.function} | ${row.display} |`
   ).join('\n');
+
+  // 如果没有提取到任何元素，返回提示信息而不是空表格
+  if (rows.length === 0) {
+    return `| 功能ID | UI区域 | 元素名称 | 功能说明 | 展示规范 |\n| :--- | :--- | :--- | :--- | :--- |\n| - | - | 未检测到UI元素 | 请检查代码是否包含有效的React组件元素 | - |`;
+  }
 
   return `| 功能ID | UI区域 | 元素名称 | 功能说明 | 展示规范 |\n| :--- | :--- | :--- | :--- | :--- |\n${tableRows}`;
 }
@@ -624,10 +660,10 @@ function generatePageOverview(code: string, options?: PrdOptions): string {
     userAction = '创建新的指令';
   }
 
-  return `### 1. 📝 页面综述 (Page Overview)
+  return `### 1. 📝 页面综述
 
 - **核心价值**: ${coreValue}。
-- **用户故事 (User Story)**: "As a ${userRole}, I want to ${userAction}, so that ${businessValue}。"
+- **用户故事**: "作为 ${userRole}，我想要 ${userAction}，以便 ${businessValue}。"
 - **前置条件**: ${prerequisites.join('、')}。`;
 }
 
@@ -677,7 +713,7 @@ function generateBusinessFlows(code: string): string {
     flows.push('**基础交互流程**：用户与界面元素交互，系统响应并更新显示内容。');
   }
 
-  return `### 3. 🔄 核心业务流程 (Core Business Flows)
+  return `### 3. 🔄 核心业务流程
 
 ${flows.join('\n\n')}`;
 }
@@ -691,47 +727,47 @@ function generateExceptions(code: string): string {
 
   // 空状态
   if (lowerCode.includes('map') || lowerCode.includes('list') || lowerCode.includes('length === 0')) {
-    exceptions.push(`**空状态 (Empty State)**：
+    exceptions.push(`**空状态**：
 - 当列表为空时，显示友好的空状态提示（如"暂无指令"或空状态插图）。
 - 空状态应引导用户进行首次操作（如"创建第一个指令"）。`);
   }
 
   // 加载状态
   if (lowerCode.includes('loading') || lowerCode.includes('isloading') || lowerCode.includes('skeleton')) {
-    exceptions.push(`**加载状态 (Loading State)**：
-- 数据加载时显示骨架屏（Skeleton Screen）或加载动画。
+    exceptions.push(`**加载状态**：
+- 数据加载时显示骨架屏或加载动画。
 - 骨架屏应模拟实际内容布局，提供良好的视觉连续性。`);
   } else {
-    exceptions.push(`**加载状态 (Loading State)**：
-- 数据加载时显示加载指示器（Spinner），避免页面空白。
+    exceptions.push(`**加载状态**：
+- 数据加载时显示加载指示器，避免页面空白。
 - 加载时间超过3秒时，显示加载进度提示。`);
   }
 
   // 网络错误
-  exceptions.push(`**网络错误 (Network Error)**：
+  exceptions.push(`**网络错误**：
 - 网络请求失败时，显示错误提示（Toast 消息）。
 - 提供"重试"按钮，允许用户重新发起请求。
 - 错误信息应用户友好，避免显示技术错误码。`);
 
   // 数据溢出
   if (lowerCode.includes('truncate') || lowerCode.includes('ellipsis') || lowerCode.includes('overflow')) {
-    exceptions.push(`**文本溢出 (Text Overflow)**：
+    exceptions.push(`**文本溢出**：
 - 标题或长文本超出容器时，使用省略号（...）截断。
-- 悬停时显示完整内容的 Tooltip 提示。`);
+- 悬停时显示完整内容的提示。`);
   } else {
-    exceptions.push(`**文本溢出 (Text Overflow)**：
+    exceptions.push(`**文本溢出**：
 - 长文本应合理截断，避免破坏布局。
 - 关键信息（如标题）应完整显示或提供展开功能。`);
   }
 
   // 条件显示
   if (lowerCode.includes('showactionbutton') || lowerCode.includes('conditional')) {
-    exceptions.push(`**条件显示 (Conditional Rendering)**：
+    exceptions.push(`**条件显示**：
 - 某些元素仅在满足条件时显示（如"催办"按钮仅在需要时出现）。
 - 条件不满足时，元素不占用布局空间，保持界面整洁。`);
   }
 
-  return `### 4. ⚠️ 异常与边界 (Exceptions & Edge Cases)
+  return `### 4. ⚠️ 异常与边界情况
 
 ${exceptions.join('\n\n')}`;
 }
@@ -772,13 +808,40 @@ function generateAnalytics(code: string): string {
   performance.push('- **页面加载性能**：首屏渲染时间 < 2秒，支持懒加载优化。');
   performance.push('- **数据分页规则**：列表数据采用分页加载，每页显示 20 条，支持无限滚动或分页器。');
 
-  return `### 5. 📊 数据埋点与性能 (Analytics & NFR)
+  return `### 5. 📊 数据埋点与性能要求
 
-**追踪事件 (Tracking)**：
+**数据埋点要求**：
 ${tracking.join('\n')}
 
-**性能要求 (Performance)**：
+**性能要求**：
 ${performance.join('\n')}`;
+}
+
+/**
+ * 从已有需求文档中提取功能表格
+ */
+function extractFunctionTableFromRequirements(requirements: string | string[]): string | null {
+  const requirementsText = Array.isArray(requirements) 
+    ? requirements.join('\n') 
+    : String(requirements || '');
+  
+  // 查找功能表格：查找包含 "功能ID" 的表格
+  // 表格格式：| 功能ID | UI区域 | 元素名称 | 功能说明 | 展示规范 |
+  const tablePattern = /\|?\s*功能ID\s*\|[^\n]*\n\s*\|?\s*:?-+\s*\|[^\n]*\n((?:\|?[^\n]*\|[^\n]*\n?)+)/;
+  const match = requirementsText.match(tablePattern);
+  
+  if (match && match[1]) {
+    // 提取表格数据行（不包括表头，因为我们会重新添加）
+    const tableRows = match[1].trim();
+    
+    // 确保表格有数据行（至少一行）
+    if (tableRows.includes('|') && tableRows.split('\n').filter(line => line.trim().includes('|')).length > 0) {
+      // 返回完整的表格（包含表头）
+      return `| 功能ID | UI区域 | 元素名称 | 功能说明 | 展示规范 |\n| :--- | :--- | :--- | :--- | :--- |\n${tableRows}`;
+    }
+  }
+  
+  return null;
 }
 
 /**
@@ -790,13 +853,15 @@ ${performance.join('\n')}`;
  * @param fileName - 文件名（用于提取功能ID前缀）
  * @param componentName - 组件名（可选，优先使用）
  * @param userOptions - 用户提供的配置（优先级最高）
+ * @param existingRequirements - 已有的需求文档（如果存在，会从中提取功能表格）
  * @returns 完整的页面级 PRD 文档（Markdown 格式）
  */
 export function generatePageLevelPrd(
   code: string,
   fileName: string = 'Component.tsx',
   componentName?: string,
-  userOptions?: PrdOptions
+  userOptions?: PrdOptions,
+  existingRequirements?: string | string[]
 ): string {
   // 提取组件名
   const componentMatch = code.match(/export\s+(?:default\s+)?function\s+(\w+)/);
@@ -817,14 +882,29 @@ export function generatePageLevelPrd(
 
   // 生成各个部分
   const pageOverview = generatePageOverview(code, finalOptions);
-  const elementSpec = generatePrdTableFromCode(code, fileName, detectedComponentName);
+  
+  // 优先使用已有需求文档中的功能表格，如果没有则重新生成
+  let elementSpec: string;
+  if (existingRequirements) {
+    const extractedTable = extractFunctionTableFromRequirements(existingRequirements);
+    if (extractedTable) {
+      elementSpec = extractedTable;
+    } else {
+      // 如果提取失败，则重新生成
+      elementSpec = generatePrdTableFromCode(code, fileName, detectedComponentName);
+    }
+  } else {
+    // 没有已有需求文档，重新生成
+    elementSpec = generatePrdTableFromCode(code, fileName, detectedComponentName);
+  }
+  
   const businessFlows = generateBusinessFlows(code);
   const exceptions = generateExceptions(code);
   const analytics = generateAnalytics(code);
 
   // 组合完整文档
-  return `**Role**: Professional Product Manager (PM).  
-**Task**: Based on the current UI component code/image, generate a comprehensive **Page-Level PRD**.
+  return `**角色**: 专业产品经理（PM）。  
+**任务**: 基于当前 UI 组件代码/图片，生成完整的**页面级产品需求文档（PRD）**。
 
 ---
 
@@ -832,7 +912,7 @@ ${pageOverview}
 
 ---
 
-### 2. 🧩 界面元素清单 (Element Specification)
+### 2. 🧩 页面功能详情
 
 ${elementSpec}
 
@@ -850,7 +930,7 @@ ${analytics}
 
 ---
 
-**Constraint**: Use professional product language. Avoid pure technical jargon (like specific API endpoints or SQL). Focus on Business Logic.`;
+**约束**: 使用专业的产品语言。避免纯技术术语（如具体的 API 端点或 SQL）。专注于业务逻辑。`;
 }
 
 /**

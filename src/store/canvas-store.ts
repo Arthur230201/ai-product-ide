@@ -168,8 +168,8 @@ export const useCanvasStore = create<CanvasStore>()(
           currentTheme: defaultTheme,
           projectMeta: {
             projectName: '未命名项目',
-            industry: 'General Internet',
-            targetAudience: 'General Users',
+            industry: '通用互联网',
+            targetAudience: '通用用户',
             description: '',
             version: '1.0.0',
           },
@@ -190,8 +190,8 @@ export const useCanvasStore = create<CanvasStore>()(
       // 初始化项目画像和全局规则（在函数开始处定义，以便在错误处理中使用）
       const initialProjectMeta: ProjectMeta = {
         projectName: '未命名项目',
-        industry: 'General Internet',
-        targetAudience: 'General Users',
+        industry: '通用互联网',
+        targetAudience: '通用用户',
         description: '',
         version: '1.0.0',
       };

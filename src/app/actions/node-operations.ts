@@ -60,8 +60,8 @@ export async function reverseGenerateSpec(input: {
     // 获取项目画像配置
     const projectMeta = input.projectMeta || {
       projectName: '未命名项目',
-      industry: 'General Internet',
-      targetAudience: 'General Users',
+      industry: '通用互联网',
+      targetAudience: '通用用户',
       description: '',
       version: '1.0.0',
     };
@@ -87,23 +87,24 @@ export async function reverseGenerateSpec(input: {
     }
 
     // 构建动态系统提示词（基于项目画像）
-    const systemPrompt = `You are a specialized Product Manager in the **${industry}** sector.
-Your target users are **${targetAudience}**.
+    const systemPrompt = `你是一位专注于 **${industry}** 行业的产品经理。
+你的目标用户是 **${targetAudience}**。
 
-# Task
-Describe the functionality of the '${nodeLabel}' module based on the provided React component code.
+# 任务
+根据提供的 React 组件代码，描述 '${nodeLabel}' 模块的功能。
 
-# Style Instructions
+# 风格要求
 ${industrySpecificInstructions}
-- Focus on features relevant to ${targetAudience}.
-- Use terminology specific to ${industry}.
-- If the user provided sparse information, infer functional details based on the industry context.
+- 关注与 ${targetAudience} 相关的功能特性。
+- 使用 ${industry} 行业的专业术语。
+- 如果用户提供的信息不完整，根据行业上下文合理推断功能细节。
 
-# Output Requirements
-- Generate a clear title for this module
-- Generate a list of functional requirements
-- Use concise Chinese descriptions
-- Ensure requirements are actionable and specific to the ${industry} industry`;
+# 输出要求
+- 生成一个清晰的模块标题（使用中文）
+- 生成功能需求列表（使用中文）
+- 使用简洁的中文描述
+- 确保需求可执行且符合 ${industry} 行业特点
+- **所有输出内容必须使用中文**，禁止使用英文`;
 
     const userPrompt = `请分析以下React组件代码，生成'${nodeLabel}'模块的需求描述：
 
@@ -199,10 +200,120 @@ export async function generateTestCases(input: {
   title: string;
   requirements: string[];
 }): Promise<{ cases: string[] }> {
-  // TODO: 实现生成测试用例逻辑
-      return {
-    cases: [],
-  };
+  try {
+    // 检查环境变量
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY 未配置。请在 .env.local 文件中添加 OPENAI_API_KEY=your_api_key');
+    }
+
+    if (!input.requirements || input.requirements.length === 0) {
+      throw new Error('需求列表为空，无法生成测试用例');
+    }
+
+    // 构建系统提示词
+    const systemPrompt = `你是一位专业的QA测试工程师，擅长编写全面的测试用例。
+
+# 任务
+根据提供的功能需求，生成详细的测试用例列表。
+
+# 输出要求
+1. 每个测试用例应该包含：
+   - 测试场景描述（清晰、具体）
+   - 测试步骤（可选，如果场景复杂）
+   - 预期结果
+2. 测试用例应该覆盖：
+   - 正常流程（Happy Path）
+   - 边界条件（Boundary Cases）
+   - 异常情况（Error Cases）
+   - 数据验证（Validation）
+   - UI交互（如果适用）
+3. 使用中文描述，确保清晰易懂
+4. 每个测试用例独立一行，格式简洁
+5. 测试用例数量：根据需求复杂度，生成5-15个测试用例
+
+# 输出格式
+直接输出测试用例列表，每行一个测试用例，格式如下：
+- 测试用例1：描述测试场景和预期结果
+- 测试用例2：描述测试场景和预期结果
+...`;
+
+    // 构建用户提示词
+    const requirementsText = input.requirements
+      .map((req, index) => `${index + 1}. ${req}`)
+      .join('\n');
+
+    const userPrompt = `请为以下功能模块生成测试用例：
+
+**模块标题：** ${input.title}
+
+**功能需求：**
+${requirementsText}
+
+请生成全面的测试用例，覆盖正常流程、边界条件、异常情况和数据验证。`;
+
+    // 获取模型配置（使用默认文本模型）
+    const textModel = getTextModel();
+    
+    // 调用 OpenAI 生成测试用例
+    const result = await generateText({
+      model: openaiClient(textModel),
+      messages: [
+        {
+          role: 'system',
+          content: systemPrompt,
+        },
+        {
+          role: 'user',
+          content: userPrompt,
+        },
+      ],
+      temperature: 0.7, // 稍微高一点的温度，鼓励创造性
+    });
+
+    // 解析生成的测试用例
+    const generatedText = result.text.trim();
+    
+    // 提取测试用例（按行分割，过滤空行和标记）
+    const cases = generatedText
+      .split('\n')
+      .map(line => {
+        // 移除列表标记（-、*、1.、1、等）和编号
+        return line
+          .replace(/^[-*\d.\s、）)]+/, '') // 移除开头的标记
+          .replace(/^测试用例\d+[：:]\s*/, '') // 移除"测试用例1："这样的前缀
+          .trim();
+      })
+      .filter(line => {
+        // 过滤空行和无效行
+        return line.length > 0 && 
+               !line.match(/^(测试用例|用例|Case)/i) && // 过滤标题行
+               line.length > 5; // 至少5个字符
+      })
+      .slice(0, 20); // 限制最多20个测试用例
+
+    if (cases.length === 0) {
+      // 如果没有解析到测试用例，将整个文本作为单个测试用例
+      const fallbackCase = generatedText.substring(0, 500);
+      if (fallbackCase.length > 0) {
+        cases.push(fallbackCase);
+      } else {
+        // 如果还是空的，返回默认测试用例
+        cases.push('功能正常流程测试');
+        cases.push('数据验证测试');
+        cases.push('异常情况处理测试');
+      }
+    }
+
+    log(`✅ [generateTestCases] 成功生成 ${cases.length} 个测试用例`);
+    
+    return {
+      cases: cases,
+    };
+  } catch (error) {
+    logError('❌ [generateTestCases] Error:', error);
+    const errorMessage = error instanceof Error ? error.message : '测试用例生成失败';
+    throw new Error(`测试用例生成失败: ${errorMessage}`);
+  }
 }
 
 // ==================== Server Actions（用于 CommandBar）====================
@@ -276,9 +387,31 @@ export const generateUIFromImage = createServerAction()
       let designSystemEnforcement = '';
       if (input.themeConfig) {
         const theme = input.themeConfig;
-        const isDarkBackground = theme.colors?.background?.dark?.includes('slate-9') || 
-                                 theme.colors?.background?.dark?.includes('zinc-9') ||
-                                 theme.colors?.background?.dark?.includes('gray-9');
+        // 检查用户是否明确要求深色主题（通过检查背景色是否明确设置为深色）
+        const hasExplicitDarkTheme = theme.colors?.background?.dark && 
+                                     (theme.colors.background.dark.includes('slate-9') || 
+                                      theme.colors.background.dark.includes('zinc-9') ||
+                                      theme.colors.background.dark.includes('gray-9') ||
+                                      theme.colors.background.dark.includes('slate-8') ||
+                                      theme.colors.background.dark.includes('zinc-8') ||
+                                      theme.colors.background.dark.includes('gray-8'));
+        
+        // 默认使用白色背景，除非用户明确要求深色主题
+        const backgroundColor = hasExplicitDarkTheme 
+          ? `bg-${theme.colors.background.dark}` 
+          : 'bg-white';
+        const surfaceColor = hasExplicitDarkTheme 
+          ? `bg-${theme.colors?.surface || 'slate-800'}` 
+          : 'bg-white';
+        const primaryTextColor = hasExplicitDarkTheme 
+          ? `text-${theme.colors?.text?.primary || 'slate-50'}` 
+          : 'text-gray-900';
+        const secondaryTextColor = hasExplicitDarkTheme 
+          ? `text-${theme.colors?.text?.secondary || 'slate-400'}` 
+          : 'text-gray-600';
+        const borderColor = hasExplicitDarkTheme 
+          ? `border-${theme.colors?.border || 'slate-700'}` 
+          : 'border-gray-200';
         
         designSystemEnforcement = `
 
@@ -286,16 +419,16 @@ export const generateUIFromImage = createServerAction()
 你必须严格遵循以下设计配置（优先级高于默认 Tailwind 选择）：
 - 主色调：使用 bg-${theme.colors?.primary || 'blue-500'} 和 text-${theme.colors?.primary || 'blue-500'}（用于主要操作按钮、链接、强调元素）
 - 次要色调：使用 bg-${theme.colors?.secondary || 'purple-500'} 和 text-${theme.colors?.secondary || 'purple-500'}（用于次要操作）
-- 背景色：使用 bg-${theme.colors?.background?.dark || 'slate-900'}（页面背景）
-- 表面色：使用 bg-${theme.colors?.surface || 'slate-800'}（卡片、面板背景）
-- 主要文本：使用 text-${theme.colors?.text?.primary || 'slate-50'}（标题、重要文本）
-- 次要文本：使用 text-${theme.colors?.text?.secondary || 'slate-400'}（描述、辅助文本）
-- 边框色：使用 border-${theme.colors?.border || 'slate-700'}（所有边框）
+- 背景色：${hasExplicitDarkTheme ? `使用 ${backgroundColor}（用户明确要求深色主题）` : '**必须使用 bg-white（白色背景，默认要求）**'}
+- 表面色：使用 ${surfaceColor}
+- 主要文本：使用 ${primaryTextColor}
+- 次要文本：使用 ${secondaryTextColor}
+- 边框色：使用 ${borderColor}
 - 圆角：所有按钮、卡片、输入框必须使用 ${theme.shape?.borderRadius?.md || 'rounded-md'}
 - 按钮阴影：使用 ${theme.shadows?.buttonShadow || 'shadow-md'}
 - 卡片阴影：使用 ${theme.shadows?.cardShadow || 'shadow-lg'}
 - 密度：${theme.typography?.density === 'compact' ? '使用紧凑间距（p-2, gap-2）' : theme.typography?.density === 'spacious' ? '使用宽松间距（p-6, gap-6）' : '使用正常间距（p-4, gap-4）'}
-${isDarkBackground ? '- 注意：背景是深色，确保所有文本使用浅色类（text-white, text-gray-200, text-slate-50等）' : ''}
+${hasExplicitDarkTheme ? '- 注意：背景是深色，确保所有文本使用浅色类（text-white, text-gray-200, text-slate-50等）' : '- **重要：背景是白色，确保所有文本使用深色类（text-gray-900, text-gray-600等），禁止使用浅色文本（text-white, text-gray-100等）**'}
 - 风格描述：${theme.vibe || 'Modern Professional'}
 
 重要：这些设计令牌必须严格应用，不要使用其他颜色或样式。`;
@@ -341,12 +474,24 @@ Generate production-ready **React + Tailwind CSS** code based on the uploaded im
 ## 1. 像素级精确复刻
 - **精确还原**图片中的所有UI元素，包括：
   - 布局结构：精确匹配容器层次、排列方式（Flex/Grid）
-  - 颜色：精确匹配背景色、文本色、按钮色、状态标签颜色等
+  - 颜色：**背景色规则（必须忠实还原设计图）**：
+    - **核心原则**：**忠实还原设计图的背景色**，不能改变或反转
+    - **如果设计图背景是白色或浅色**：**必须使用**白色或浅色背景（如 \`bg-white\`、\`bg-gray-50\` 等），**禁止使用深色背景**
+    - **如果设计图背景是深色**（如黑色、深灰色等）：使用对应的深色背景（如 \`bg-gray-900\`、\`bg-slate-900\` 等）
+    - **严格禁止**：如果设计图是白色/浅色背景，**绝对不能生成深色背景**（如 \`bg-gray-900\`、\`bg-slate-900\`、\`bg-zinc-900\` 等）
+    - **判断方法**：仔细观察设计图的整体背景色，如果背景是白色或浅色，必须使用浅色背景；如果背景是深色，才使用深色背景
+  - 文本色、按钮色、状态标签颜色：精确匹配图片中的颜色
   - 字体：精确匹配字体大小、粗细、行高
   - 间距：精确匹配 padding、margin、gap 等间距
   - 圆角：精确匹配 rounded 类名
   - 图标和状态指示器：完整还原所有图标、状态图标
-- **严格按照图片还原**：不要修改、不要规范化，完全按照图片中的样子复刻
+- **背景色判断规则（强制要求）**：
+  - **忠实还原原则**：**必须忠实还原设计图的背景色**，不能改变或反转
+  - **如果设计图背景是白色/浅色**：**必须使用**白色/浅色背景（\`bg-white\`、\`bg-gray-50\` 等），**严格禁止使用深色背景**
+  - **如果设计图背景是深色**：使用对应的深色背景（\`bg-gray-900\`、\`bg-slate-900\` 等）
+  - **关键禁止项**：如果设计图是白色/浅色背景，**绝对不能生成深色背景**，这是严重错误
+  - **注意**：不要因为图片中有深色元素（如深色卡片、按钮）就认为背景是深色，背景是指整个页面的底色
+- **严格按照图片还原**：不要修改、不要规范化，完全按照图片中的样子复刻，背景色必须忠实还原设计图
 
 ## 2. 忽略系统UI元素
 - **完全忽略**手机系统状态栏（时间、信号图标、Wi-Fi图标、电池图标等）
@@ -390,7 +535,16 @@ Generate production-ready **React + Tailwind CSS** code based on the uploaded im
 - 标签可切换，使用 useState 管理激活状态
 - 添加 hover 和 active 状态反馈
 
-## 6. 技术要求
+## 6. 语言要求（强制）
+⚠️ **关键要求：所有文本内容必须使用中文**
+- **所有UI文本必须使用中文**：包括按钮文字、标签、提示信息、标题、描述等
+- **禁止使用英文**：除非图片中明确显示英文内容，否则所有文本必须使用中文
+- **示例**：
+  - ✅ 按钮文字："提交"、"取消"、"搜索"
+  - ✅ 标签文字："进行中"、"已完成"、"待处理"
+  - ❌ 禁止："Submit"、"Cancel"、"Search"、"In Progress"、"Completed"
+
+## 7. 技术要求
 - 使用 React Hooks（useState, useEffect）
 - 使用 Tailwind CSS 实现所有样式，禁止内联样式
 - 使用 Lucide React 图标库（从 'lucide-react' 导入）
@@ -400,7 +554,8 @@ ${designSystemEnforcement}
 
 # Output
 - 只返回完整的 .tsx 代码
-- 不要包含 markdown 标记、注释或说明文字`;
+- 不要包含 markdown 标记、注释或说明文字
+- **所有文本内容必须使用中文**`;
 
       // 构建用户提示词（新版本：结构化提示词）
       const defaultUserPrompt = `Analyze the uploaded image and generate production-ready React + Tailwind CSS code.
@@ -409,11 +564,19 @@ ${designSystemEnforcement}
 - Is this a high-fidelity design mockup? -> Use "Pixel-Perfect Clone" strategy.
 - Is this a wireframe/sketch? -> Use "Professional Interpretation" strategy.
 
-**Step 2: Apply Universal Rules**
-- Every text element MUST have an explicit \`text-*\` color class (e.g., \`text-gray-900\`, \`text-slate-600\`).
-- Headings: Use dark colors (\`text-gray-900\` / \`text-slate-800\`).
-- Body text: Use medium-dark colors (\`text-gray-600\` / \`text-slate-500\`).
-- NEVER use light gray text (\`text-gray-300\` or lighter) on white backgrounds.
+**Step 2: Apply Universal Rules - Background Color (CRITICAL)**
+- **核心原则**：**忠实还原设计图的背景色**，不能改变或反转
+- **背景色判断（必须忠实还原）**：
+  - **如果设计图背景是白色或浅色**：**必须使用**白色或浅色背景（如 \`bg-white\`、\`bg-gray-50\` 等），**严格禁止使用深色背景**
+  - **如果设计图背景是深色**（如深灰、黑色等）：使用对应的深色背景（如 \`bg-gray-900\`、\`bg-slate-900\` 等）
+  - **严格禁止**：如果设计图是白色/浅色背景，**绝对不能生成深色背景**（如 \`bg-gray-900\`、\`bg-slate-900\`、\`bg-zinc-900\` 等），这是严重错误
+  - **判断方法**：仔细观察设计图的整体背景色，如果背景是白色或浅色，必须使用浅色背景；如果背景是深色，才使用深色背景
+  - **注意**：不要因为图片中有深色元素（如深色卡片、按钮）就认为背景是深色，背景是指整个页面的底色
+- **文本颜色规则**：
+  - Every text element MUST have an explicit \`text-*\` color class (e.g., \`text-gray-900\`, \`text-slate-600\`).
+  - **白色背景时**：Headings use dark colors (\`text-gray-900\` / \`text-slate-800\`), body text use medium-dark colors (\`text-gray-600\` / \`text-slate-500\`).
+  - **深色背景时**：Headings use light colors (\`text-white\` / \`text-gray-50\`), body text use light-medium colors (\`text-gray-300\` / \`text-gray-400\`).
+  - NEVER use light gray text (\`text-gray-300\` or lighter) on white backgrounds.
 - Look for indicator bars (colored side strips) and implement them with \`absolute\` positioning.
 
 **Step 3: Generate Code**
@@ -623,9 +786,31 @@ export const generateUIFromText = createServerAction()
       let designSystemEnforcement = '';
       if (input.themeConfig) {
         const theme = input.themeConfig;
-        const isDarkBackground = theme.colors?.background?.dark?.includes('slate-9') || 
-                                 theme.colors?.background?.dark?.includes('zinc-9') ||
-                                 theme.colors?.background?.dark?.includes('gray-9');
+        // 检查用户是否明确要求深色主题（通过检查背景色是否明确设置为深色）
+        const hasExplicitDarkTheme = theme.colors?.background?.dark && 
+                                     (theme.colors.background.dark.includes('slate-9') || 
+                                      theme.colors.background.dark.includes('zinc-9') ||
+                                      theme.colors.background.dark.includes('gray-9') ||
+                                      theme.colors.background.dark.includes('slate-8') ||
+                                      theme.colors.background.dark.includes('zinc-8') ||
+                                      theme.colors.background.dark.includes('gray-8'));
+        
+        // 默认使用白色背景，除非用户明确要求深色主题
+        const backgroundColor = hasExplicitDarkTheme 
+          ? `bg-${theme.colors.background.dark}` 
+          : 'bg-white';
+        const surfaceColor = hasExplicitDarkTheme 
+          ? `bg-${theme.colors?.surface || 'slate-800'}` 
+          : 'bg-white';
+        const primaryTextColor = hasExplicitDarkTheme 
+          ? `text-${theme.colors?.text?.primary || 'slate-50'}` 
+          : 'text-gray-900';
+        const secondaryTextColor = hasExplicitDarkTheme 
+          ? `text-${theme.colors?.text?.secondary || 'slate-400'}` 
+          : 'text-gray-600';
+        const borderColor = hasExplicitDarkTheme 
+          ? `border-${theme.colors?.border || 'slate-700'}` 
+          : 'border-gray-200';
         
         designSystemEnforcement = `
 
@@ -633,16 +818,16 @@ export const generateUIFromText = createServerAction()
 你必须严格遵循以下设计配置（优先级高于默认 Tailwind 选择）：
 - 主色调：使用 bg-${theme.colors?.primary || 'blue-500'} 和 text-${theme.colors?.primary || 'blue-500'}
 - 次要色调：使用 bg-${theme.colors?.secondary || 'purple-500'} 和 text-${theme.colors?.secondary || 'purple-500'}
-- 背景色：使用 bg-${theme.colors?.background?.dark || 'slate-900'}
-- 表面色：使用 bg-${theme.colors?.surface || 'slate-800'}
-- 主要文本：使用 text-${theme.colors?.text?.primary || 'slate-50'}
-- 次要文本：使用 text-${theme.colors?.text?.secondary || 'slate-400'}
-- 边框色：使用 border-${theme.colors?.border || 'slate-700'}
+- 背景色：${hasExplicitDarkTheme ? `使用 ${backgroundColor}（用户明确要求深色主题）` : '**必须使用 bg-white（白色背景，默认要求）**'}
+- 表面色：使用 ${surfaceColor}
+- 主要文本：使用 ${primaryTextColor}
+- 次要文本：使用 ${secondaryTextColor}
+- 边框色：使用 ${borderColor}
 - 圆角：所有按钮、卡片、输入框必须使用 ${theme.shape?.borderRadius?.md || 'rounded-md'}
 - 按钮阴影：使用 ${theme.shadows?.buttonShadow || 'shadow-md'}
 - 卡片阴影：使用 ${theme.shadows?.cardShadow || 'shadow-lg'}
 - 密度：${theme.typography?.density === 'compact' ? '使用紧凑间距（p-2, gap-2）' : theme.typography?.density === 'spacious' ? '使用宽松间距（p-6, gap-6）' : '使用正常间距（p-4, gap-4）'}
-${isDarkBackground ? '- 注意：背景是深色，确保所有文本使用浅色类（text-white, text-gray-200, text-slate-50等）' : ''}
+${hasExplicitDarkTheme ? '- 注意：背景是深色，确保所有文本使用浅色类（text-white, text-gray-200, text-slate-50等）' : '- **重要：背景是白色，确保所有文本使用深色类（text-gray-900, text-gray-600等），禁止使用浅色文本（text-white, text-gray-100等）**'}
 - 风格描述：${theme.vibe || 'Modern Professional'}
 
 重要：这些设计令牌必须严格应用，不要使用其他颜色或样式。`;
@@ -673,12 +858,14 @@ Generate production-ready **React + Tailwind CSS** code based on the page descri
 ## 2. 背景色和文本颜色（强制要求）
 
 ⚠️ **关键要求：**
-1. **默认背景色必须是白色**：最外层容器必须使用 \`bg-white\` 或 \`bg-gray-50\`
+1. **默认背景色必须是白色**：最外层容器必须使用 \`bg-white\`（**统一使用白色底色，除非用户特别要求其他颜色**）
 2. **所有文本元素必须明确设置Tailwind的text-*颜色类名，不能省略！**
 
 **背景色规则（强制要求）：**
+- **默认规则**：**统一使用白色背景**（\`bg-white\`），这是默认要求
 - **最外层容器（App组件的根div）**：**必须使用** \`bg-white\`（**禁止使用** \`bg-gray-50\`、\`bg-gray-100\` 或其他非白色背景）
 - **卡片、面板等容器**：**必须使用** \`bg-white\`（**禁止使用**深色背景如 \`bg-gray-900\`、\`bg-slate-900\`、\`bg-zinc-900\`、\`bg-blue-900\`、\`bg-purple-900\` 等）
+- **例外情况**：**只有当用户明确要求深色主题**（如"深色模式"、"dark theme"、"黑色背景"等）时，才可以使用深色背景
 - **严格禁止使用深色背景**：除非用户**明确要求**深色主题，否则**所有背景必须是白色**（\`bg-white\`）
 - **错误示例（禁止）：**
   - ❌ \`<div className="bg-gray-900">...</div>\` - 深色背景
@@ -788,7 +975,10 @@ ${designSystemEnforcement}
 2. 实现所有必要的交互功能
 3. 使用现代化的设计风格
 4. 确保代码可以直接运行
-5. **必须使用白色背景**（\`bg-white\`），禁止使用深色背景
+5. **背景色要求（重要）**：
+   - **默认使用白色背景**（\`bg-white\`），这是统一要求
+   - **除非用户特别要求其他颜色**（如"深色模式"、"黑色背景"、"dark theme"等），否则必须使用白色背景
+   - 禁止使用深色背景（如 \`bg-gray-900\`、\`bg-slate-900\` 等），除非用户明确要求
 6. **所有文本内容必须使用中文**，包括按钮、标签、提示信息等
 7. **确保内容在移动端屏幕内完整显示，不超出屏幕范围**（使用 \`w-full overflow-x-hidden\`）`;
 

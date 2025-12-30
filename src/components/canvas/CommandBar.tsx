@@ -23,16 +23,18 @@ interface FileAttachment {
 export function CommandBar() {
   const [prompt, setPrompt] = useState('');
   const [attachment, setAttachment] = useState<FileAttachment | null>(null);
+  const [attachments, setAttachments] = useState<FileAttachment[]>([]);
   const [isProcessingVideo, setIsProcessingVideo] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>('');
   const [progress, setProgress] = useState(0);
   // 超时覆盖标志：当超时发生时，强制重置所有 loading 状态
   const [isTimeoutOverride, setIsTimeoutOverride] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const loadingTimersRef = useRef<NodeJS.Timeout[]>([]);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { nodes, selectedNodeId, selectNode, addNodes, addEdges, updateNodeData, layoutNodes, currentTheme, aiConfig } = useCanvasStore();
+  const { nodes, selectedNodeId, selectNode, addNodes, addEdges, updateNodeData, layoutNodes, currentTheme, aiConfig, openBlueprint, updateProjectMeta } = useCanvasStore();
   
   // 获取当前选中的节点
   const selectedNode = selectedNodeId 
@@ -75,6 +77,7 @@ export function CommandBar() {
         dataExists: !!(result as any)?.data,
         dataType: typeof (result as any)?.data,
         dataKeys: (result as any)?.data && typeof (result as any).data === 'object' ? Object.keys((result as any).data) : [],
+        dataTypeField: (result as any)?.data?.type,
         dataNodesExists: !!(result as any)?.data?.nodes,
         dataNodesType: typeof (result as any)?.data?.nodes,
         dataNodesIsArray: Array.isArray((result as any)?.data?.nodes),
@@ -89,8 +92,8 @@ export function CommandBar() {
 
       // 处理 zsa-react 的返回格式
       // zsa-react 的 useServerAction 返回格式：result 直接是 handler 的返回值
-      // 所以 result 应该是 { data: { nodes, edges } }
-      let resultData: { data?: { nodes?: any[]; edges?: any[] } } | null = null;
+      // 所以 result 应该是 { data: { type: 'clarification_needed' | 'graph_generated', ... } }
+      let resultData: { data?: any } | null = null;
 
       if (Array.isArray(result)) {
         // 数组格式：[data, error]
@@ -107,6 +110,112 @@ export function CommandBar() {
         });
         return;
       }
+
+      // 检查是否为澄清请求
+      // generateGraph 返回格式：{ data: { type: 'clarification_needed', data: {...} } }
+      const responseData = resultData?.data;
+      log('🔍 [CommandBar] 检查返回数据类型:', {
+        hasData: !!responseData,
+        dataType: responseData?.type,
+        dataKeys: responseData ? Object.keys(responseData) : [],
+        fullData: JSON.stringify(responseData).substring(0, 1000),
+        isClarification: responseData?.type === 'clarification_needed',
+        resultDataKeys: resultData ? Object.keys(resultData) : [],
+        resultDataFull: JSON.stringify(resultData).substring(0, 1000),
+      });
+      
+      // 检查是否为澄清请求（优先检查，避免继续处理图结构）
+      // 检查多种可能的数据结构
+      let isClarification = false;
+      let clarificationData: any = null;
+      
+      // 方式1: 直接检查 responseData.type
+      if (responseData && responseData.type === 'clarification_needed') {
+        isClarification = true;
+        clarificationData = responseData.data;
+      }
+      // 方式2: 检查 resultData 是否直接包含 clarification_needed
+      else if (resultData && (resultData as any).type === 'clarification_needed') {
+        isClarification = true;
+        clarificationData = (resultData as any).data;
+      }
+      // 方式3: 检查 resultData.data 是否是一个对象且包含 type 字段
+      else if (resultData?.data && typeof resultData.data === 'object' && 'type' in resultData.data && resultData.data.type === 'clarification_needed') {
+        isClarification = true;
+        clarificationData = resultData.data.data;
+      }
+      
+      if (isClarification) {
+        log('💬 [CommandBar] 收到澄清请求，跳转到项目画像页面', {
+          clarificationData,
+          hasMessage: !!clarificationData?.message,
+          hasQuestion: !!clarificationData?.question,
+          hasOptions: !!clarificationData?.options,
+        });
+        setIsProcessingVideo(false);
+        clearLoadingTimers();
+        
+        if (!clarificationData) {
+          logError('❌ [CommandBar] 澄清请求数据不完整:', {
+            responseData,
+            resultData,
+            dataKeys: responseData ? Object.keys(responseData) : [],
+          });
+          // 即使数据不完整，也打开项目画像页面，让用户能够补充信息
+          log('⚠️ [CommandBar] 澄清数据不完整，但仍打开项目画像页面以便用户补充信息');
+          openBlueprint('profile', {
+            description: prompt.trim(),
+          });
+          setIsProcessingVideo(false);
+          setIsTimeoutOverride(false);
+          clearLoadingTimers();
+          setProgress(0);
+          setLoadingStep('');
+          toast.warning('需要更多信息', {
+            description: '请在项目画像页面中补充详细信息',
+            duration: 5000,
+          });
+          return;
+        }
+        
+        log('📋 [CommandBar] 澄清请求详情:', {
+          message: clarificationData.message,
+          question: clarificationData.question,
+          optionsCount: clarificationData.options?.length || 0,
+        });
+        
+        // 跳转到项目蓝图的项目画像页面，而不是显示对话框
+        // 构建初始数据，将澄清信息填充到项目画像中
+        const initialData: Partial<import('@/types/fractal').ProjectMeta> = {
+          description: prompt.trim(), // 保留原始输入作为项目简介
+        };
+        
+        // 如果检测到领域信息，可以填充到行业字段
+        if (clarificationData.message) {
+          // 尝试从消息中提取领域信息
+          const domainMatch = clarificationData.message.match(/已检测到领域[：:]([^。，,]+)/);
+          if (domainMatch) {
+            initialData.industry = domainMatch[1].trim();
+          }
+        }
+
+        // 打开项目蓝图并跳转到项目画像标签（但不阻塞流程）
+        // 注意：现在即使输入不够明确，也会继续生成图结构
+        // 所以这里只是提示用户可以在项目画像中补充信息，但不阻止继续
+        openBlueprint('profile', initialData);
+        
+        log('✅ [CommandBar] 已打开项目画像页面，提示用户补充信息（但继续生成基础图结构）');
+        toast.info('提示：输入信息可以更明确', {
+          description: '系统将生成基础结构，您可以在项目画像页面补充详细信息后优化',
+          duration: 5000,
+        });
+        
+        // 不再提前返回，继续处理图结构生成
+        // return; // 注释掉，让流程继续
+      }
+
+      // 如果不是澄清请求，继续处理图结构
+      log('📊 [CommandBar] 不是澄清请求，继续处理图结构数据');
 
       // 详细记录 resultData 的结构
       log('🔍 [CommandBar] resultData 详细结构:', {
@@ -181,20 +290,63 @@ export function CommandBar() {
           fullDataString: JSON.stringify(data).substring(0, 1000),
         });
         
-        // 如果 data 中只有一个键，且这个键的值是对象，尝试从这个对象中提取 nodes 和 edges
+        // 如果 data 中只有一个键，且这个键的值是对象，检查是否是澄清请求
         if (dataKeys.length === 1 && typeof data[dataKeys[0]] === 'object' && data[dataKeys[0]] !== null) {
           const firstKeyValue = data[dataKeys[0]];
-          log('🔍 [CommandBar] 检测到 data 只有一个键，尝试从该键的值中提取 nodes 和 edges:', {
+          log('🔍 [CommandBar] 检测到 data 只有一个键，检查其内容:', {
             key: dataKeys[0],
             valueType: typeof firstKeyValue,
             valueKeys: Object.keys(firstKeyValue),
+            hasType: 'type' in firstKeyValue,
+            typeValue: firstKeyValue.type,
             hasNodes: 'nodes' in firstKeyValue,
             hasEdges: 'edges' in firstKeyValue,
-            nodesValue: firstKeyValue.nodes,
-            nodesIsArray: Array.isArray(firstKeyValue.nodes),
-            edgesValue: firstKeyValue.edges,
-            edgesIsArray: Array.isArray(firstKeyValue.edges),
           });
+          
+          // 检查是否是澄清请求（可能在嵌套结构中）
+          if (firstKeyValue.type === 'clarification_needed') {
+            log('💬 [CommandBar] 在嵌套结构中检测到澄清请求');
+            setIsProcessingVideo(false);
+            clearLoadingTimers();
+            
+            const clarificationData = firstKeyValue.data;
+            if (!clarificationData) {
+              logError('❌ [CommandBar] 澄清请求数据不完整:', {
+                data: firstKeyValue,
+                dataKeys: Object.keys(firstKeyValue),
+              });
+              toast.error('澄清请求数据格式错误', {
+                description: '请重试',
+                duration: 3000,
+              });
+              return;
+            }
+            
+            const initialData: Partial<import('@/types/fractal').ProjectMeta> = {
+              description: prompt.trim(),
+            };
+            
+            if (clarificationData.message) {
+              const domainMatch = clarificationData.message.match(/已检测到领域[：:]([^。，,]+)/);
+              if (domainMatch) {
+                initialData.industry = domainMatch[1].trim();
+              }
+            }
+
+            openBlueprint('profile', initialData);
+            setIsProcessingVideo(false);
+            setIsTimeoutOverride(false);
+            clearLoadingTimers();
+            setProgress(0);
+            setLoadingStep('');
+            
+            log('✅ [CommandBar] 已打开项目蓝图的项目画像页面（从嵌套结构）');
+            toast.info('需要更多信息', {
+              description: '请在项目画像页面中补充详细信息',
+              duration: 5000,
+            });
+            return;
+          }
           
           // 如果这个对象中有 nodes 和 edges，使用它们
           if (Array.isArray(firstKeyValue.nodes) && !nodes) {
@@ -330,6 +482,26 @@ export function CommandBar() {
           isArray: Array.isArray(edges),
         });
       }
+      
+      // 如果 nodes 和 edges 都无效，可能是澄清请求没有被正确识别
+      // 或者输入确实不够明确，打开项目画像页面让用户补充信息
+      if ((!nodes || !Array.isArray(nodes) || nodes.length === 0) && 
+          (!edges || !Array.isArray(edges) || edges.length === 0)) {
+        log('⚠️ [CommandBar] 无法生成有效的图结构，可能是输入不够明确，打开项目画像页面');
+        openBlueprint('profile', {
+          description: prompt.trim(),
+        });
+        setIsProcessingVideo(false);
+        setIsTimeoutOverride(false);
+        clearLoadingTimers();
+        setProgress(0);
+        setLoadingStep('');
+        toast.warning('输入信息不够明确', {
+          description: '请在项目画像页面中补充详细信息后重试',
+          duration: 5000,
+        });
+        return;
+      }
 
         // 添加节点后自动应用布局，避免节点重叠
       if (nodes && Array.isArray(nodes) && nodes.length > 0) {
@@ -350,91 +522,12 @@ export function CommandBar() {
       if (finalNodesCount > nodesBeforeAdd) {
         log('🔄 [CommandBar] 节点已成功添加，重置状态');
         
-        // 检查是否有图片附件，如果没有，为每个节点生成UI代码
-        const hasImage = attachment?.type === 'media' && 
-                        (attachment?.mimeType?.startsWith('image/') || 
-                         (attachment?.preview && attachment.mimeType !== 'application/pdf'));
-        
-        if (!hasImage && nodes && Array.isArray(nodes) && nodes.length > 0) {
-          log('🎨 [CommandBar] 没有图片附件，开始为每个节点生成UI代码');
-          setLoadingStep('🎨 正在为节点生成UI代码...');
-          setProgress(20);
-          
-          // 保存原始 prompt，用于生成UI
-          const originalPrompt = prompt;
-          
-          // 为每个节点异步生成UI代码（使用立即执行的异步函数）
-          (async () => {
-            try {
-              const generateUIPromises = nodes.map(async (node, index) => {
-                try {
-                  log(`🎨 [CommandBar] 开始为节点 ${index + 1}/${nodes.length} 生成UI: ${node.data?.label}`);
-                  setLoadingStep(`🎨 正在为"${node.data?.label}"生成UI代码... (${index + 1}/${nodes.length})`);
-                  setProgress(20 + (index + 1) * 60 / nodes.length);
-                  
-                  // 构建节点特定的提示词
-                  const nodePrompt = originalPrompt 
-                    ? `${originalPrompt}\n\n请为"${node.data?.label}"页面生成完整的UI代码。`
-                    : `请为"${node.data?.label}"页面生成完整的React组件代码，包含现代化的UI设计和完整的交互功能。`;
-                  
-                  const uiResult = await executeUIText({
-                    prompt: nodePrompt,
-                    nodeLabel: node.data?.label || node.id,
-                    projectMeta: useCanvasStore.getState().projectMeta,
-                    themeConfig: currentTheme,
-                    aiConfig: aiConfig,
-                  });
-                  
-                  // 处理返回结果
-                  let uiCode = '';
-                  if (Array.isArray(uiResult)) {
-                    uiCode = uiResult[0]?.code || uiResult[0] || '';
-                  } else if (uiResult && typeof uiResult === 'object') {
-                    uiCode = (uiResult as any).code || '';
-                  }
-                  
-                  if (uiCode && uiCode.length > 50) {
-                    // 更新节点的 view.code
-                    updateNodeData(node.id, {
-                      artifacts: {
-                        view: {
-                          code: uiCode,
-                        },
-                      },
-                    });
-                    log(`✅ [CommandBar] 节点 ${index + 1}/${nodes.length} UI代码生成成功: ${node.data?.label}`);
-                  } else {
-                    logWarn(`⚠️ [CommandBar] 节点 ${index + 1}/${nodes.length} UI代码生成失败或为空: ${node.data?.label}`);
-                  }
-                } catch (error) {
-                  logError(`❌ [CommandBar] 节点 ${index + 1}/${nodes.length} UI代码生成失败: ${node.data?.label}`, error);
-                }
-              });
-              
-              // 等待所有UI生成完成
-              await Promise.all(generateUIPromises);
-              log('✅ [CommandBar] 所有节点的UI代码生成完成');
-              setLoadingStep('✅ UI代码生成完成');
-        setProgress(100);
-              toast.success('节点和UI代码生成完成', {
-                description: `已生成 ${nodes.length} 个节点及其UI代码`,
-          duration: 3000,
-        });
-            } catch (error) {
-              logError('❌ [CommandBar] 部分节点的UI代码生成失败:', error);
-              toast.warning('部分UI代码生成失败', {
-                description: '部分节点的UI代码可能未生成，请手动生成',
-                duration: 5000,
-              });
-            } finally {
-              setIsProcessingVideo(false);
-              clearLoadingTimers();
-            }
-          })();
-        }
+        // 移除自动生成UI的逻辑，用户需要手动在节点详情面板中生成UI
         
         setPrompt('');
         setAttachment(null);
+      setAttachments([]);
+        setAttachments([]);
         setIsProcessingVideo(false);
         setIsTimeoutOverride(false); // 重置超时覆盖标志
         clearLoadingTimers();
@@ -564,6 +657,7 @@ export function CommandBar() {
       // 重置状态
       setPrompt('');
       setAttachment(null);
+      setAttachments([]);
       setIsProcessingVideo(false);
       setIsTimeoutOverride(false); // 重置超时覆盖标志
       clearLoadingTimers();
@@ -645,7 +739,7 @@ export function CommandBar() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       e.stopPropagation();
-      const hasContent = Boolean(prompt.trim() || attachment);
+      const hasContent = Boolean(prompt.trim() || attachments.length > 0);
       const isLoading = isCreating || isUpdating || isProcessingVideo || isGeneratingUIText;
       if (hasContent && !isLoading) {
         // 触发表单提交
@@ -764,108 +858,264 @@ export function CommandBar() {
   };
   
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  // 处理单个文件的辅助函数
+  const processSingleFile = async (file: File): Promise<FileAttachment | null> => {
+    return new Promise((resolve, reject) => {
       const isImage = file.type.startsWith('image/');
       const isVideo = file.type.startsWith('video/');
       const isPDF = file.type === 'application/pdf';
-      // 文本文件：基于扩展名和 MIME 类型判断
+      const isWord = file.type === 'application/msword' || 
+                     file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                     /\.(doc|docx)$/i.test(file.name);
+      const isPPT = file.type === 'application/vnd.ms-powerpoint' ||
+                     file.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+                     /\.(ppt|pptx)$/i.test(file.name);
       const isText = file.type.startsWith('text/') || 
                      /\.(md|txt|json|csv|js|ts|tsx|jsx|css|html|xml|yaml|yml)$/i.test(file.name);
       
-    // 允许的文件类型：图片、视频、PDF、文本文件
-    if (!isImage && !isVideo && !isPDF && !isText) {
-      toast.error('不支持的文件类型', {
-        description: '请选择支持的文件类型：图片、视频、PDF、文档或代码文件（支持 .pdf, .md, .txt, .json, .csv, .js, .ts, .tsx 等）',
-          duration: 5000,
-        });
-      return;
-    }
-
-    // ========== 混合读取策略 ==========
-    
-    // 策略 1: 文本文件 - 使用 readAsText()
-    if (isText) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const textContent = event.target?.result as string;
-          if (!textContent || textContent.trim().length === 0) {
-          toast.error('文件内容为空', {
-            description: '请选择有效的文档文件',
-              duration: 3000,
-            });
-          if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-          }
+      // 策略 1: Word 文档
+      if (isWord) {
+        const maxSize = 20 * 1024 * 1024;
+        if (file.size > maxSize) {
+          reject(new Error(`Word 文件 "${file.name}" 大小超过 20MB`));
           return;
         }
-        setAttachment({
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64String = event.target?.result as string;
+          resolve({
+            name: file.name,
+            type: 'text',
+            content: base64String,
+            mimeType: file.type || (file.name.endsWith('.docx') 
+              ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+              : 'application/msword'),
+          });
+        };
+        reader.onerror = () => reject(new Error(`读取 Word 文件 "${file.name}" 失败`));
+        reader.readAsDataURL(file);
+        return;
+      }
+      
+      // 策略 1.5: PPT 文档
+      if (isPPT) {
+        const maxSize = 20 * 1024 * 1024;
+          if (file.size > maxSize) {
+          reject(new Error(`PPT 文件 "${file.name}" 大小超过 20MB`));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64String = event.target?.result as string;
+          resolve({
+            name: file.name,
+            type: 'text',
+            content: base64String,
+            mimeType: file.type || (file.name.endsWith('.pptx') 
+              ? 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+              : 'application/vnd.ms-powerpoint'),
+          });
+        };
+        reader.onerror = () => reject(new Error(`读取 PPT 文件 "${file.name}" 失败`));
+        reader.readAsDataURL(file);
+        return;
+      }
+      
+      // 策略 2: 文本文件
+      if (isText) {
+        const maxSize = 20 * 1024 * 1024;
+        if (file.size > maxSize) {
+          reject(new Error(`Word 文件 "${file.name}" 大小超过 20MB`));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64String = event.target?.result as string;
+          resolve({
+            name: file.name,
+            type: 'text',
+            content: base64String,
+            mimeType: file.type || (file.name.endsWith('.docx') 
+              ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+              : 'application/msword'),
+          });
+        };
+        reader.onerror = () => reject(new Error(`读取 Word 文件 "${file.name}" 失败`));
+        reader.readAsDataURL(file);
+        return;
+      }
+      
+      // 策略 2: 文本文件
+        if (isText) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+          const textContent = event.target?.result as string;
+          if (!textContent || textContent.trim().length === 0) {
+            reject(new Error(`文件 "${file.name}" 内容为空`));
+                return;
+              }
+          resolve({
             name: file.name,
             type: 'text',
             content: textContent,
-        });
-      };
-      reader.onerror = () => {
-        alert('读取文本文件失败，请重试');
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
+          });
+        };
+        reader.onerror = () => reject(new Error(`读取文本文件 "${file.name}" 失败`));
+        reader.readAsText(file, 'UTF-8');
+        return;
         }
-      };
-            reader.readAsText(file, 'UTF-8');
-      return;
-    }
 
-    // 策略 2: 二进制文件（PDF、图片、视频）- 使用 readAsDataURL()
-        // 验证文件大小
+      // 策略 3: 二进制文件（PDF、图片、视频）
         const maxSize = isVideo ? 50 * 1024 * 1024 : (isPDF ? 20 * 1024 * 1024 : 10 * 1024 * 1024);
         if (file.size > maxSize) {
           const sizeLimit = isVideo ? '50MB' : (isPDF ? '20MB' : '10MB');
-      toast.error('文件大小超限', {
-            description: `文件大小不能超过 ${sizeLimit}`,
-            duration: 4000,
-          });
-      return;
+        reject(new Error(`文件 "${file.name}" 大小超过 ${sizeLimit}`));
+        return;
         }
 
         // 处理视频（需要验证时长）
         if (isVideo) {
-      setIsProcessingVideo(true);
-      try {
           const video = document.createElement('video');
           video.preload = 'metadata';
             video.onloadedmetadata = () => {
               window.URL.revokeObjectURL(video.src);
               const duration = video.duration;
               if (duration > 30) {
-            alert('视频时长不能超过 30 秒（关键流程）');
-            setIsProcessingVideo(false);
-            if (fileInputRef.current) {
-              fileInputRef.current.value = '';
-            }
+            reject(new Error(`视频 "${file.name}" 时长超过 30 秒`));
                 return;
               }
-          processBinaryFile(file, 'video');
-            };
-            video.onerror = () => {
-          setIsProcessingVideo(false);
-          toast.error('读取视频元数据失败', {
-                description: '请重试',
-                duration: 3000,
-              });
-            };
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const base64String = event.target?.result as string;
+            resolve({
+              name: file.name,
+              type: 'media',
+              content: base64String,
+              mimeType: file.type,
+            });
+          };
+          reader.onerror = () => reject(new Error(`读取视频 "${file.name}" 失败`));
+          reader.readAsDataURL(file);
+        };
+        video.onerror = () => reject(new Error(`读取视频元数据 "${file.name}" 失败`));
             video.src = URL.createObjectURL(file);
+        return;
+      }
+
+      // 处理图片或 PDF
+      if (isImage) {
+        convertFileToLosslessBase64(file)
+          .then((base64String) => {
+            resolve({
+          name: file.name,
+          type: 'media',
+              content: base64String,
+              preview: base64String,
+              mimeType: file.type,
+            });
+          })
+          .catch((error) => reject(new Error(`读取图片 "${file.name}" 失败: ${error.message}`)));
+      } else {
+        // PDF
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const base64String = event.target?.result as string;
+          resolve({
+            name: file.name,
+            type: 'media',
+            content: base64String,
+            mimeType: file.type,
+          });
+        };
+        reader.onerror = () => reject(new Error(`读取 PDF "${file.name}" 失败`));
+        reader.readAsDataURL(file);
+      }
+    });
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const fileArray = Array.from(files);
+    
+    // 验证所有文件类型
+    for (const file of fileArray) {
+      const isImage = file.type.startsWith('image/');
+      const isVideo = file.type.startsWith('video/');
+      const isPDF = file.type === 'application/pdf';
+      const isWord = file.type === 'application/msword' || 
+                     file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                     /\.(doc|docx)$/i.test(file.name);
+      const isPPT = file.type === 'application/vnd.ms-powerpoint' ||
+                     file.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+                     /\.(ppt|pptx)$/i.test(file.name);
+      const isText = file.type.startsWith('text/') || 
+                     /\.(md|txt|json|csv|js|ts|tsx|jsx|css|html|xml|yaml|yml)$/i.test(file.name);
+      
+      if (!isImage && !isVideo && !isPDF && !isWord && !isPPT && !isText) {
+        toast.error('不支持的文件类型', {
+          description: `文件 "${file.name}" 不支持。请选择支持的文件类型：图片、视频、PDF、Word、PPT、文档或代码文件`,
+          duration: 5000,
+        });
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
+    }
+
+    // 处理所有文件
+    setIsProcessingVideo(true);
+    const processedAttachments: FileAttachment[] = [];
+    const errors: string[] = [];
+
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i];
+      try {
+        const attachment = await processSingleFile(file);
+        if (attachment) {
+          processedAttachments.push(attachment);
+        }
       } catch (error) {
-        setIsProcessingVideo(false);
-        toast.error('处理视频失败', {
-          description: '请重试',
-          duration: 3000,
+        const errorMsg = error instanceof Error ? error.message : `处理文件 "${file.name}" 失败`;
+        errors.push(errorMsg);
+        logError(`处理文件失败: ${file.name}`, error);
+      }
+    }
+
+    setIsProcessingVideo(false);
+
+    // 显示处理结果
+    if (processedAttachments.length > 0) {
+      setAttachments(prev => [...prev, ...processedAttachments]);
+      // 为了向后兼容，将第一个文件设置为 attachment
+      if (processedAttachments.length > 0) {
+        setAttachment(processedAttachments[0]);
+      }
+      
+      if (processedAttachments.length === fileArray.length) {
+        toast.success(`成功上传 ${processedAttachments.length} 个文件`, {
+          description: processedAttachments.map(a => a.name).join('、'),
+          duration: 4000,
+        });
+      } else {
+        toast.warning(`部分文件上传成功`, {
+          description: `成功: ${processedAttachments.length}/${fileArray.length}，失败: ${errors.length}`,
+          duration: 5000,
         });
       }
-    } else {
-      // 处理图片或 PDF
-      processBinaryFile(file, isPDF ? 'pdf' : 'image');
+    }
+
+    if (errors.length > 0) {
+      errors.forEach(error => {
+        toast.error(error, { duration: 3000 });
+      });
+    }
+
+    // 清空文件输入，允许重复选择相同文件
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -948,8 +1198,24 @@ export function CommandBar() {
     reader.readAsDataURL(file);
   };
 
-  const handleRemoveAttachment = () => {
-    setAttachment(null);
+  const handleRemoveAttachment = (index?: number) => {
+    if (index !== undefined) {
+      // 删除指定索引的附件
+      setAttachments(prev => {
+        const newAttachments = prev.filter((_, i) => i !== index);
+        // 如果删除的是第一个附件，更新 attachment
+        if (index === 0 && newAttachments.length > 0) {
+          setAttachment(newAttachments[0]);
+        } else if (newAttachments.length === 0) {
+          setAttachment(null);
+        }
+        return newAttachments;
+      });
+    } else {
+      // 删除所有附件
+      setAttachment(null);
+      setAttachments([]);
+    }
     setIsProcessingVideo(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -968,47 +1234,79 @@ export function CommandBar() {
     const items = e.clipboardData.items;
     if (!items) return;
 
-    // 遍历剪贴板项目
+    // 遍历剪贴板项目，查找文件
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       
-      // 检查是否为图片（粘贴功能主要支持图片）
-      if (item.type.indexOf('image') !== -1) {
+      // 检查是否为文件类型（图片、PDF、Word等）
+      if (item.kind === 'file') {
         e.preventDefault(); // 防止粘贴二进制数据作为文本
         
         const blob = item.getAsFile();
-        if (!blob) return;
+        if (!blob) continue;
 
-        // 验证文件大小（图片最大 10MB）
-        const maxSize = 10 * 1024 * 1024;
-        if (blob.size > maxSize) {
-          toast.error('图片大小超限', {
-            description: '图片大小不能超过 10MB',
+        // 创建File对象，使用原始文件名或生成默认名称
+        const fileName = blob.name || `粘贴的文件_${Date.now()}`;
+        const file = new File([blob], fileName, { type: blob.type || item.type });
+        
+        // 检查文件类型
+        const isImage = file.type.startsWith('image/');
+        const isVideo = file.type.startsWith('video/');
+        const isPDF = file.type === 'application/pdf';
+        const isWord = file.type === 'application/msword' || 
+                       file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                       /\.(doc|docx)$/i.test(file.name);
+        const isPPT = file.type === 'application/vnd.ms-powerpoint' ||
+                      file.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+                      /\.(ppt|pptx)$/i.test(file.name);
+        const isText = file.type.startsWith('text/') || 
+                       /\.(md|txt|json|csv|js|ts|tsx|jsx|css|html|xml|yaml|yml)$/i.test(file.name);
+        
+        // 验证文件类型
+        if (!isImage && !isVideo && !isPDF && !isWord && !isPPT && !isText) {
+          toast.warning('不支持的文件类型', {
+            description: `文件类型 "${file.type || '未知'}" 不支持粘贴。请使用文件选择按钮上传。`,
             duration: 4000,
           });
-          return;
+          continue;
         }
 
-        // 对于粘贴的图片，使用无损读取（不压缩，保持原始质量）
-        const file = new File([blob], `粘贴的图片_${Date.now()}.png`, { type: blob.type || 'image/png' });
-        try {
-          const losslessBase64 = await convertFileToLosslessBase64(file);
-          setAttachment({
-            name: `粘贴的图片_${Date.now()}.png`,
-            type: 'media',
-            content: losslessBase64,
-            preview: losslessBase64,
-            mimeType: blob.type || 'image/png',
+        // 验证文件大小
+        const maxSize = isVideo ? 50 * 1024 * 1024 : (isPDF || isWord || isPPT ? 20 * 1024 * 1024 : 10 * 1024 * 1024);
+        if (blob.size > maxSize) {
+          const sizeLimit = isVideo ? '50MB' : (isPDF || isWord || isPPT ? '20MB' : '10MB');
+          toast.error('文件大小超限', {
+            description: `文件大小不能超过 ${sizeLimit}`,
+            duration: 4000,
           });
-        } catch (error) {
-          logError('粘贴图片读取失败:', error);
-            toast.error('读取图片失败', {
-              description: '请重试',
+          continue;
+        }
+
+        // 使用 processSingleFile 处理文件（统一处理逻辑）
+        try {
+          setIsProcessingVideo(true);
+          const attachment = await processSingleFile(file);
+          if (attachment) {
+            setAttachments(prev => [...prev, attachment]);
+            // 为了向后兼容，将第一个文件设置为 attachment
+            setAttachment(attachment);
+            toast.success('文件粘贴成功', {
+              description: attachment.name,
               duration: 3000,
             });
+          }
+        } catch (error) {
+          logError('粘贴文件处理失败:', error);
+          const errorMsg = error instanceof Error ? error.message : '处理文件失败';
+          toast.error('粘贴文件失败', {
+            description: errorMsg,
+            duration: 4000,
+          });
+        } finally {
+          setIsProcessingVideo(false);
         }
         
-        // 只处理第一个图片
+        // 只处理第一个文件
         break;
       }
     }
@@ -1024,7 +1322,7 @@ export function CommandBar() {
       return;
     }
 
-    const hasContent = prompt.trim() || attachment;
+    const hasContent = prompt.trim() || attachments.length > 0;
     if (!hasContent) {
       toast.error('请输入内容或上传文件', {
         description: '请填写产品描述或上传参考文件',
@@ -1316,11 +1614,18 @@ Generate the complete .tsx code now.`;
           });
 
           // 清除超时保护（UI 已成功生成）
+          // 清除UI生成专用的超时定时器
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+            log('✅ [CommandBar] UI生成成功（从图片），已清除超时定时器');
+          }
           clearLoadingTimers();
           
           // 重置状态
           setPrompt('');
           setAttachment(null);
+          setAttachments([]);
           if (fileInputRef.current) {
             fileInputRef.current.value = '';
           }
@@ -1370,6 +1675,13 @@ Generate the complete .tsx code now.`;
           
           // 检查是否至少 UI 代码已生成
           const currentCode = selectedNode?.data?.artifacts?.view?.code;
+          // 清除UI生成专用的超时定时器
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+            log('❌ [CommandBar] UI生成失败（从图片），已清除超时定时器');
+          }
+          
           if (currentCode && currentCode.length > 0 && currentCode !== '// PLACEHOLDER') {
             toast.warning('UI 生成失败', {
               description: errorMessage,
@@ -1379,6 +1691,7 @@ Generate the complete .tsx code now.`;
             setIsTimeoutOverride(false); // 重置超时覆盖标志
             setPrompt('');
             setAttachment(null);
+            setAttachments([]);
             clearLoadingTimers();
             return; // 不抛出错误，让用户可以使用已生成的 UI
           } else {
@@ -1427,7 +1740,9 @@ Generate the complete .tsx code now.`;
         ].filter(Boolean),
       });
       
-      if (isRequestingUI && !isImage && !attachment) {
+      // 在编辑模式下，如果没有附件，默认使用 generateUIFromText 来优化或更新UI
+      // 这样可以确保用户输入的任何文本都能得到响应
+      if ((isRequestingUI || (!attachment && !isImage)) && !isImage && !attachment) {
         // 用户明确要求生成UI，且没有图片，使用 generateUIFromText
         log('🎨 [CommandBar] 检测到用户要求生成UI，使用 generateUIFromText');
         setLoadingStep('🎨 正在生成UI代码...');
@@ -1435,6 +1750,23 @@ Generate the complete .tsx code now.`;
         
         // 注意：不要在这里重置状态，保持按钮禁用状态直到生成完成
         // 状态重置将在生成成功或失败后执行
+        // 清除之前的超时定时器，避免在UI生成过程中被重置
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+          log('🔄 [CommandBar] 已清除之前的超时定时器，避免在UI生成过程中被重置');
+        }
+        
+        // 为UI生成设置更长的超时时间（600秒，10分钟）
+        const uiGenerationTimeout = 600000; // 600秒
+        timeoutRef.current = setTimeout(() => {
+          logWarn('⚠️ [CommandBar] UI生成超时，自动重置加载状态');
+          forceResetLoading();
+          toast.error('⏱️ UI生成超时', {
+            description: 'UI生成已超过 10 分钟，已自动重置。如果问题持续，请检查网络连接或稍后重试。',
+            duration: 8000,
+          });
+        }, uiGenerationTimeout);
         
         try {
           const uiResult = await executeUIText({
@@ -1542,8 +1874,16 @@ Generate the complete .tsx code now.`;
             });
             
             // 生成成功后重置状态
+            // 清除UI生成专用的超时定时器
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+              log('✅ [CommandBar] UI生成成功，已清除超时定时器');
+            }
+            
             setPrompt('');
             setAttachment(null);
+            setAttachments([]);
             setIsProcessingVideo(false);
             setIsTimeoutOverride(false);
             clearLoadingTimers();
@@ -1561,6 +1901,12 @@ Generate the complete .tsx code now.`;
               duration: 3000,
             });
             // 生成失败后重置状态，允许用户重试
+            // 清除UI生成专用的超时定时器
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+              log('❌ [CommandBar] UI生成失败，已清除超时定时器');
+            }
             setIsProcessingVideo(false);
             setIsTimeoutOverride(false);
             clearLoadingTimers();
@@ -1574,6 +1920,12 @@ Generate the complete .tsx code now.`;
             duration: 5000,
           });
           // 生成失败后重置状态，允许用户重试
+          // 清除UI生成专用的超时定时器
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+            log('❌ [CommandBar] UI生成异常，已清除超时定时器');
+          }
           setIsProcessingVideo(false);
           setIsTimeoutOverride(false);
           clearLoadingTimers();
@@ -1596,23 +1948,25 @@ Generate the complete .tsx code now.`;
       });
       
       // 编辑模式：更新节点
-      const attachments: Array<{ type: 'image' | 'text'; content: string; name?: string; mimeType?: string }> = [];
+      const attachmentsForAPI: Array<{ type: 'image' | 'text'; content: string; name?: string; mimeType?: string }> = [];
       
-      if (attachment) {
-        if (attachment.type === 'media' && (attachment.preview || attachment.mimeType === 'application/pdf')) {
+      // 处理所有附件
+      for (const att of attachments) {
+        if (att.type === 'media' && (att.preview || att.mimeType === 'application/pdf')) {
           // 图片或 PDF（PDF 也作为 image 类型传递，因为 updateNodeArtifacts 只支持 image 和 text）
-          attachments.push({
+          attachmentsForAPI.push({
             type: 'image' as const,
-            content: attachment.content,
-            name: attachment.name,
-            mimeType: attachment.mimeType,
+            content: att.content,
+            name: att.name,
+            mimeType: att.mimeType,
           });
-        } else if (attachment.type === 'text') {
-          // 文本文件
-          attachments.push({
+        } else if (att.type === 'text') {
+          // 文本文件（包括 Word 文档）
+          attachmentsForAPI.push({
             type: 'text' as const,
-            content: attachment.content,
-            name: attachment.name,
+            content: att.content,
+            name: att.name,
+            mimeType: att.mimeType,
           });
         }
         // 注意：视频在编辑模式下暂不支持，因为 updateNodeArtifacts 只支持 image 和 text
@@ -1663,17 +2017,17 @@ Generate the complete .tsx code now.`;
         nodeId: selectedNode.id,
         nodeTitle: selectedNode.data.label,
         userPrompt: prompt.trim() || '',
-          attachmentsCount: attachments.length,
-        attachments: attachments.map(att => ({ type: att.type, name: att.name, hasContent: !!att.content })),
-        });
-        
+          attachmentsCount: attachmentsForAPI.length,
+        attachments: attachmentsForAPI.map(att => ({ type: att.type, name: att.name, hasContent: !!att.content })),
+      });
+
       try {
         await executeUpdate({
           nodeId: selectedNode.id,
           nodeTitle: selectedNode.data.label,
           currentArtifacts,
           userPrompt: prompt.trim() || '',
-          attachments,
+          attachments: attachmentsForAPI,
         });
         log('✅ [CommandBar] executeUpdate completed');
       } catch (error) {
@@ -1682,40 +2036,76 @@ Generate the complete .tsx code now.`;
       }
     } else {
       // 创建模式：生成新图
-      const isPDF = attachment?.mimeType === 'application/pdf';
-      const isVideo = attachment?.mimeType?.startsWith('video/');
-      const isImage = attachment?.mimeType?.startsWith('image/') || (attachment?.type === 'media' && attachment.preview && !isPDF && !isVideo);
-      
-      // 根据文件类型决定使用 mediaBase64 还是 attachmentContent
-      // PDF 和文本文件使用 attachmentContent，图片和视频使用 mediaBase64
+      // 处理多个附件：合并文本/PDF 文件，选择第一个图片/视频
       let mediaBase64: string | undefined;
       let mediaType: 'image' | 'video' | undefined;
       let attachmentContent: string | undefined;
       let attachmentType: 'media' | 'text' | undefined;
+      let mimeType: string | undefined;
       
-      if (attachment?.type === 'text') {
-        // 文本文件
-        attachmentContent = attachment.content;
-        attachmentType = 'text';
-      } else if (attachment?.type === 'media') {
-        if (isPDF) {
-          // PDF 使用 attachmentContent（重要：PDF 不应该使用 mediaBase64）
-          attachmentContent = attachment.content;
-          attachmentType = 'media';
-          // 不设置 mediaBase64 和 mediaType
-        } else if (isVideo) {
-          // 视频使用 mediaBase64
-          mediaBase64 = attachment.content;
-          mediaType = 'video';
-        } else if (isImage) {
-          // 图片使用 mediaBase64
-          mediaBase64 = attachment.content;
-          mediaType = 'image';
-        } else {
-          // 默认作为图片处理（如果有 preview）或视频（如果没有 preview）
-          mediaBase64 = attachment.content;
-          mediaType = attachment.preview ? 'image' : 'video';
+      // 收集所有文本和 PDF 文件内容
+      const textAttachments: string[] = [];
+      const attachmentNames: string[] = [];
+      
+      // 查找第一个图片或视频
+      let firstImageOrVideo: FileAttachment | null = null;
+      
+      for (const att of attachments) {
+        const isPDF = att.mimeType === 'application/pdf';
+        const isVideo = att.mimeType?.startsWith('video/');
+        const isImage = att.mimeType?.startsWith('image/') || (att.type === 'media' && att.preview && !isPDF && !isVideo);
+        const isWord = att.mimeType?.includes('word') || att.mimeType?.includes('msword');
+        
+        if (att.type === 'text' || isPDF || isWord) {
+          // 文本文件、PDF 或 Word 文档
+          textAttachments.push(`\n\n【文件：${att.name}】\n${att.content.substring(0, 50000)}`); // 限制每个文件最多 50000 字符
+          attachmentNames.push(att.name);
+          if (!attachmentType) {
+            attachmentType = att.type === 'text' ? 'text' : 'media';
+            mimeType = att.mimeType;
+          }
+        } else if ((isImage || isVideo) && !firstImageOrVideo) {
+          // 第一个图片或视频
+          firstImageOrVideo = att;
         }
+      }
+      
+      // 合并所有文本/PDF/Word 内容
+      if (textAttachments.length > 0) {
+        attachmentContent = `用户上传了 ${textAttachments.length} 个文档文件：${attachmentNames.join('、')}${textAttachments.join('')}`;
+        if (!attachmentType) {
+        attachmentType = 'text';
+        }
+      }
+      
+      // 处理第一个图片或视频
+      if (firstImageOrVideo) {
+        const isPDF = firstImageOrVideo.mimeType === 'application/pdf';
+        const isVideo = firstImageOrVideo.mimeType?.startsWith('video/');
+        const isImage = firstImageOrVideo.mimeType?.startsWith('image/') || 
+                       (firstImageOrVideo.type === 'media' && firstImageOrVideo.preview && !isPDF && !isVideo);
+        
+        if (isVideo) {
+          mediaBase64 = firstImageOrVideo.content;
+          mediaType = 'video';
+          mimeType = firstImageOrVideo.mimeType;
+        } else if (isImage) {
+          mediaBase64 = firstImageOrVideo.content;
+          mediaType = 'image';
+          mimeType = firstImageOrVideo.mimeType;
+        }
+      }
+      
+      // 如果有多个图片/视频，在提示词中添加说明
+      const imageVideoCount = attachments.filter(att => {
+        const isPDF = att.mimeType === 'application/pdf';
+        const isVideo = att.mimeType?.startsWith('video/');
+        const isImage = att.mimeType?.startsWith('image/') || (att.type === 'media' && att.preview && !isPDF && !isVideo);
+        return isImage || isVideo;
+      }).length;
+      
+      if (imageVideoCount > 1 && attachmentContent) {
+        attachmentContent += `\n\n注意：用户还上传了 ${imageVideoCount} 个图片/视频文件，当前仅处理第一个。`;
       }
 
       log('🆕 [CommandBar] Create mode: Generating new graph', {
@@ -1724,7 +2114,8 @@ Generate the complete .tsx code now.`;
         mediaType,
         hasAttachmentContent: !!attachmentContent,
         attachmentType,
-        mimeType: attachment?.mimeType,
+        mimeType: mimeType,
+        attachmentsCount: attachments.length,
         currentNodesCount: nodes.length,
         selectedNodeId,
         isEditMode,
@@ -1736,7 +2127,8 @@ Generate the complete .tsx code now.`;
         mediaType,
         hasAttachmentContent: !!attachmentContent,
         attachmentType,
-        mimeType: attachment?.mimeType,
+        mimeType: mimeType,
+        attachmentsCount: attachments.length,
         currentNodesCount: nodes.length,
       });
 
@@ -1747,7 +2139,7 @@ Generate the complete .tsx code now.`;
           mediaType,
           attachmentContent,
           attachmentType,
-          mimeType: attachment?.mimeType,
+          mimeType: mimeType,
           aiConfig: aiConfig, // 传递 AI 模型配置
         });
         log('✅ [CommandBar] executeCreate completed');
@@ -1758,8 +2150,8 @@ Generate the complete .tsx code now.`;
     }
   };
 
-  // 按钮启用逻辑：prompt 不为空 OR attachment 不为空
-  const hasContent = Boolean(prompt.trim() || attachment);
+  // 按钮启用逻辑：prompt 不为空 OR attachments 不为空
+  const hasContent = Boolean(prompt.trim() || attachments.length > 0);
   // 如果超时覆盖标志为 true，强制重置 loading 状态
   const isLoading = isTimeoutOverride 
     ? false 
@@ -1780,7 +2172,7 @@ Generate the complete .tsx code now.`;
       isGeneratingUIText,
       buttonDisabled: !hasContent || isLoading,
     });
-  }, [prompt, attachment, hasContent, isLoading, isCreating, isUpdating, isProcessingVideo, isGeneratingUIText]);
+  }, [prompt, attachments, hasContent, isLoading, isCreating, isUpdating, isProcessingVideo, isGeneratingUIText]);
 
   // 处理取消选择节点
   const handleClearSelection = () => {
@@ -1822,27 +2214,91 @@ Generate the complete .tsx code now.`;
     >
 
       {/* 附件预览（如果有） */}
-      {attachment && (
-        <div className="mb-2 flex items-center justify-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300">
-              {attachment.mimeType === 'application/pdf' && <FileText className="w-4 h-4 text-red-400" />}
-            {attachment.type === 'text' && <FileText className="w-4 h-4 text-blue-400" />}
-              {attachment.type === 'media' && !attachment.preview && <Video className="w-4 h-4 text-purple-400" />}
-              {attachment.type === 'media' && attachment.preview && attachment.mimeType !== 'application/pdf' && <ImageIcon className="w-4 h-4 text-green-400" />}
-              <span className="max-w-[200px] truncate">{attachment.name}</span>
+      {attachments.length > 0 && (
+        <div className="mb-2 flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto">
+          {attachments.map((att, index) => {
+            // 判断文件类型并返回对应的图标颜色
+            const getFileIcon = () => {
+              const fileName = att.name?.toLowerCase() || '';
+              const mimeType = att.mimeType?.toLowerCase() || '';
+              
+              // PPT文件 - 橙色
+              if (fileName.endsWith('.ppt') || fileName.endsWith('.pptx') || 
+                  mimeType.includes('presentation') || mimeType.includes('powerpoint')) {
+                return <FileText className="w-4 h-4 text-orange-400" />;
+              }
+              
+              // PDF文件 - 红色
+              if (mimeType === 'application/pdf' || fileName.endsWith('.pdf')) {
+                return <FileText className="w-4 h-4 text-red-400" />;
+              }
+              
+              // Word文件 - 蓝色
+              if (fileName.endsWith('.doc') || fileName.endsWith('.docx') ||
+                  mimeType.includes('word') || mimeType.includes('msword')) {
+                return <FileText className="w-4 h-4 text-blue-400" />;
+              }
+              
+              // 图片文件 - 绿色
+              if (att.type === 'media' && att.preview && mimeType.startsWith('image/')) {
+                return <ImageIcon className="w-4 h-4 text-green-400" />;
+              }
+              
+              // 视频文件 - 紫色
+              if (att.type === 'media' && !att.preview && mimeType.startsWith('video/')) {
+                return <Video className="w-4 h-4 text-purple-400" />;
+              }
+              
+              // 文本文件（txt, md等）- 白色
+              if (att.type === 'text' && (
+                fileName.endsWith('.txt') || fileName.endsWith('.md') || 
+                fileName.endsWith('.json') || fileName.endsWith('.csv') ||
+                fileName.endsWith('.js') || fileName.endsWith('.ts') ||
+                fileName.endsWith('.jsx') || fileName.endsWith('.tsx') ||
+                fileName.endsWith('.css') || fileName.endsWith('.html') ||
+                fileName.endsWith('.xml') || fileName.endsWith('.yaml') ||
+                fileName.endsWith('.yml') || mimeType.startsWith('text/')
+              )) {
+                return <FileText className="w-4 h-4 text-white" />;
+              }
+              
+              // 默认 - 灰色
+              return <FileText className="w-4 h-4 text-zinc-400" />;
+            };
+            
+            return (
+            <div key={index} className="inline-flex items-center gap-2 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300">
+                {getFileIcon()}
+                <span className="max-w-[200px] truncate" title={att.name}>{att.name}</span>
               <button
                 type="button"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                handleRemoveAttachment();
+                    handleRemoveAttachment(index);
                 }}
                 className="ml-2 p-1 hover:bg-zinc-700 rounded transition-colors"
-                aria-label="移除附件"
+                  aria-label={`移除附件 ${att.name}`}
               >
                 <X className="w-3 h-3 text-zinc-400 hover:text-zinc-200" />
               </button>
             </div>
+            );
+          })}
+          {attachments.length > 1 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleRemoveAttachment();
+              }}
+              className="px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded transition-colors"
+              aria-label="清除所有附件"
+            >
+              清除全部
+            </button>
+          )}
         </div>
       )}
 
@@ -1876,18 +2332,119 @@ Generate the complete .tsx code now.`;
             className={`relative flex items-center gap-3 bg-zinc-950/80 backdrop-blur-xl border rounded-2xl px-4 py-3 transition-all ${
               isFocused 
                 ? 'border-purple-500/50 shadow-[0_0_20px_rgba(147,51,234,0.15)] ring-1 ring-purple-500/20' 
+                : isDragging
+                ? 'border-purple-500 shadow-[0_0_20px_rgba(147,51,234,0.3)] ring-2 ring-purple-500/50 bg-purple-500/10'
                 : 'border-zinc-800/50 shadow-lg'
             }`}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
+            onDragEnter={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(true);
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(true);
+            }}
+            onDragLeave={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // 只有当离开整个表单区域时才取消拖拽状态
+              if (e.currentTarget === e.target) {
+                setIsDragging(false);
+              }
+            }}
+            onDrop={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsDragging(false);
+              
+              const files = e.dataTransfer.files;
+              if (files && files.length > 0) {
+                const fileArray = Array.from(files);
+                
+                // 验证所有文件类型
+                for (const file of fileArray) {
+                  const isImage = file.type.startsWith('image/');
+                  const isVideo = file.type.startsWith('video/');
+                  const isPDF = file.type === 'application/pdf';
+                  const isWord = file.type === 'application/msword' || 
+                                 file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+                                 /\.(doc|docx)$/i.test(file.name);
+                  const isPPT = file.type === 'application/vnd.ms-powerpoint' ||
+                                 file.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+                                 /\.(ppt|pptx)$/i.test(file.name);
+                  const isText = file.type.startsWith('text/') || 
+                                 /\.(md|txt|json|csv|js|ts|tsx|jsx|css|html|xml|yaml|yml)$/i.test(file.name);
+                  
+                  if (!isImage && !isVideo && !isPDF && !isWord && !isPPT && !isText) {
+                    toast.error('不支持的文件类型', {
+                      description: `文件 "${file.name}" 不支持。请选择支持的文件类型：图片、视频、PDF、Word、PPT、文档或代码文件`,
+                      duration: 5000,
+                    });
+                    return;
+                  }
+                }
+
+                // 处理所有文件
+                setIsProcessingVideo(true);
+                const processedAttachments: FileAttachment[] = [];
+                const errors: string[] = [];
+
+                for (let i = 0; i < fileArray.length; i++) {
+                  const file = fileArray[i];
+                  try {
+                    const attachment = await processSingleFile(file);
+                    if (attachment) {
+                      processedAttachments.push(attachment);
+                    }
+                  } catch (error) {
+                    const errorMsg = error instanceof Error ? error.message : `处理文件 "${file.name}" 失败`;
+                    errors.push(errorMsg);
+                    logError(`处理文件失败: ${file.name}`, error);
+                  }
+                }
+
+                setIsProcessingVideo(false);
+
+                // 显示处理结果
+                if (processedAttachments.length > 0) {
+                  setAttachments(prev => [...prev, ...processedAttachments]);
+                  if (processedAttachments.length > 0) {
+                    setAttachment(processedAttachments[0]);
+                  }
+                  
+                  if (processedAttachments.length === fileArray.length) {
+                    toast.success(`成功上传 ${processedAttachments.length} 个文件`, {
+                      description: processedAttachments.map(a => a.name).join('、'),
+                      duration: 4000,
+                    });
+                  } else {
+                    toast.warning(`部分文件上传成功`, {
+                      description: `成功: ${processedAttachments.length}/${fileArray.length}，失败: ${errors.length}`,
+                      duration: 5000,
+                    });
+                  }
+                }
+
+                if (errors.length > 0) {
+                  errors.forEach(error => {
+                    toast.error(error, { duration: 3000 });
+                  });
+                }
+              }
+            }}
           >
             {/* 隐藏的文件输入 */}
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*,video/*,.pdf,.md,.txt,.json,.csv,.tsx,.ts,.js,.jsx,.css,.html,.xml,.yaml,.yml"
+              accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.md,.txt,.json,.csv,.tsx,.ts,.js,.jsx,.css,.html,.xml,.yaml,.yml"
               onChange={handleFileSelect}
               className="hidden"
+              multiple
               aria-label="文件上传输入"
             />
 

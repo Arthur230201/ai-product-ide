@@ -22,7 +22,15 @@ export function NodeTree() {
 
   // 构建树结构
   const treeData = useMemo(() => {
-    return buildTree(nodes, edges);
+    const result = buildTree(nodes, edges);
+    // 调试日志
+    console.log('[NodeTree] buildTree result:', {
+      nodesCount: nodes.length,
+      edgesCount: edges.length,
+      treeNodesCount: result.length,
+      treeNodes: result.map(n => ({ id: n.id, label: n.data?.label, childrenCount: n.children?.length || 0 }))
+    });
+    return result;
   }, [nodes, edges]);
 
   // 过滤树节点（递归过滤）
@@ -35,8 +43,9 @@ export function NodeTree() {
     const filtered: TreeNode[] = [];
 
     treeNodes.forEach((node) => {
-      const matchesQuery = node.data.label.toLowerCase().includes(query);
-      const filteredChildren = filterTree(node.children);
+      const label = node.data?.label || '';
+      const matchesQuery = label.toLowerCase().includes(query);
+      const filteredChildren = filterTree(node.children || []);
 
       if (matchesQuery || filteredChildren.length > 0) {
         filtered.push({
@@ -50,7 +59,13 @@ export function NodeTree() {
   };
 
   const filteredTreeData = useMemo(() => {
-    return filterTree(treeData);
+    const result = filterTree(treeData);
+    console.log('[NodeTree] filteredTreeData:', {
+      originalCount: treeData.length,
+      filteredCount: result.length,
+      searchQuery
+    });
+    return result;
   }, [treeData, searchQuery]);
 
   return (
@@ -78,7 +93,7 @@ export function NodeTree() {
       <div className="flex-1 overflow-y-auto">
         {filteredTreeData.length === 0 ? (
           <div className="text-center text-zinc-500 text-xs mt-8 px-2">
-            {searchQuery ? '无匹配结果' : '暂无节点'}
+            {searchQuery ? '无匹配结果' : nodes.length === 0 ? '暂无节点' : '节点树构建失败，请检查节点数据'}
           </div>
         ) : (
           <div className="py-1">

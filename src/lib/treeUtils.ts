@@ -99,21 +99,38 @@ export function buildTree(
     }
   });
 
-  // 5. 如果所有节点都有父节点（可能是循环引用或孤立节点），至少返回第一个节点
+  // 5. 如果所有节点都有父节点（可能是循环引用），或者没有找到根节点，返回所有节点作为根节点
   if (rootNodes.length === 0 && nodes.length > 0) {
-    // 处理孤立节点（没有边的节点）
+    // 处理孤立节点（没有边的节点）或循环引用的情况
+    const processedIds = new Set<string>();
     nodes.forEach((node) => {
-      if (!parentMap.has(node.id)) {
+      // 如果节点不在 parentMap 中（没有父节点），或者是孤立节点
+      if (!parentMap.has(node.id) && !processedIds.has(node.id)) {
         rootNodes.push({
           ...node,
           children: [],
         });
+        processedIds.add(node.id);
       }
     });
+    
+    // 如果还是没有根节点（所有节点都有父节点，可能是循环引用），返回所有节点
+    if (rootNodes.length === 0) {
+      nodes.forEach((node) => {
+        if (!processedIds.has(node.id)) {
+          rootNodes.push({
+            ...node,
+            children: [],
+          });
+          processedIds.add(node.id);
+        }
+      });
+    }
   }
 
   return rootNodes;
 }
+
 
 
 

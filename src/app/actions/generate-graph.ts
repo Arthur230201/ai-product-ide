@@ -385,9 +385,12 @@ export const generateGraph = createServerAction()
       const shouldAnalyzeClarity = input.prompt.trim().length > 0 || !!input.mediaBase64 || !!input.attachmentContent;
       const hasMediaOrAttachment = !!input.mediaBase64 || !!input.attachmentContent;
       
+      // 声明 clarityAnalysis 变量，在作用域外也可访问
+      let clarityAnalysis: z.infer<typeof InputClarityAnalysisSchema> | null = null;
+      
       if (shouldAnalyzeClarity) {
         log('🔍 [generateGraph] 开始分析输入模糊度（包含文件内容）...');
-        const clarityAnalysis = await analyzeInputClarity(
+        clarityAnalysis = await analyzeInputClarity(
           input.prompt.trim(),
           textModel,
           input.aiConfig,
@@ -408,42 +411,41 @@ export const generateGraph = createServerAction()
 
         // 现在 analyzeInputClarity 已经考虑了文件内容，所以直接使用分析结果
         // 不再需要额外的调整逻辑，因为文件内容已经在分析时被考虑了
-        const adjustedIsVague = clarityAnalysis.isVague;
-
-        if (adjustedIsVague) {
-          log('⚠️ [generateGraph] 输入过于模糊，生成澄清请求', {
-            originalIsVague: clarityAnalysis.isVague,
-            adjustedIsVague,
+        // 即使输入不够明确，也继续生成图结构（不再返回澄清请求）
+        if (clarityAnalysis.isVague) {
+          log('⚠️ [generateGraph] 输入过于模糊，但仍继续生成基础图结构', {
+            isVague: clarityAnalysis.isVague,
             hasMediaOrAttachment,
             confidence: clarityAnalysis.confidence,
+            note: '即使输入不够明确，也会生成基础结构，让用户可以继续流程',
           });
           
-          const clarificationRequest = await generateClarificationRequest(
-            clarityAnalysis, 
-            textModel,
-            hasMediaOrAttachment
-          );
-          
-          return {
-            data: clarificationRequest,
-          };
-        }
-        
-        if (hasMediaOrAttachment && !clarityAnalysis.isVague) {
-          log('✅ [generateGraph] 输入足够具体，且有附件支持，继续生成图结构');
+          // 不再返回澄清请求，而是继续生成图结构
+          // 在生成时，会在提示词中说明输入不够明确，要求AI生成一个基础结构
+          // 同时，前端会打开项目画像页面，提示用户补充信息
+          log('📝 [generateGraph] 继续生成图结构，但会在提示词中说明输入不够明确');
         } else {
-          log('✅ [generateGraph] 输入足够具体，继续生成图结构');
+          if (hasMediaOrAttachment) {
+            log('✅ [generateGraph] 输入足够具体，且有附件支持，继续生成图结构');
+          } else {
+            log('✅ [generateGraph] 输入足够具体，继续生成图结构');
+          }
         }
       } else {
         log('⏭️ [generateGraph] 没有文本输入，直接生成图结构');
       }
 
       // 构建系统提示词 - 包含Top-Down Architecture策略
+      // 如果输入不够明确，在提示词中添加说明
+      const clarityNote = (clarityAnalysis && clarityAnalysis.isVague)
+        ? `\n\n⚠️ **重要提示**：用户输入不够明确（明确度: ${clarityAnalysis.confidence}%）。请基于检测到的领域"${clarityAnalysis.detectedDomain || '通用业务'}"生成一个基础的项目结构。即使信息不足，也要生成至少1-2个核心页面节点，让用户可以在此基础上继续完善。`
+        : '';
+      
       const systemPrompt = `# Role
 Product Solution Architect (Domain Driven Design Expert).
 
 # Task
-Analyze the User Input and generate a **Global Business Architecture JSON** using Top-Down Architecture strategy.
+Analyze the User Input and generate a **Global Business Architecture JSON** using Top-Down Architecture strategy.${clarityNote}
 
 # 🧠 Processing Strategy: Top-Down Architecture
 
@@ -868,27 +870,254 @@ Return JSON with the following structure:
         return edgeObj;
       });
 
+      // ============================================================================
+      // Layer 2: 节点标准化算法 (The Collapse Algorithm)
+      // ============================================================================
+      /**
+       * 识别并合并"伪节点"（逻辑碎片）到宿主页面的事件列表中
+       * 
+       * 算法逻辑：
+       * 1. 识别"伪节点"：包含"点击"、"确认"、"服务"、"API"、"判断"等动词，或没有 view.code
+       * 2. 寻找宿主：查看谁连线给了这个碎片（edge.source）
+       * 3. 执行吞噬：将碎片转换为事件对象，注入到宿主页面的 events 列表
+       * 4. 删除碎片：从 nodes 数组中删除
+       * 5. 重连线路：如果碎片后面还有页面，直接连通宿主页面和目标页面
+       */
+      function normalizeNodes(nodes: FractalNode[], edges: Edge[]): { nodes: FractalNode[]; edges: Edge[] } {
+        // 伪节点关键词（用于识别逻辑碎片）
+        const fragmentKeywords = [
+          '点击', '确认', '服务', 'API', '判断', '校验', '验证', '计算', '处理',
+          '发送', '接收', '保存', '删除', '更新', '查询', '审批', '提交', '取消',
+          'click', 'confirm', 'service', 'api', 'validate', 'check', 'process',
+          'send', 'receive', 'save', 'delete', 'update', 'query', 'approve', 'submit', 'cancel'
+        ];
+
+        // 1. 分类：区分页面节点和逻辑碎片
+        const pages: FractalNode[] = [];
+        const fragments: FractalNode[] = [];
+        const nodeMap = new Map<string, FractalNode>();
+
+        nodes.forEach(node => {
+          nodeMap.set(node.id, node);
+          
+          const label = node.data.label.toLowerCase();
+          const hasViewCode = node.data.artifacts.view?.code && node.data.artifacts.view.code.trim().length > 0;
+          const isFragment = 
+            // 检查是否包含碎片关键词
+            fragmentKeywords.some(keyword => label.includes(keyword.toLowerCase())) ||
+            // 或者没有 UI 代码
+            !hasViewCode;
+
+          if (isFragment) {
+            fragments.push(node);
+            logWarn(`🔍 [normalizeNodes] 识别到逻辑碎片: ${node.data.label}`, {
+              nodeId: node.id,
+              hasViewCode,
+              label,
+            });
+          } else {
+            pages.push(node);
+          }
+        });
+
+        if (fragments.length === 0) {
+          log('✅ [normalizeNodes] 未发现逻辑碎片，跳过标准化');
+          return { nodes, edges };
+        }
+
+        log(`🔄 [normalizeNodes] 开始标准化: ${fragments.length} 个碎片需要合并到 ${pages.length} 个页面`);
+
+        // 2. 构建边映射：快速查找碎片的来源和目标
+        const incomingEdges = new Map<string, Edge[]>(); // fragmentId -> edges[]
+        const outgoingEdges = new Map<string, Edge[]>(); // fragmentId -> edges[]
+        const allEdges = new Map<string, Edge>(); // edgeId -> edge
+
+        edges.forEach(edge => {
+          allEdges.set(edge.id, edge);
+
+          // 记录指向碎片的边（来源）
+          if (fragments.some(f => f.id === edge.target)) {
+            if (!incomingEdges.has(edge.target)) {
+              incomingEdges.set(edge.target, []);
+            }
+            incomingEdges.get(edge.target)!.push(edge);
+          }
+
+          // 记录从碎片出发的边（目标）
+          if (fragments.some(f => f.id === edge.source)) {
+            if (!outgoingEdges.has(edge.source)) {
+              outgoingEdges.set(edge.source, []);
+            }
+            outgoingEdges.get(edge.source)!.push(edge);
+          }
+        });
+
+        // 3. 执行吞噬：将碎片合并到宿主页面
+        const mergedNodes = new Map<string, FractalNode>(pages.map(p => [p.id, { ...p }]));
+        const fragmentsToRemove = new Set<string>();
+        const edgesToRemove = new Set<string>();
+        const edgesToAdd: Edge[] = [];
+
+        fragments.forEach(fragment => {
+          const incoming = incomingEdges.get(fragment.id) || [];
+          
+          if (incoming.length === 0) {
+            logWarn(`⚠️ [normalizeNodes] 碎片 ${fragment.data.label} 没有来源边，无法合并，将删除`, {
+              fragmentId: fragment.id,
+            });
+            fragmentsToRemove.add(fragment.id);
+            return;
+          }
+
+          // 找到宿主页面（第一个来源边指向的页面）
+          const hostEdge = incoming.find(e => pages.some(p => p.id === e.source));
+          if (!hostEdge) {
+            logWarn(`⚠️ [normalizeNodes] 碎片 ${fragment.data.label} 的来源不是页面节点，将删除`, {
+              fragmentId: fragment.id,
+              sources: incoming.map(e => e.source),
+            });
+            fragmentsToRemove.add(fragment.id);
+            return;
+          }
+
+          const hostPage = mergedNodes.get(hostEdge.source);
+          if (!hostPage) {
+            logWarn(`⚠️ [normalizeNodes] 找不到宿主页面: ${hostEdge.source}`, {
+              fragmentId: fragment.id,
+            });
+            fragmentsToRemove.add(fragment.id);
+            return;
+          }
+
+          // 将碎片转换为事件对象
+          const eventId = `evt_${fragment.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          const fragmentLabel = fragment.data.label;
+          
+          // 提取触发条件（从标签中推断）
+          let trigger = fragmentLabel;
+          if (fragmentLabel.includes('点击')) {
+            trigger = `点击'${fragmentLabel.replace(/点击|按钮|操作/g, '').trim()}'按钮`;
+          } else if (fragmentLabel.includes('确认')) {
+            trigger = `点击'确认'按钮`;
+          } else {
+            trigger = `触发${fragmentLabel}`;
+          }
+
+          // 提取动作（从 spec 或 impl 中获取）
+          const action = fragment.data.artifacts.spec?.requirements?.[0] || 
+                        fragment.data.artifacts.impl?.apiEndpoints?.[0] || 
+                        `执行${fragmentLabel}逻辑`;
+
+          // 提取结果（从 spec 或描述中获取）
+          const outcome = fragment.data.artifacts.spec?.requirements?.find(r => r.includes('结果') || r.includes('跳转')) ||
+                          `完成${fragmentLabel}`;
+
+          // 创建业务事件对象
+          const businessEvent = {
+            id: eventId,
+            name: fragmentLabel,
+            trigger: trigger,
+            type: 'UserAction' as const,
+            processFlow: [
+              {
+                step: 1,
+                action: action,
+                desc: fragment.data.artifacts.spec?.title || fragmentLabel,
+              },
+            ],
+            outcome: outcome,
+          };
+
+          // 注入到宿主页面的事件列表
+          if (!hostPage.data.artifacts.events) {
+            hostPage.data.artifacts.events = [];
+          }
+          hostPage.data.artifacts.events.push(businessEvent);
+
+          log(`✅ [normalizeNodes] 碎片 "${fragmentLabel}" 已合并到页面 "${hostPage.data.label}"`, {
+            fragmentId: fragment.id,
+            hostPageId: hostPage.id,
+            eventId: eventId,
+          });
+
+          // 4. 重连线路：如果碎片后面还有页面，直接连通宿主页面和目标页面
+          const outgoing = outgoingEdges.get(fragment.id) || [];
+          outgoing.forEach(outEdge => {
+            const targetNode = nodeMap.get(outEdge.target);
+            if (targetNode && pages.some(p => p.id === targetNode.id)) {
+              // 目标是一个页面节点，创建新边：宿主页面 -> 目标页面
+              const newEdge: Edge = {
+                id: `edge-${hostPage.id}-${targetNode.id}-merged-${Date.now()}`,
+                source: hostPage.id,
+                target: targetNode.id,
+                label: outEdge.label || fragmentLabel,
+                type: 'default' as const,
+                markerEnd: {
+                  type: 'arrowclosed' as const,
+                },
+              };
+              edgesToAdd.push(newEdge);
+              log(`🔗 [normalizeNodes] 重连: ${hostPage.data.label} -> ${targetNode.data.label}`, {
+                oldEdge: outEdge.id,
+                newEdge: newEdge.id,
+              });
+            }
+            edgesToRemove.add(outEdge.id);
+          });
+
+          // 标记碎片和相关的边为待删除
+          fragmentsToRemove.add(fragment.id);
+          incoming.forEach(e => edgesToRemove.add(e.id));
+        });
+
+        // 5. 构建清理后的节点和边列表
+        const cleanedNodes = Array.from(mergedNodes.values());
+        const cleanedEdges = edges
+          .filter(e => !edgesToRemove.has(e.id))
+          .concat(edgesToAdd);
+
+        log(`✅ [normalizeNodes] 标准化完成:`, {
+          originalNodes: nodes.length,
+          cleanedNodes: cleanedNodes.length,
+          removedFragments: fragmentsToRemove.size,
+          originalEdges: edges.length,
+          cleanedEdges: cleanedEdges.length,
+          removedEdges: edgesToRemove.size,
+          addedEdges: edgesToAdd.length,
+        });
+
+        return {
+          nodes: cleanedNodes,
+          edges: cleanedEdges,
+        };
+      }
+
+      // 执行节点标准化
+      const normalized = normalizeNodes(nodes, edges);
+      const normalizedNodes = normalized.nodes;
+      const normalizedEdges = normalized.edges;
+
       const duration = Date.now() - startTime;
       
-      // 统计用户故事、业务事件和数据查询
-      const totalUserStories = nodes.reduce((sum, n) => sum + (n.data.artifacts.userStories?.length || 0), 0);
-      const totalEvents = nodes.reduce((sum, n) => sum + (n.data.artifacts.events?.length || 0), 0);
-      const totalDataQueries = nodes.reduce((sum, n) => sum + (n.data.artifacts.dataQueries?.length || 0), 0);
-      const actionPages = nodes.filter(n => n.data.artifacts.events && n.data.artifacts.events.length > 0).length;
-      const viewPages = nodes.filter(n => n.data.artifacts.dataQueries && n.data.artifacts.dataQueries.length > 0).length;
+      // 统计用户故事、业务事件和数据查询（使用标准化后的节点）
+      const totalUserStories = normalizedNodes.reduce((sum, n) => sum + (n.data.artifacts.userStories?.length || 0), 0);
+      const totalEvents = normalizedNodes.reduce((sum, n) => sum + (n.data.artifacts.events?.length || 0), 0);
+      const totalDataQueries = normalizedNodes.reduce((sum, n) => sum + (n.data.artifacts.dataQueries?.length || 0), 0);
+      const actionPages = normalizedNodes.filter(n => n.data.artifacts.events && n.data.artifacts.events.length > 0).length;
+      const viewPages = normalizedNodes.filter(n => n.data.artifacts.dataQueries && n.data.artifacts.dataQueries.length > 0).length;
       
       log('✅ [generateGraph] 图结构生成完成:', {
         duration: `${duration}ms`,
-        nodesCount: nodes.length,
-        edgesCount: edges.length,
+        nodesCount: normalizedNodes.length,
+        edgesCount: normalizedEdges.length,
         totalUserStories,
         totalEvents,
         totalDataQueries,
         actionPages,
         viewPages,
-        nodeIds: nodes.map(n => n.id),
-        edgeIds: edges.map(e => e.id),
-        nodesWithUserStories: nodes.filter(n => n.data.artifacts.userStories && n.data.artifacts.userStories.length > 0).length,
+        nodeIds: normalizedNodes.map(n => n.id),
+        edgeIds: normalizedEdges.map(e => e.id),
+        nodesWithUserStories: normalizedNodes.filter(n => n.data.artifacts.userStories && n.data.artifacts.userStories.length > 0).length,
         nodesWithEvents: actionPages,
         nodesWithDataQueries: viewPages,
       });
@@ -900,8 +1129,8 @@ Return JSON with the following structure:
             userJourneys: result.object.global.userJourneys,
             businessEvents: result.object.global.businessEvents,
           },
-          nodes,
-          edges,
+          nodes: normalizedNodes,
+          edges: normalizedEdges,
         },
       };
 

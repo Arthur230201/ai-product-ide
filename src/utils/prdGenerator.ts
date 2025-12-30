@@ -380,6 +380,10 @@ export function generateFullPrdHtml(data: FullPrdData): string {
             scrollbar-width: thin;
             scrollbar-color: #475569 #0f172a;
         }
+        /* 确保sidebar中的项目名称显示为白色 */
+        .sidebar h1 {
+            color: #ffffff !important;
+        }
         .sidebar::-webkit-scrollbar {
             width: 6px;
         }
@@ -392,23 +396,53 @@ export function generateFullPrdHtml(data: FullPrdData): string {
         }
         .main-content { margin-left: 280px; min-height: 100vh; background: #fff; }
         
-        /* Typography & Tables */
-        h1 { color: #0f172a; font-weight: 800; }
-        h2 { 
-            color: #1e293b; 
-            font-weight: 700; 
-            font-size: 1.75rem;
-            margin-top: 2rem; 
-            margin-bottom: 1rem; 
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid #cbd5e1;
+        /* Typography & Tables - 企业级文档标题层级 */
+        /* 使用 !important 确保样式优先级，覆盖 Tailwind 和 markdown-body 的默认样式 */
+        .main-content h1,
+        section h1,
+        h1 { 
+            color: #0f172a !important; 
+            font-weight: 800 !important; 
+            font-size: 2.5rem !important; /* 40px - 章节标题，最大 */
+            line-height: 1.2 !important;
+            margin-top: 3rem !important; 
+            margin-bottom: 1.5rem !important; 
+            padding-bottom: 0.75rem !important;
+            border-bottom: 3px solid #cbd5e1 !important;
         }
+        .main-content h2,
+        section h2,
+        h2 { 
+            color: #1e293b !important; 
+            font-weight: 700 !important; 
+            font-size: 2rem !important; /* 32px - 页面/模块标题，比 h1 小 */
+            line-height: 1.3 !important;
+            margin-top: 2.5rem !important; 
+            margin-bottom: 1.25rem !important; 
+            padding-bottom: 0.5rem !important;
+            border-bottom: 2px solid #cbd5e1 !important;
+        }
+        .main-content h3,
+        section h3,
         h3 { 
-            color: #475569; 
-            font-weight: 600; 
-            font-size: 1.125rem;
-            margin-top: 1.5rem; 
-            margin-bottom: 0.75rem; 
+            color: #475569 !important; 
+            font-weight: 600 !important; 
+            font-size: 1.5rem !important; /* 24px - 小节标题，比 h2 小 */
+            line-height: 1.4 !important;
+            margin-top: 2rem !important; 
+            margin-bottom: 1rem !important; 
+            padding-bottom: 0.5rem !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+        }
+        .main-content h4,
+        section h4,
+        h4 { 
+            color: #64748b !important; 
+            font-weight: 600 !important; 
+            font-size: 1.25rem !important; /* 20px - 子小节标题，比 h3 小 */
+            line-height: 1.5 !important;
+            margin-top: 1.5rem !important; 
+            margin-bottom: 0.75rem !important; 
         }
         
         /* Logic Block Styling (for business logic, data rules, etc.) */
@@ -440,6 +474,78 @@ export function generateFullPrdHtml(data: FullPrdData): string {
         /* Markdown Tables Override */
         .markdown-body table { display: table; width: 100%; }
         .markdown-body th { background-color: #f1f5f9; }
+        
+        /* 确保正文文本不会比标题更突出 */
+        .markdown-body {
+            color: #475569; /* 正文文本颜色，比 h3 更浅 */
+            font-size: 0.9375rem; /* 15px，小于 h4 的 20px */
+            line-height: 1.6;
+        }
+        .markdown-body p {
+            color: #475569 !important; /* 确保段落文本颜色不会比标题深 */
+            font-size: 0.9375rem !important; /* 确保段落字号不会比标题大 */
+            margin-bottom: 1rem;
+        }
+        .markdown-body strong,
+        .markdown-body b {
+            color: #64748b !important; /* 加粗文本颜色，比 h4 更浅 */
+            font-weight: 600 !important;
+            font-size: inherit !important; /* 继承父元素字号，不会比标题大 */
+        }
+        .markdown-body em,
+        .markdown-body i {
+            color: #64748b !important;
+            font-size: inherit !important;
+        }
+        .markdown-body ul,
+        .markdown-body ol {
+            color: #475569 !important;
+            font-size: 0.9375rem !important;
+        }
+        .markdown-body li {
+            color: #475569 !important;
+            font-size: 0.9375rem !important;
+        }
+        
+        /* 确保 markdown-body 内的标题使用我们的样式 */
+        .markdown-body h1 {
+            color: #0f172a !important;
+            font-weight: 800 !important;
+            font-size: 2.5rem !important;
+            line-height: 1.2 !important;
+            margin-top: 3rem !important;
+            margin-bottom: 1.5rem !important;
+            padding-bottom: 0.75rem !important;
+            border-bottom: 3px solid #cbd5e1 !important;
+        }
+        .markdown-body h2 {
+            color: #1e293b !important;
+            font-weight: 700 !important;
+            font-size: 2rem !important;
+            line-height: 1.3 !important;
+            margin-top: 2.5rem !important;
+            margin-bottom: 1.25rem !important;
+            padding-bottom: 0.5rem !important;
+            border-bottom: 2px solid #cbd5e1 !important;
+        }
+        .markdown-body h3 {
+            color: #475569 !important;
+            font-weight: 600 !important;
+            font-size: 1.5rem !important;
+            line-height: 1.4 !important;
+            margin-top: 2rem !important;
+            margin-bottom: 1rem !important;
+            padding-bottom: 0.5rem !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+        }
+        .markdown-body h4 {
+            color: #64748b !important;
+            font-weight: 600 !important;
+            font-size: 1.25rem !important;
+            line-height: 1.5 !important;
+            margin-top: 1.5rem !important;
+            margin-bottom: 0.75rem !important;
+        }
 
         /* Split View Sticky UI */
         .sticky-ui { 
@@ -546,10 +652,35 @@ export function generateFullPrdHtml(data: FullPrdData): string {
             <a href="#ch2" class="block px-4 py-2 hover:bg-slate-800 rounded">2. 全局规范</a>
             <a href="#ch3" class="block px-4 py-2 hover:bg-slate-800 rounded">3. 系统架构</a>
             <a href="#ch4" class="block px-4 py-2 hover:bg-slate-800 rounded">4. 业务流程</a>
-            <div class="px-4 pt-4 pb-2 text-xs font-bold uppercase tracking-wider text-slate-600">5. 功能详述</div>
-            ${data.nodes.map((n, i) => 
-                `<a href="#node-${i}" class="block px-4 py-1.5 hover:bg-slate-800 rounded truncate pl-6 text-xs">5.${i+1} ${n.title}</a>`
-            ).join('')}
+            <a href="#ch5" class="block px-4 py-2 hover:bg-slate-800 rounded">5. 功能详述</a>
+            ${data.nodes.map((n, i) => {
+                const nodeNum = `5.${i+1}`;
+                let sectionIdx = 1;
+                // 构建三级菜单项（sections）
+                let tempSectionIdx = 1;
+                const sectionsMenu = n.sections && n.sections.length > 0
+                    ? n.sections.map((section, secIdx) => {
+                        const secNum = `${nodeNum}.${tempSectionIdx++}`;
+                        return `<a href="#node-${i}-section-${tempSectionIdx - 1}" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">${secNum} ${section.title}</a>`;
+                    }).join('')
+                    : '';
+                // 更新 sectionIdx 以便用户故事使用正确的编号
+                sectionIdx = tempSectionIdx;
+                // 构建用户故事菜单项（如果有）
+                const userStoriesMenu = n.userStories && n.userStories.length > 0
+                    ? n.userStories.map((story, storyIdx) => {
+                        const storyNum = `${nodeNum}.${sectionIdx++}`;
+                        return `<a href="#node-${i}-story-${storyIdx}" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">${storyNum} ${story.id || `US-${storyIdx + 1}`}</a>`;
+                    }).join('')
+                    : '';
+                return `
+                    <div class="space-y-0.5">
+                        <a href="#node-${i}" class="block px-4 py-1.5 hover:bg-slate-800 rounded truncate pl-6 text-xs font-medium text-slate-300 transition-colors">${nodeNum} ${n.title}</a>
+                        ${sectionsMenu}
+                        ${userStoriesMenu}
+                    </div>
+                `;
+            }).join('')}
         </nav>
     </aside>
 
@@ -558,7 +689,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
             
             <section id="version-control" class="mb-16">
                 <div class="bg-slate-50 rounded-xl border p-6">
-                    <h2 style="margin-top:0; border:none; padding:0;">📝 文档版本记录</h2>
+                    <h2 style="margin-top:0; border:none; padding-bottom:0;">📝 文档版本记录</h2>
                     <table class="w-full text-sm text-left mt-4 border-collapse bg-white">
                         <thead class="bg-slate-100 text-slate-700">
                             <tr>
@@ -654,14 +785,15 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                   
                   // Build sections HTML
                   const sectionsHtml = node.sections && node.sections.length > 0
-                    ? node.sections.map((section) => {
+                    ? node.sections.map((section, secIdx) => {
+                        const currentSectionIdx = sectionIdx;
                         const secNum = `${nodeNum}.${sectionIdx++}`;
-                        const parsedContent = marked.parse(section.content || '（暂无内容）');
+                        const parsedContent = marked.parse(section.content || '（暂无内容）') as string;
                         
                         if (section.type === 'table') {
                           return `
-                            <div class="mb-6">
-                                <h3 class="text-lg font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">${secNum} ${section.title}</h3>
+                            <div id="node-${nodeIdx}-section-${secIdx - 1}" class="mb-6 scroll-mt-20">
+                                <h3>${secNum} ${section.title}</h3>
                                 <div class="overflow-x-auto">
                                     ${parsedContent}
                                 </div>
@@ -669,11 +801,17 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                           `;
                         } else {
                           // Text/Markdown content with logic-block styling
+                          // 尝试解析内容中的三级标题
+                          let contentWithH4 = parsedContent;
+                          // 如果内容包含列表项，可以将其转换为三级标题
+                          if (typeof parsedContent === 'string' && (parsedContent.includes('<li>') || parsedContent.includes('<ul>'))) {
+                            // 保持原样，但添加 id 用于锚点
+                          }
                           return `
-                            <div class="mb-6">
-                                <h3 class="text-lg font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">${secNum} ${section.title}</h3>
+                            <div id="node-${nodeIdx}-section-${secIdx - 1}" class="mb-6 scroll-mt-20">
+                                <h3>${secNum} ${section.title}</h3>
                                 <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
-                                    ${parsedContent}
+                                    ${contentWithH4}
                                 </div>
                             </div>
                           `;
@@ -681,7 +819,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                       }).join('')
                     : `
                       <div class="mb-6">
-                          <h3 class="text-lg font-semibold text-slate-800 mb-3 pb-2 border-b border-slate-200">${nodeNum}.${sectionIdx++} 功能需求说明</h3>
+                          <h3>${nodeNum}.${sectionIdx++} 功能需求说明</h3>
                           <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
                               <p class="text-slate-500 italic">（暂无功能需求说明）</p>
                           </div>
@@ -693,42 +831,42 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                     ? node.userStories.map((story, storyIdx) => {
                         const storyNum = `${nodeNum}.${sectionIdx++}`;
                         return `
-                          <div class="mb-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-500 shadow-sm">
+                          <div id="node-${nodeIdx}-story-${storyIdx}" class="mb-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-500 shadow-sm scroll-mt-20">
                               <div class="flex items-start justify-between mb-4">
-                                  <h3 class="text-lg font-semibold text-slate-800">【用户故事卡片 ${story.id || `US-${storyIdx + 1}`}】</h3>
+                                  <h3>【用户故事卡片 ${story.id || `US-${storyIdx + 1}`}】</h3>
                                   <span class="text-xs text-slate-500 font-mono">${storyNum}</span>
                               </div>
                               
                               <div class="space-y-3">
-                                  <div class="flex items-start">
-                                      <span class="text-2xl mr-2">🧑‍💻</span>
-                                      <div>
-                                          <span class="text-sm font-medium text-slate-600">角色：</span>
-                                          <span class="text-slate-800">${story.role || '（未指定）'}</span>
-                                      </div>
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">🧑‍💻</span>
+                                          <span>角色</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">${story.role || '（未指定）'}</p>
                                   </div>
                                   
-                                  <div class="flex items-start">
-                                      <span class="text-2xl mr-2">🚩</span>
-                                      <div>
-                                          <span class="text-sm font-medium text-slate-600">目标：</span>
-                                          <span class="text-slate-800">${story.activity || '（未指定）'}</span>
-                                      </div>
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">🚩</span>
+                                          <span>目标</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">${story.activity || '（未指定）'}</p>
                                   </div>
                                   
-                                  <div class="flex items-start">
-                                      <span class="text-2xl mr-2">💎</span>
-                                      <div>
-                                          <span class="text-sm font-medium text-slate-600">价值：</span>
-                                          <span class="text-slate-800">${story.value || '（未指定）'}</span>
-                                      </div>
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">💎</span>
+                                          <span>价值</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">${story.value || '（未指定）'}</p>
                                   </div>
                                   
                                   <div class="mt-4 pt-4 border-t border-blue-200">
-                                      <div class="flex items-start mb-2">
-                                          <span class="text-xl mr-2">✅</span>
-                                          <span class="text-sm font-semibold text-slate-700">验收标准 (逻辑细节)：</span>
-                                      </div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                          <span class="text-xl">✅</span>
+                                          <span>验收标准 (逻辑细节)</span>
+                                      </h4>
                                       <ul class="ml-6 space-y-2">
                                           ${story.acceptanceCriteria && story.acceptanceCriteria.length > 0
                                             ? story.acceptanceCriteria.map((ac, acIdx) => {
@@ -752,13 +890,13 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                   return `
                 <div id="node-${nodeIdx}" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20">
                     <!-- Page Title (H2) -->
-                    <h2 class="text-2xl mb-6 font-bold text-slate-900 pb-2 border-b-2 border-slate-300">${nodeNum} ${node.title || `功能模块 ${nodeIdx + 1}`}</h2>
+                    <h2>${nodeNum} ${node.title || `功能模块 ${nodeIdx + 1}`}</h2>
                     
                     <div class="grid grid-cols-12 gap-8 items-start">
                         <!-- Left Column: UI Preview (Sticky) -->
                         <div class="col-span-4">
                             <div class="sticky-ui">
-                                <h3 class="text-lg font-semibold text-slate-700 mb-3">${nodeNum}.${sectionIdx++} 界面示意</h3>
+                                <h3>${nodeNum}.${sectionIdx++} 界面示意</h3>
                                 ${node.uiCode ? `
                                 <!-- React 交互式 UI 容器 -->
                                 <div class="phone-mockup bg-white" style="min-height: 400px;">
@@ -1168,21 +1306,21 @@ export const exportToFullPrdHtml = async (options: {
 }) => {
   const { projectMeta, globalRules, nodes, edges = [], architectureImage, topologyImage, swimlaneChart, dataDictionary } = options;
 
-  // 构建全局规则 Markdown
+  // 构建全局规则 Markdown（使用三级标题）
   const globalRulesMarkdown = `
-## 性能要求
+### 性能要求
 ${globalRules.performance || '（待补充）'}
 
-## 安全要求
+### 安全要求
 ${globalRules.security || '（待补充）'}
 
-## 兼容性要求
+### 兼容性要求
 ${globalRules.compatibility || '（待补充）'}
 
-## 错误处理
+### 错误处理
 ${globalRules.errorHandling || '（待补充）'}
 
-## 数据追踪
+### 数据追踪
 ${globalRules.dataTracking || '（待补充）'}
   `.trim();
 
