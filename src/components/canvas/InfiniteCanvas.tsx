@@ -2,7 +2,7 @@
 
 import 'reactflow/dist/style.css';
 
-import React, { useCallback, useEffect, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import ReactFlow, {
   Background,
   Controls,
@@ -27,7 +27,7 @@ import { NodeDetailPanel } from './NodeDetailPanel';
 import { PresentationMode } from './PresentationMode';
 import { ContextMenu } from './ContextMenu';
 import { toast } from 'sonner';
-import { Sparkles, FileText, Image as ImageIcon, Wand2 } from 'lucide-react';
+import { Play } from 'lucide-react';
 import type { FractalNode as FractalNodeType } from '@/types/fractal';
 
 // 注册自定义节点类型（必须在组件外部定义，避免每次渲染重新创建）
@@ -84,15 +84,7 @@ function CanvasContent() {
 
   const handleNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => {
-      // 单击：只选择节点（用于连接/移动），不打开面板
-      selectNode(node.id);
-    },
-    [selectNode]
-  );
-
-  const handleNodeDoubleClick: NodeMouseHandler = useCallback(
-    (_event, node) => {
-      // 双击：选择节点 + 打开详情面板（不再聚焦和调整画布）
+      // 统一交互：单击直接打开节点详情面板
       selectNode(node.id);
       openNodeDetail(node.id);
     },
@@ -149,8 +141,6 @@ function CanvasContent() {
 
   // 处理键盘快捷键
   useEffect(() => {
-    const { addChildNode, addSiblingNode } = useCanvasStore.getState();
-    
     const handleKeyDown = (e: KeyboardEvent) => {
       // 如果焦点在输入框或文本框中，不处理快捷键
       const activeElement = document.activeElement;
@@ -163,16 +153,54 @@ function CanvasContent() {
         return;
       }
 
-      // Tab 键：添加子节点（使用选中节点作为父节点）
-      if (e.key === 'Tab' && selectedNodeId && !isDetailPanelOpen) {
+      // Cmd/Ctrl + K: 打开命令面板（未来实现）
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        addChildNode();
+        // TODO: 实现命令面板
+        return;
       }
 
-      // Enter 键：添加同级节点（与选中节点同级）
-      if (e.key === 'Enter' && selectedNodeId && !isDetailPanelOpen && !e.shiftKey) {
+      // Cmd/Ctrl + N: 创建新节点
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
         e.preventDefault();
-        addSiblingNode();
+        // TODO: 实现快速创建节点
+        return;
+      }
+
+      // Tab 键：在节点间切换（改进的快捷键）
+      if (e.key === 'Tab' && selectedNodeId && !isDetailPanelOpen && !e.shiftKey) {
+        e.preventDefault();
+        // 边界检查：确保有节点可以切换
+        if (nodes.length === 0) return;
+        
+        const currentIndex = nodes.findIndex(n => n.id === selectedNodeId);
+        // 如果当前节点不存在，直接返回
+        if (currentIndex === -1) return;
+        
+        const nextIndex = (currentIndex + 1) % nodes.length;
+        if (nodes[nextIndex]) {
+          selectNode(nodes[nextIndex].id);
+          openNodeDetail(nodes[nextIndex].id);
+        }
+        return;
+      }
+
+      // Shift + Tab: 反向切换节点
+      if (e.key === 'Tab' && selectedNodeId && !isDetailPanelOpen && e.shiftKey) {
+        e.preventDefault();
+        // 边界检查：确保有节点可以切换
+        if (nodes.length === 0) return;
+        
+        const currentIndex = nodes.findIndex(n => n.id === selectedNodeId);
+        // 如果当前节点不存在，直接返回
+        if (currentIndex === -1) return;
+        
+        const prevIndex = currentIndex === 0 ? nodes.length - 1 : currentIndex - 1;
+        if (nodes[prevIndex]) {
+          selectNode(nodes[prevIndex].id);
+          openNodeDetail(nodes[prevIndex].id);
+        }
+        return;
       }
 
       // Delete 或 Backspace 键删除选中的节点
@@ -186,50 +214,15 @@ function CanvasContent() {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [selectedNodeId, isDetailPanelOpen, deleteNode]);
+  }, [selectedNodeId, isDetailPanelOpen, deleteNode, nodes, selectNode, openNodeDetail]);
 
-  // 空状态组件
+  // 空状态组件 - 极简设计
   const EmptyState = () => (
     <div className="fixed inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 1 }}>
-      <div className="text-center max-w-md px-8 animate-fade-in">
-        <div className="mb-6 flex justify-center">
-          <div className="relative">
-            <Sparkles className="w-16 h-16 text-purple-500/50 animate-pulse" />
-            <Wand2 className="w-8 h-8 text-purple-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-          </div>
-        </div>
-        <h2 className="text-2xl font-bold text-zinc-100 mb-2">开始你的产品设计之旅</h2>
-        <p className="text-zinc-400 mb-6 leading-relaxed">
-          在下方输入你的想法，或上传图片/文档，AI 将为你生成完整的产品原型
+      <div className="text-center max-w-lg px-8">
+        <p className="text-lg text-zinc-400">
+          描述你的产品想法，或上传设计稿
         </p>
-        <div className="flex flex-col gap-3 items-center mb-6">
-          <div className="flex items-center gap-2 text-sm text-zinc-500">
-            <FileText className="w-4 h-4" />
-            <span>支持上传 PRD 文档、设计稿</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-zinc-500">
-            <ImageIcon className="w-4 h-4" />
-            <span>支持截图、Figma 导出图片</span>
-          </div>
-        </div>
-        <div className="flex flex-col gap-2 text-xs text-zinc-600 border-t border-zinc-800 pt-4">
-          <div className="flex items-center justify-center gap-4">
-            <span>💡 <strong>提示：</strong></span>
-            <span>双击节点查看详情</span>
-            <span>•</span>
-            <span>拖拽节点移动位置</span>
-            <span>•</span>
-            <span>右键空白处添加节点</span>
-          </div>
-          <div className="flex items-center justify-center gap-4">
-            <span>⌨️ <strong>快捷键：</strong></span>
-            <span>ESC 关闭面板</span>
-            <span>•</span>
-            <span>Delete 删除节点</span>
-            <span>•</span>
-            <span>Enter 提交</span>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -243,7 +236,6 @@ function CanvasContent() {
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
         onNodeClick={handleNodeClick}
-        onNodeDoubleClick={handleNodeDoubleClick}
         nodeTypes={memoizedNodeTypes}
         edgeTypes={memoizedEdgeTypes}
         fitView
@@ -327,7 +319,7 @@ function RefreshButton({ isDetailPanelOpen }: { isDetailPanelOpen: boolean }) {
   );
 }
 
-// 按钮容器组件，需要在 ReactFlowProvider 内部
+// 按钮容器组件 - 简化设计，隐藏次要功能
 function TopButtons({ 
   isDetailPanelOpen,
   onPresentationModeChange
@@ -335,8 +327,10 @@ function TopButtons({
   isDetailPanelOpen: boolean;
   onPresentationModeChange: (isOpen: boolean) => void;
 }) {
-  const { nodes, selectedNodeId } = useCanvasStore();
+  const { nodes } = useCanvasStore();
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [isStyleExtractorOpen, setIsStyleExtractorOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const handlePresentationMode = useCallback(() => {
     onPresentationModeChange(true);
@@ -346,39 +340,80 @@ function TopButtons({
     setIsStyleExtractorOpen(true);
   }, []);
 
+  // 点击外部关闭菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowAdvanced(false);
+      }
+    };
+
+    if (showAdvanced) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showAdvanced]);
+
   if (isDetailPanelOpen) return null;
 
   return (
     <>
       <div 
+        ref={menuRef}
         className="fixed top-4 right-4 pointer-events-auto" 
         style={{ 
           zIndex: 9999,
-          maxWidth: 'calc(50vw - 2rem)',
           position: 'fixed',
           isolation: 'isolate',
           transform: 'translateZ(0)',
         }}
       >
-        <div className="p-2 flex gap-2 flex-wrap">
-          <AIConfigButton />
-          <AutoLayoutButtonWrapper />
-          <button
-            onClick={handleStyleExtractor}
-            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all bg-cyan-600 hover:bg-cyan-700 text-white cursor-pointer shadow-lg hover:shadow-xl active:scale-95"
-            title="提取 UI 风格，应用到后续生成的界面"
-            aria-label="UI 风格提取"
-          >
-            🎨 风格提取
-          </button>
-          <button
-            onClick={handlePresentationMode}
-            className="flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-all bg-purple-600 hover:bg-purple-700 text-white cursor-pointer shadow-lg hover:shadow-xl active:scale-95"
-            title={nodes.length > 0 ? "进入演示模式，全屏展示节点" : "进入演示模式（当前无节点）"}
-            aria-label="进入演示模式"
-          >
-            🎥 演示
-          </button>
+        <div className="flex items-center gap-2">
+          {/* 主要功能：演示模式 */}
+          {nodes.length > 0 && (
+            <button
+              onClick={handlePresentationMode}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all bg-cyan-500 hover:bg-cyan-400 text-white shadow-lg hover:shadow-xl active:scale-95"
+              title="进入演示模式"
+              aria-label="进入演示模式"
+            >
+              <Play className="w-4 h-4" />
+              演示
+            </button>
+          )}
+          
+          {/* 高级功能：折叠菜单 */}
+          <div className="relative">
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700"
+              title="更多选项"
+              aria-label="更多选项"
+            >
+              <span className="text-xs">⋯</span>
+            </button>
+            
+            {showAdvanced && (
+              <div className="absolute top-full right-0 mt-2 p-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl min-w-[180px] z-50">
+                <AIConfigButton />
+                <div className="h-px bg-zinc-800 my-2" />
+                <AutoLayoutButtonWrapper />
+                <div className="h-px bg-zinc-800 my-2" />
+                <button
+                  onClick={() => {
+                    handleStyleExtractor();
+                    setShowAdvanced(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+                  title="提取 UI 风格"
+                >
+                  🎨 风格提取
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       {isStyleExtractorOpen && (

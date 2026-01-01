@@ -171,10 +171,10 @@ export function CommandBar() {
           clearLoadingTimers();
           setProgress(0);
           setLoadingStep('');
-          toast.warning('需要更多信息', {
-            description: '请在项目画像页面中补充详细信息',
-            duration: 5000,
-          });
+        toast.info('需要更多信息', {
+          description: '请在项目画像页面补充详细信息',
+          duration: 4000,
+        });
           return;
         }
         
@@ -205,9 +205,9 @@ export function CommandBar() {
         openBlueprint('profile', initialData);
         
         log('✅ [CommandBar] 已打开项目画像页面，提示用户补充信息（但继续生成基础图结构）');
-        toast.info('提示：输入信息可以更明确', {
-          description: '系统将生成基础结构，您可以在项目画像页面补充详细信息后优化',
-          duration: 5000,
+        toast.info('将生成基础结构', {
+          description: '可在项目画像页面补充详细信息',
+          duration: 4000,
         });
         
         // 不再提前返回，继续处理图结构生成
@@ -496,9 +496,9 @@ export function CommandBar() {
         clearLoadingTimers();
         setProgress(0);
         setLoadingStep('');
-        toast.warning('输入信息不够明确', {
-          description: '请在项目画像页面中补充详细信息后重试',
-          duration: 5000,
+        toast.info('输入信息不够明确', {
+          description: '请在项目画像页面补充详细信息',
+          duration: 4000,
         });
         return;
       }
@@ -557,26 +557,29 @@ export function CommandBar() {
         ? error.message 
         : '生成图表失败，请稍后重试';
       
-      // 提供更详细的错误信息
+      // 提供简洁友好的错误信息
       if (error instanceof Error) {
         if (error.message.includes('API_KEY') || error.message.includes('api key')) {
-          errorMessage = '❌ API 密钥未配置\n\n请检查环境变量 OPENAI_API_KEY 是否正确设置';
+          errorMessage = 'API 密钥未配置，请检查环境变量';
         } else if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
-          errorMessage = '⏱️ 请求超时\n\n请检查网络连接，或稍后重试';
+          errorMessage = '请求超时，请检查网络连接';
         } else if (error.message.includes('quota') || error.message.includes('QUOTA') || error.message.includes('429')) {
-          errorMessage = '📊 API 配额已用完\n\n请检查 OpenAI API 配额，或稍后重试';
+          errorMessage = 'API 配额已用完，请稍后重试';
         } else if (error.message.includes('invalid') || error.message.includes('INVALID') || error.message.includes('400')) {
-          errorMessage = `⚠️ 请求参数无效\n\n${error.message}\n\n请检查上传的文件格式是否正确`;
+          errorMessage = '请求参数无效，请检查文件格式';
         } else if (error.message.includes('500') || error.message.includes('Internal')) {
-          errorMessage = '🔧 服务器内部错误\n\n请稍后重试，或联系技术支持';
+          errorMessage = '服务器错误，请稍后重试';
         } else if (error.message.includes('Body exceeded') || error.message.includes('size limit')) {
-          errorMessage = '📦 文件大小超过限制\n\n请尝试上传较小的文件（建议 < 20MB）';
+          errorMessage = '文件过大，请上传小于 20MB 的文件';
         } else {
-          errorMessage = `❌ 生成失败\n\n${error.message}\n\n如果问题持续，请检查：\n1. API 密钥是否正确配置\n2. 网络连接是否正常\n3. 文件大小是否超过限制\n4. 文件格式是否支持`;
+          errorMessage = `生成失败：${error.message}`;
         }
       }
       
-      alert(errorMessage);
+      toast.error('操作失败', {
+        description: errorMessage,
+        duration: 5000,
+      });
       setIsProcessingVideo(false);
       setIsTimeoutOverride(false); // 重置超时覆盖标志
       clearLoadingTimers();
@@ -710,17 +713,10 @@ export function CommandBar() {
         }
       }
       
-      // 使用 toast 显示错误，而不是 alert（更好的 UX）
-      toast.error('更新节点失败', {
-        description: errorMessage.split('\n').slice(0, 3).join('\n'),
-        duration: 8000,
-        action: {
-          label: '查看详情',
-          onClick: () => {
-            logError('完整错误信息:', errorInfo);
-            alert(errorMessage);
-          },
-        },
+      // 使用简洁的错误提示
+      toast.error('更新失败', {
+        description: errorMessage.split('\n')[0],
+        duration: 5000,
       });
       
       setIsProcessingVideo(false);
@@ -749,7 +745,6 @@ export function CommandBar() {
         }
       } else if (!hasContent) {
         toast.error('请输入内容或上传文件', {
-          description: '请填写产品描述或上传参考文件',
           duration: 3000,
         });
       }
@@ -807,10 +802,10 @@ export function CommandBar() {
     timeoutRef.current = setTimeout(() => {
       logWarn('操作超时，自动重置加载状态');
       forceResetLoading();
-      toast.error('⏱️ 操作超时', {
-        description: '请求已超过 300 秒，已自动重置。如果问题持续，请检查网络连接或稍后重试。',
-        duration: 8000,
-      });
+              toast.error('操作超时', {
+                description: '请求已超过 5 分钟，已自动重置',
+                duration: 5000,
+              });
     }, 300000);
     
     // 重置超时覆盖标志（新请求开始时）
@@ -1478,9 +1473,9 @@ Generate the complete .tsx code now.`;
               logError('❌ [CommandBar] 4. API 调用失败 - 请检查 OPENAI_API_KEY 是否正确配置');
               logError('❌ [CommandBar] ====================================');
               
-              toast.error('⏱️ 请求超时', {
-                description: '服务器响应超时。请检查终端日志，确认服务器是否收到请求。',
-                duration: 10000,
+              toast.error('请求超时', {
+                description: '服务器响应超时，请检查网络连接',
+                duration: 5000,
               });
               
               // 重置加载状态，允许用户重新操作
@@ -2311,30 +2306,35 @@ Generate the complete .tsx code now.`;
         </div>
       )}
 
-      {/* 主输入栏 - 简化设计 */}
+      {/* 主输入栏 - 极简设计 */}
       <div className="w-full">
-        {/* 进度条 - 科幻风格 */}
+        {/* 进度条 - 统一视觉语言 */}
         {isLoading && (
-          <div className="mb-2 w-full max-w-3xl mx-auto">
-            <div className="h-0.5 bg-zinc-900/50 rounded-full overflow-hidden backdrop-blur-sm border border-cyan-500/10">
+          <div className="mb-3 w-full max-w-2xl mx-auto">
+            <div className="h-1 bg-zinc-900/50 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300 shadow-[0_0_10px_rgba(6,182,212,0.5)]"
+                className="h-full bg-cyan-500 transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
+            {loadingStep && (
+              <div className="mt-2 text-center text-xs text-zinc-400">
+                {loadingStep}
+              </div>
+            )}
           </div>
         )}
 
-        {/* 主表单容器 */}
-        <div className="w-full max-w-3xl mx-auto">
+        {/* 主表单容器 - 统一视觉语言 */}
+        <div className="w-full max-w-2xl mx-auto">
           <form
             onSubmit={handleSubmit}
-            className={`relative flex items-center gap-3 bg-zinc-950/80 backdrop-blur-xl border rounded-2xl px-4 py-3 transition-all ${
+            className={`relative flex items-center gap-3 bg-zinc-900/95 backdrop-blur-xl border rounded-xl px-6 py-4 shadow-2xl transition-all ${
               isFocused 
-                ? 'border-purple-500/50 shadow-[0_0_20px_rgba(147,51,234,0.15)] ring-1 ring-purple-500/20' 
+                ? 'border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.15)]' 
                 : isDragging
-                ? 'border-purple-500 shadow-[0_0_20px_rgba(147,51,234,0.3)] ring-2 ring-purple-500/50 bg-purple-500/10'
-                : 'border-zinc-800/50 shadow-lg'
+                ? 'border-cyan-500 shadow-[0_0_20px_rgba(6,182,212,0.3)] bg-cyan-500/10'
+                : 'border-zinc-800'
             }`}
             onClick={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
@@ -2448,13 +2448,13 @@ Generate the complete .tsx code now.`;
               aria-label="文件上传输入"
             />
 
-            {/* 附件按钮 */}
+            {/* 附件按钮 - 统一视觉语言 */}
             <button
               type="button"
               onClick={handleAttachClick}
               onMouseDown={(e) => e.stopPropagation()}
               disabled={isLoading}
-              className="p-2.5 text-zinc-400 hover:text-purple-400 hover:bg-purple-500/10 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 self-center"
+              className="p-2.5 text-zinc-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 self-center"
               style={{ pointerEvents: 'auto' }}
               title="上传文件"
               aria-label="上传文件"
@@ -2490,15 +2490,15 @@ Generate the complete .tsx code now.`;
               placeholder={
                 isEditMode && selectedNode
                   ? `编辑 ${selectedNode.data.label}...`
-                  : '描述你的产品想法...'
+                  : '描述你的想法，或拖拽文件到这里'
               }
-              className="flex-1 bg-transparent text-zinc-100 placeholder-zinc-500/60 outline-none text-sm resize-none overflow-y-auto py-2.5 min-h-[72px] max-h-[200px] leading-relaxed"
+              className="flex-1 bg-transparent text-zinc-100 placeholder-zinc-500 outline-none text-base resize-none overflow-y-auto py-2.5 min-h-[60px] max-h-[200px] leading-relaxed"
               style={{ pointerEvents: 'auto' }}
               disabled={isLoading}
               rows={1}
             />
 
-            {/* 发送按钮 */}
+            {/* 发送按钮 - 统一视觉语言 */}
             <button
               type="submit"
               onClick={(e) => e.stopPropagation()}
@@ -2514,11 +2514,11 @@ Generate the complete .tsx code now.`;
                   : "生成新的节点和连接"
               }
               className={`
-                p-2.5 rounded-xl transition-all flex items-center justify-center flex-shrink-0 self-center
+                p-3 rounded-lg transition-all flex items-center justify-center flex-shrink-0 self-center
                 ${
                   hasContent && !isLoading
-                    ? 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 hover:text-cyan-300 cursor-pointer shadow-[0_0_15px_rgba(6,182,212,0.2)] hover:shadow-[0_0_20px_rgba(6,182,212,0.3)] border border-cyan-500/30'
-                    : 'bg-zinc-800/50 text-zinc-500 cursor-not-allowed border border-zinc-700/50'
+                    ? 'bg-cyan-500 hover:bg-cyan-400 text-white cursor-pointer shadow-lg hover:shadow-xl active:scale-95'
+                    : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
                 }
               `}
               style={{ pointerEvents: 'auto' }}
@@ -2532,15 +2532,6 @@ Generate the complete .tsx code now.`;
           </form>
         </div>
 
-        {/* 加载步骤文本 */}
-        {isLoading && loadingStep && (
-          <div className="mt-2 text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-400">
-              <Loader2 className="w-3 h-3 animate-spin" />
-              <span>{loadingStep}</span>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

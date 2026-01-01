@@ -110,9 +110,17 @@ export function NodeDetailPanel() {
   }, [isDetailPanelOpen, closeNodeDetail]);
 
   // 如果面板未打开或没有选中节点，不渲染（必须在所有 hooks 之后）
-  if (!isDetailPanelOpen || !selectedNodeId || !selectedNode) return null;
+  if (!isDetailPanelOpen || !selectedNodeId || !selectedNode || !selectedNode.data) return null;
 
   const { data } = selectedNode;
+  
+  // 确保 artifacts 存在，提供默认值（使用可选链避免错误）
+  const artifacts = data.artifacts || {
+    view: { code: '', previewUrl: undefined },
+    spec: { title: data.label || '未命名节点', requirements: [] },
+    impl: { apiEndpoints: [], dbSchema: '' },
+    test: { cases: [] },
+  };
 
   // --- Actions ---
 
@@ -309,17 +317,17 @@ export function NodeDetailPanel() {
     }
   };
 
-  // 检查 impl 是否为空
-  const isImplEmpty = !data.artifacts.impl || 
-    ((!data.artifacts.impl.apiEndpoints || data.artifacts.impl.apiEndpoints.length === 0) &&
-     (!data.artifacts.impl.dbSchema || 
-      data.artifacts.impl.dbSchema.trim() === '' || 
-      data.artifacts.impl.dbSchema === '-- 将在后续阶段生成' || 
-      data.artifacts.impl.dbSchema === '-- PLACEHOLDER'));
+  // 检查 impl 是否为空（使用安全的 artifacts 访问）
+  const isImplEmpty = !artifacts.impl || 
+    ((!artifacts.impl.apiEndpoints || artifacts.impl.apiEndpoints.length === 0) &&
+     (!artifacts.impl.dbSchema || 
+      artifacts.impl.dbSchema.trim() === '' || 
+      artifacts.impl.dbSchema === '-- 将在后续阶段生成' || 
+      artifacts.impl.dbSchema === '-- PLACEHOLDER'));
 
-  // 检查 test 是否为空
-  const isTestEmpty = !data.artifacts.test || 
-    (!data.artifacts.test.cases || data.artifacts.test.cases.length === 0);
+  // 检查 test 是否为空（使用安全的 artifacts 访问）
+  const isTestEmpty = !artifacts.test || 
+    (!artifacts.test.cases || artifacts.test.cases.length === 0);
 
   // 生成技术架构
   const handleGenerateImpl = async () => {
@@ -524,7 +532,7 @@ export function NodeDetailPanel() {
                 className={clsx(
                   "flex-1 py-3 text-xs font-medium flex items-center justify-center gap-2 border-b-2 transition-colors relative",
                   activeTab === tab.id 
-                    ? "border-blue-500 text-blue-400 bg-blue-500/5" 
+                    ? "border-cyan-500 text-cyan-400 bg-cyan-500/5" 
                     : "border-transparent text-zinc-500 hover:text-zinc-300",
                   tab.isEmpty && "opacity-60"
                 )}
@@ -787,36 +795,36 @@ export function NodeDetailPanel() {
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Live Preview (33.3%) */}
+        {/* RIGHT COLUMN: Live Preview (33.3%) - 统一视觉语言 */}
         <div className="flex flex-col bg-black/20 relative overflow-hidden">
-          {/* Toolbar */}
+          {/* Toolbar - 简化设计 */}
           <div className="h-10 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900/30">
-            <span className="text-xs text-zinc-400 font-mono">Real-time Preview</span>
+            <span className="text-xs text-zinc-400 font-mono">实时预览</span>
             <div className="flex items-center gap-2">
                <button 
                  onClick={() => setZoom(Math.max(0.5, zoom - 0.1))} 
-                 title="缩小预览 (最小 50%)"
-                 className="p-1 hover:bg-zinc-800 rounded text-zinc-400 transition-colors"
+                 title="缩小预览"
+                 className="p-1.5 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-300 transition-colors"
                >
                  <ZoomOut size={14}/>
                </button>
-               <span className="text-xs text-zinc-500 w-8 text-center" title="当前缩放比例">{Math.round(zoom * 100)}%</span>
+               <span className="text-xs text-zinc-500 w-8 text-center">{Math.round(zoom * 100)}%</span>
                <button 
                  onClick={() => setZoom(Math.min(1.5, zoom + 0.1))} 
-                 title="放大预览 (最大 150%)"
-                 className="p-1 hover:bg-zinc-800 rounded text-zinc-400 transition-colors"
+                 title="放大预览"
+                 className="p-1.5 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-300 transition-colors"
                >
                  <ZoomIn size={14}/>
                </button>
                <button 
                  onClick={handleRefineUI} 
                  disabled={isLoading}
-                 title="使用 AI 优化 UI 样式和一致性"
+                 title="优化 UI 样式"
                  className={clsx(
-                   "ml-2 text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors",
+                   "ml-2 text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors",
                    isLoading
-                     ? "bg-indigo-800 text-indigo-300 cursor-not-allowed"
-                     : "bg-indigo-600 text-white hover:bg-indigo-500"
+                     ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                     : "bg-cyan-500 hover:bg-cyan-400 text-white"
                  )}
                >
                   <Wand2 size={10} /> 美化
@@ -824,7 +832,7 @@ export function NodeDetailPanel() {
             </div>
           </div>
 
-          {/* Preview Canvas - 紧凑布局 */}
+          {/* Preview Canvas */}
           <div 
             className="flex-1 overflow-hidden flex justify-center items-start pt-2 pb-2 px-2 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] relative"
           >
