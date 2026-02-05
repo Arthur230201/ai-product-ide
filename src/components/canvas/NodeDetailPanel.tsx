@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
-import { X, Maximize2, Minimize2, Download, Wand2, RefreshCw, FileText, Database, Bug, Play, ZoomIn, ZoomOut, Edit, Eye, FileCheck } from 'lucide-react';
+import { X, Download, Wand2, RefreshCw, FileText, Database, Bug, Play, ZoomIn, ZoomOut, Edit, Eye, FileCheck } from 'lucide-react';
 import { LivePreview } from './LivePreview'; 
 import { SpecViewer } from './SpecViewer';
 import { CommandBar } from './CommandBar';
@@ -12,8 +12,6 @@ import { useServerAction } from 'zsa-react';
 import { generatePageLevelPrd, inferPrdOptions, PrdOptions } from '@/utils/codeToPrdTable';
 import { toast } from 'sonner';
 import { clsx } from 'clsx';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 
 // 简单的编辑器组件
 const EditorSection = ({ value, onChange, onBlur, placeholder }: { value: string, onChange: (v: string) => void, onBlur?: () => void, placeholder: string }) => {
@@ -63,7 +61,7 @@ export function NodeDetailPanel() {
     return Array.isArray(requirements) 
       ? requirements.join('\n') 
       : (requirements || '');
-  }, [requirementsKey]);
+  }, [requirements]);
 
   // 当节点改变或 store 数据改变时，同步本地状态（必须在条件返回之前）
   useEffect(() => {
@@ -84,7 +82,7 @@ export function NodeDetailPanel() {
     } else {
       setTitle('');
     }
-  }, [selectedNodeId, nodeTitleValue]);
+  }, [selectedNodeId, selectedNode, nodeTitleValue]);
 
   // 处理全局ESC键关闭面板（必须在条件返回之前）
   useEffect(() => {
@@ -129,11 +127,13 @@ export function NodeDetailPanel() {
     try {
       const currentCode = data.artifacts.view.code;
       const result = await refineUI(currentCode, "Please refine styling and consistency.");
-      
+      if (!result.ok) {
+        toast.error(`优化失败: ${result.message}`);
+        return;
+      }
       updateNodeData(selectedNode.id, {
-        artifacts: { ...data.artifacts, view: { ...data.artifacts.view, code: result.code } }
+        artifacts: { ...data.artifacts, view: { ...data.artifacts.view, code: result.data.code } }
       });
-      
       toast.success('界面优化完成');
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : '未知错误';
@@ -150,7 +150,7 @@ export function NodeDetailPanel() {
         code: data.artifacts.view.code,
         nodeLabel: data.label || selectedNode.data.label,
         projectMeta: projectMeta,
-        aiConfig: aiConfig, // 传递 AI 模型配置
+        aiConfig: aiConfig,
       });
       updateNodeData(selectedNode.id, {
         artifacts: { ...data.artifacts, spec: { title: result.title, requirements: result.requirements } }
@@ -388,16 +388,18 @@ export function NodeDetailPanel() {
         title: data.artifacts.spec.title || selectedNode.data.label,
         requirements: requirements,
       });
-
+      if (!result.ok) {
+        toast.error(result.message ?? '测试用例生成失败');
+        return;
+      }
+      const cases = result.data.cases || [];
       updateNodeData(selectedNode.id, {
         artifacts: { 
           ...data.artifacts, 
-          test: {
-            cases: result.cases || [],
-          }
+          test: { cases }
         }
       });
-      toast.success(`测试用例生成完成，共生成 ${result.cases.length} 个测试用例`);
+      toast.success(`测试用例生成完成，共生成 ${cases.length} 个测试用例`);
     } catch (e) {
       console.error('Generate test cases error:', e);
       const errorMessage = e instanceof Error ? e.message : '生成失败，请稍后重试';

@@ -1,15 +1,16 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Paperclip, X, Send, Loader2, FileText, Image as ImageIcon, Video, Target } from 'lucide-react';
+import { Paperclip, X, Send, Loader2, FileText, Image as ImageIcon, Video } from 'lucide-react';
 import { useServerAction } from 'zsa-react';
 import { generateGraph } from '@/app/actions/generate-graph';
-import { updateNodeArtifacts, generateUIFromImage, generateUIFromText, generateAnalysisFromCode } from '@/app/actions/node-operations';
+import { updateNodeArtifacts, generateUIFromImage, generateUIFromText, generateAnalysisFromCode, type UIGenerationResponse } from '@/app/actions/node-operations';
 import { useCanvasStore } from '@/store/canvas-store';
 import { toast } from 'sonner';
 import { log, logError, logWarn } from '@/lib/logger';
+import { classifyHTMLFile, getClassificationDescription, type HTMLFileClassificationContext } from '@/utils/html-file-classifier';
+import { parseHTML, generateStructuredInfoText, generateIconMappingInstructions } from '@/utils/html-parser';
 
-type MediaType = 'image' | 'video' | null;
 type AttachmentType = 'media' | 'text' | null;
 
 interface FileAttachment {
@@ -18,6 +19,7 @@ interface FileAttachment {
   content: string;
   preview?: string;
   mimeType?: string; // For PDF and other binary files
+  rawTextContent?: string; // 原始文本内容（用于HTML文件分类分析）
 }
 
 export function CommandBar() {
@@ -454,7 +456,7 @@ export function CommandBar() {
             logError('❌ [CommandBar] 节点添加失败！节点数量不匹配:', {
               expected: nodesBeforeAdd + nodes.length,
               actual: nodesAfterAdd,
-              nodesToAdd: nodes.map(n => ({ id: n.id, label: n.data?.label })),
+              nodesToAdd: (Array.isArray(nodes) ? nodes : []).map(n => ({ id: n.id, label: n.data?.label })),
             });
           }
         } catch (error) {
@@ -553,9 +555,22 @@ export function CommandBar() {
         stack: error instanceof Error ? error.stack : undefined,
       });
       
+      // 处理网络错误（Failed to fetch）
       let errorMessage = error instanceof Error 
         ? error.message 
         : '生成图表失败，请稍后重试';
+      
+      // 检测 Failed to fetch 错误
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('fetch')) {
+        errorMessage = '网络连接失败。请检查：1. 服务器是否正常运行 (npm run dev) 2. 网络连接是否正常 3. 防火墙设置';
+        logError('❌ [CommandBar] ========== 网络错误诊断 ==========');
+        logError('❌ [CommandBar] 网络连接失败，可能的原因：');
+        logError('❌ [CommandBar] 1. 开发服务器未运行 - 请在终端运行: npm run dev');
+        logError('❌ [CommandBar] 2. 服务器端口被占用 - 请检查端口 3000 是否可用');
+        logError('❌ [CommandBar] 3. 网络连接问题 - 请检查网络状态');
+        logError('❌ [CommandBar] 4. 防火墙阻止连接 - 请检查防火墙设置');
+        logError('❌ [CommandBar] ====================================');
+      }
       
       // 提供简洁友好的错误信息
       if (error instanceof Error) {
@@ -597,7 +612,18 @@ export function CommandBar() {
       });
       
       // 检查是否是超时错误（超时错误已经在 catch 块中处理，不应该触发 onError）
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      let errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // 检测 Failed to fetch 错误
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('fetch')) {
+        errorMessage = '网络连接失败。请检查：1. 服务器是否正常运行 2. 网络连接是否正常 3. 防火墙设置';
+        logError('❌ [CommandBar] 网络错误检测:', {
+          errorType: 'NetworkError',
+          errorMessage: errorMessage,
+          suggestion: '请确保开发服务器正在运行 (npm run dev)',
+        });
+      }
+      
       if (errorMessage.includes('请求超时') || errorMessage.includes('timeout')) {
         // 超时错误已经在 catch 块中处理，这里只记录日志，不重置 isTimeoutOverride
         logWarn('⚠️ [CommandBar] 检测到超时错误，但已在 catch 块中处理，跳过 onError 重置');
@@ -621,7 +647,44 @@ export function CommandBar() {
     },
   });
   const { execute: executeAnalysis, isPending: isGeneratingPRD } = useServerAction(generateAnalysisFromCode);
-  const { execute: executeUIText, isPending: isGeneratingUIText } = useServerAction(generateUIFromText);
+  const { execute: executeUIText, isPending: isGeneratingUIText } = useServerAction(generateUIFromText, {
+    onError: (error) => {
+      logError('❌ [CommandBar] executeUIText onError 回调被触发:', error);
+      
+      // 处理网络错误（Failed to fetch）
+      let errorMessage = error instanceof Error ? error.message : '未知错误';
+      
+      // 检测 Failed to fetch 错误
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('fetch')) {
+        errorMessage = '网络连接失败。请检查：1. 服务器是否正常运行 2. 网络连接是否正常 3. 防火墙设置';
+        logError('❌ [CommandBar] 网络错误检测:', {
+          errorType: 'NetworkError',
+          errorMessage: errorMessage,
+          suggestion: '请确保开发服务器正在运行 (npm run dev)',
+        });
+      }
+      
+      toast.error('UI代码生成失败', {
+        description: errorMessage,
+        duration: 8000,
+      });
+      // 重置状态
+      setIsProcessingVideo(false);
+      setIsTimeoutOverride(false);
+      clearLoadingTimers();
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    },
+    onSuccess: (result) => {
+      log('✅ [CommandBar] executeUIText onSuccess 回调被触发:', {
+        resultType: typeof result,
+        isArray: Array.isArray(result),
+        hasCode: !!(result as any)?.code,
+      });
+    },
+  });
 
   // 编辑模式的 action（必须在所有使用它的函数之前定义）
   const { execute: executeUpdate, isPending: isUpdating } = useServerAction(updateNodeArtifacts, {
@@ -736,7 +799,7 @@ export function CommandBar() {
       e.preventDefault();
       e.stopPropagation();
       const hasContent = Boolean(prompt.trim() || attachments.length > 0);
-      const isLoading = isCreating || isUpdating || isProcessingVideo || isGeneratingUIText;
+      const isLoading = isCreating || isUpdating || isProcessingVideo || isGeneratingUI || isGeneratingUIText;
       if (hasContent && !isLoading) {
         // 触发表单提交
         const form = e.currentTarget.closest('form');
@@ -753,7 +816,7 @@ export function CommandBar() {
       e.currentTarget.blur();
     }
     // Shift+Enter 允许默认行为（插入换行）
-  }, [prompt, attachment, isCreating, isUpdating, isProcessingVideo]);
+  }, [prompt, attachments.length, isCreating, isUpdating, isProcessingVideo, isGeneratingUI, isGeneratingUIText]);
 
   // 清理加载定时器
   const clearLoadingTimers = () => {
@@ -798,15 +861,15 @@ export function CommandBar() {
       loadingTimersRef.current = [];
     }
     
-    // 设置超时：300秒后自动重置（防止卡死）
+    // 设置超时：600秒后自动重置（防止卡死）
     timeoutRef.current = setTimeout(() => {
       logWarn('操作超时，自动重置加载状态');
       forceResetLoading();
               toast.error('操作超时', {
-                description: '请求已超过 5 分钟，已自动重置',
+                description: '请求已超过 10 分钟，已自动重置',
                 duration: 5000,
               });
-    }, 300000);
+    }, 600000);
     
     // 重置超时覆盖标志（新请求开始时）
     setIsTimeoutOverride(false);
@@ -949,10 +1012,16 @@ export function CommandBar() {
             reject(new Error(`文件 "${file.name}" 内容为空`));
                 return;
               }
+          
+          // 检查是否为HTML文件
+          const isHTML = file.name.toLowerCase().endsWith('.html') || file.name.toLowerCase().endsWith('.htm');
+          
           resolve({
             name: file.name,
             type: 'text',
             content: textContent,
+            // 对于HTML文件，保存原始文本内容用于分类分析
+            rawTextContent: isHTML ? textContent : undefined,
           });
         };
         reader.onerror = () => reject(new Error(`读取文本文件 "${file.name}" 失败`));
@@ -1091,7 +1160,7 @@ export function CommandBar() {
       
       if (processedAttachments.length === fileArray.length) {
         toast.success(`成功上传 ${processedAttachments.length} 个文件`, {
-          description: processedAttachments.map(a => a.name).join('、'),
+          description: (Array.isArray(processedAttachments) ? processedAttachments : []).map(a => a.name).join('、'),
           duration: 4000,
         });
       } else {
@@ -1311,7 +1380,7 @@ export function CommandBar() {
     e.preventDefault();
     e.stopPropagation();
 
-    const isLoading = isCreating || isUpdating || isProcessingVideo || isGeneratingUIText;
+    const isLoading = isCreating || isUpdating || isProcessingVideo || isGeneratingUI || isGeneratingUIText;
     if (isLoading) {
       toast.info('正在处理中，请稍候...');
       return;
@@ -1338,33 +1407,12 @@ export function CommandBar() {
                       (attachment?.type === 'media' && attachment.preview && !isPDF && !isVideo)) &&
                !isPDF;
 
-      // 调试日志：记录图片检测结果
-      log('🔍 [CommandBar] 图片检测结果:', {
-        hasAttachment: !!attachment,
-        attachmentType: attachment?.type,
-        attachmentMimeType: attachment?.mimeType,
-        hasPreview: !!attachment?.preview,
-        isPDF,
-        isVideo,
-        isImage,
-        hasContent: !!attachment?.content,
-        willUseModelRelay: isImage && !!attachment?.content,
-      });
-
       if (isImage && attachment?.content) {
         // ========== Model Relay 流程：UI 优先，PRD 由用户手动生成 ==========
-        log('🚀 [CommandBar] 开始处理图片生成UI请求');
-        log('📋 [CommandBar] 请求参数:', {
-          prompt: prompt,
-          promptLength: prompt.length,
-          hasAttachment: !!attachment,
-          attachmentType: attachment?.type,
-          attachmentName: attachment?.name,
-          attachmentSize: attachment?.content?.length || 0,
-          isEditMode: isEditMode,
-          selectedNodeId: selectedNodeId,
-          timestamp: new Date().toISOString(),
-        });
+        
+        // 🚨 保存目标节点ID和标签（防止用户在生成过程中切换节点）
+        const targetNodeId = selectedNode.id;
+        const targetNodeLabel = selectedNode.data.label || selectedNode.id;
         
         // 在 try 块外部声明变量，以便在 catch 块中访问
         let accumulatedCode: string = '';
@@ -1372,7 +1420,6 @@ export function CommandBar() {
         
         try {
           // ========== Step 1: 生成 UI 代码（使用高智能视觉模型）==========
-          log('🎨 [CommandBar] Step 1: 开始生成 UI 代码');
           setLoadingStep('🎨 正在生成 UI 代码...');
           setProgress(10);
           
@@ -1413,21 +1460,13 @@ Generate the complete .tsx code now.`;
             }
           }
           
-          log('📤 [CommandBar] 准备调用 executeUI');
-          log('📤 [CommandBar] 调用参数:', {
-            promptLength: optimizedPrompt.length,
-            imageBase64Length: imageBase64Data.length,
-            imageBase64Prefix: imageBase64Data.substring(0, 50),
-            hasDataPrefix: attachment?.content?.includes('data:') || false,
-            timestamp: new Date().toISOString(),
-          });
 
           // zsa-react 的 execute 函数可能返回 [data, error] 数组格式或直接返回数据
           let uiResult: any;
           const executeStartTime = Date.now();
           
-          // 添加请求超时检测（400秒）
-          const requestTimeout = 400000; // 400秒
+          // 添加请求超时检测（10分钟）
+          const requestTimeout = 600000; // 600秒 (10分钟)
           const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => {
               reject(new Error(`请求超时：超过 ${requestTimeout / 1000} 秒未收到服务器响应。请检查：1. 服务器是否正常运行 2. 终端是否有日志输出 3. 网络连接是否正常`));
@@ -1435,23 +1474,75 @@ Generate the complete .tsx code now.`;
           });
           
           try {
-            log('⏳ [CommandBar] 开始执行 executeUI，等待服务器响应...');
-            log('⏳ [CommandBar] 请求超时设置:', `${requestTimeout / 1000}秒`);
-            log('⏳ [CommandBar] 如果超过此时间未响应，请检查终端日志');
+            if (typeof executeUI !== 'function') {
+              throw new Error(`executeUI 不是一个函数: ${typeof executeUI}`);
+            }
             
-            // 使用 Promise.race 来检测超时
             uiResult = await Promise.race([
               executeUI({
                 prompt: optimizedPrompt,
                 imageBase64: imageBase64Data,
-                themeConfig: currentTheme, // 传递当前主题配置
-                aiConfig: aiConfig, // 传递 AI 模型配置
+                themeConfig: currentTheme,
+                aiConfig: aiConfig,
+                generationMode: 'skeleton', // Always use skeleton mode for fast response
+                explicitEnhance: false, // Default: DIRECT mode (no RATIONALIZE)
               }),
               timeoutPromise,
-            ]) as any;
+            ]) as UIGenerationResponse | any;
             
             const executeDuration = Date.now() - executeStartTime;
-            log(`✅ [CommandBar] executeUI 执行成功，耗时: ${executeDuration}ms`);
+            log(`✅ [CommandBar] executeUI 完成，耗时: ${executeDuration}ms`);
+            
+            // Handle typed response
+            if (uiResult && typeof uiResult === 'object' && 'type' in uiResult) {
+              const response = uiResult as UIGenerationResponse;
+              
+              if (response.type === 'rate_limit') {
+                toast.error('请求过多', {
+                  description: `请在 ${response.cooldownSeconds} 秒后重试`,
+                  duration: 5000,
+                });
+                forceResetLoading();
+                return;
+              }
+              
+              if (response.type === 'network_error') {
+                toast.error('网络不稳定', {
+                  description: response.message,
+                  duration: 5000,
+                });
+                forceResetLoading();
+                return;
+              }
+              
+              if (response.type === 'validation_error' || response.type === 'api_error') {
+                toast.error('生成失败', {
+                  description: response.message,
+                  duration: 5000,
+                });
+                forceResetLoading();
+                return;
+              }
+              
+              // For skeleton or success, extract code
+              if (response.type === 'skeleton' || response.type === 'success') {
+                accumulatedCode = response.code;
+                fullCode = response.code;
+                log('✅ [CommandBar] UI代码生成成功 (skeleton/success)', {
+                  type: response.type,
+                  codeLength: response.code.length,
+                  requestId: response.requestId,
+                  stages: response.stages,
+                });
+                // Continue with normal flow below
+              } else {
+                // Unknown response type (runtime fallback)
+                const r = response as { type?: string };
+                logError('❌ [CommandBar] 未知的响应类型', { type: r.type });
+                forceResetLoading();
+                return;
+              }
+            }
           } catch (executeError: any) {
             const executeDuration = Date.now() - executeStartTime;
             logError(`❌ [CommandBar] executeUI 执行失败，耗时: ${executeDuration}ms`);
@@ -1462,8 +1553,29 @@ Generate the complete .tsx code now.`;
               errorStack: executeError instanceof Error ? executeError.stack : undefined,
             });
             
-            // 检查是否是超时错误
-            const errorMessage = executeError?.message || executeError?.error || String(executeError);
+            // 检查是否是超时错误或网络错误
+            let errorMessage = executeError?.message || executeError?.error || String(executeError);
+            
+            // 检测 Failed to fetch 错误
+            if (errorMessage.includes('Failed to fetch') || errorMessage.includes('fetch')) {
+              errorMessage = '网络连接失败。请检查：1. 服务器是否正常运行 (npm run dev) 2. 网络连接是否正常 3. 防火墙设置';
+              logError('❌ [CommandBar] ========== 网络错误诊断 ==========');
+              logError('❌ [CommandBar] 网络连接失败，可能的原因：');
+              logError('❌ [CommandBar] 1. 开发服务器未运行 - 请在终端运行: npm run dev');
+              logError('❌ [CommandBar] 2. 服务器端口被占用 - 请检查端口 3000 是否可用');
+              logError('❌ [CommandBar] 3. 网络连接问题 - 请检查网络状态');
+              logError('❌ [CommandBar] 4. 防火墙阻止连接 - 请检查防火墙设置');
+              logError('❌ [CommandBar] ====================================');
+              
+              toast.error('网络连接失败', {
+                description: '无法连接到服务器。请确保开发服务器正在运行 (npm run dev)',
+                duration: 8000,
+              });
+              
+              forceResetLoading();
+              return;
+            }
+            
             if (errorMessage.includes('请求超时') || errorMessage.includes('timeout')) {
               logError('❌ [CommandBar] ========== 诊断信息 ==========');
               logError('❌ [CommandBar] 请求超时，可能的原因：');
@@ -1569,16 +1681,29 @@ Generate the complete .tsx code now.`;
           accumulatedCode = fullCode;
 
           // 立即更新 UI 代码到节点（用户可以看到 UI 立即出现）
+          // 使用保存的目标节点ID，确保即使切换节点也能更新到正确的节点
           log('💾 [CommandBar] 立即保存UI代码到store:', {
-            nodeId: selectedNode.id,
+            nodeId: targetNodeId,
+            nodeLabel: targetNodeLabel,
             codeLength: accumulatedCode.length,
             codePreview: accumulatedCode.substring(0, 100),
             hasPreviewUrl: !!attachment?.preview,
           });
           
-          updateNodeData(selectedNode.id, {
+          // 从store获取最新的节点数据，确保使用最新的artifacts
+          const latestNode = useCanvasStore.getState().nodes.find(n => n.id === targetNodeId);
+          if (!latestNode) {
+            logError('❌ [CommandBar] 找不到目标节点:', { targetNodeId });
+            toast.error('节点不存在', {
+              description: '目标节点已不存在，无法保存UI代码',
+              duration: 3000,
+            });
+            return;
+          }
+          
+          updateNodeData(targetNodeId, {
             artifacts: {
-              ...selectedNode.data.artifacts,
+              ...latestNode.data.artifacts,
               view: {
                 code: accumulatedCode,
                 previewUrl: attachment?.preview,
@@ -1588,14 +1713,16 @@ Generate the complete .tsx code now.`;
           
           // 验证保存是否成功
           setTimeout(() => {
-            const savedNode = nodes.find(n => n.id === selectedNode.id);
+            const savedNode = useCanvasStore.getState().nodes.find(n => n.id === targetNodeId);
             if (savedNode) {
               log('✅ [CommandBar] UI代码保存验证:', {
-                nodeId: selectedNode.id,
+                nodeId: targetNodeId,
                 savedCodeLength: savedNode.data.artifacts?.view?.code?.length || 0,
                 savedCodePreview: savedNode.data.artifacts?.view?.code?.substring(0, 100) || 'N/A',
                 isMatch: savedNode.data.artifacts?.view?.code === accumulatedCode,
               });
+            } else {
+              logError('❌ [CommandBar] UI代码保存验证失败：找不到节点:', { targetNodeId });
             }
           }, 100);
 
@@ -1701,6 +1828,476 @@ Generate the complete .tsx code now.`;
         }
       }
 
+      // ========== 检测HTML文件并使用分类器判断用途 ==========
+      // 查找HTML文件（文本类型，文件名以.html或.htm结尾）
+      const htmlAttachments = attachments.filter(att => {
+        const fileName = att.name.toLowerCase();
+        return att.type === 'text' && (fileName.endsWith('.html') || fileName.endsWith('.htm'));
+      });
+
+      // 如果存在HTML文件，使用分类器判断用途
+      if (htmlAttachments.length > 0) {
+        const htmlAttachment = htmlAttachments[0]; // 处理第一个HTML文件
+        const htmlContent = htmlAttachment.rawTextContent || htmlAttachment.content;
+        
+        log('🔍 [CommandBar] 检测到HTML文件，开始分类:', {
+          fileName: htmlAttachment.name,
+          hasRawTextContent: !!htmlAttachment.rawTextContent,
+          contentLength: htmlContent?.length || 0,
+        });
+
+        const classificationContext: HTMLFileClassificationContext = {
+          userPrompt: prompt.trim(),
+          isEditMode: isEditMode,
+          htmlContent: htmlContent,
+          fileName: htmlAttachment.name,
+        };
+
+        const htmlPurpose = classifyHTMLFile(classificationContext);
+        const purposeDescription = getClassificationDescription(htmlPurpose);
+        
+        log('✅ [CommandBar] HTML文件分类结果:', {
+          fileName: htmlAttachment.name,
+          purpose: htmlPurpose,
+          description: purposeDescription,
+        });
+
+        // 根据分类结果处理
+        if (htmlPurpose === 'ui-mockup') {
+          // UI示意文件：使用 generateUIFromText，将HTML内容作为参考
+          log('🎨 [CommandBar] HTML文件识别为UI示意，使用 generateUIFromText');
+          setLoadingStep('🎨 正在基于HTML生成UI代码...');
+          setProgress(10);
+          
+          // 清除之前的超时定时器
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+          
+          // 设置超时时间（600秒，10分钟）
+          const uiGenerationTimeout = 600000;
+          timeoutRef.current = setTimeout(() => {
+            logWarn('⚠️ [CommandBar] UI生成超时，自动重置加载状态');
+            forceResetLoading();
+            toast.error('⏱️ UI生成超时', {
+              description: 'UI生成已超过 10 分钟，已自动重置。如果问题持续，请检查网络连接或稍后重试。',
+              duration: 8000,
+            });
+          }, uiGenerationTimeout);
+          
+          try {
+            // 分析用户意图：判断是"复刻"还是"改进"
+            const userPromptLower = prompt.trim().toLowerCase();
+            const isExactClone = userPromptLower.includes('复刻') || 
+                                 userPromptLower.includes('还原') ||
+                                 userPromptLower.includes('复制') ||
+                                 userPromptLower.includes('一模一样') ||
+                                 userPromptLower.includes('精确') ||
+                                 userPromptLower.includes('完全按照') ||
+                                 userPromptLower.includes('保持原样');
+            
+            const isImprovement = userPromptLower.includes('改进') || 
+                                  userPromptLower.includes('优化') ||
+                                  userPromptLower.includes('美化') ||
+                                  userPromptLower.includes('升级') ||
+                                  userPromptLower.includes('现代化') ||
+                                  userPromptLower.includes('优化设计');
+            
+            // 默认策略：如果用户没有明确要求，对于完整HTML文件倾向于复刻，对于线框图倾向于改进
+            const isWireframe = htmlContent.includes('手绘') || 
+                               htmlContent.includes('wireframe') ||
+                               htmlContent.includes('sketch') ||
+                               htmlContent.length < 5000; // 很短的HTML可能是简单线框图
+            
+            const shouldExactClone = isExactClone || (!isImprovement && !isWireframe);
+            
+            log('🔍 [CommandBar] HTML文件处理意图分析:', {
+              userPrompt: prompt.trim(),
+              isExactClone,
+              isImprovement,
+              isWireframe,
+              shouldExactClone,
+              htmlContentLength: htmlContent.length,
+            });
+            
+            // 增加HTML内容长度限制到100000字符，确保完整传递（支持大型HTML文件）
+            const htmlContentForPrompt = htmlContent.substring(0, 100000);
+            const isTruncated = htmlContent.length > 100000;
+            
+            // 解析HTML提取关键信息（用于精确复刻）
+            const parsedInfo = parseHTML(htmlContent);
+            const structuredInfo = generateStructuredInfoText(parsedInfo);
+            const iconMapping = generateIconMappingInstructions(parsedInfo);
+            
+            log('📊 [CommandBar] HTML解析结果:', {
+              backgroundColors: parsedInfo.backgroundColors?.all?.length || 0,
+              textColors: parsedInfo.textColors?.all?.length || 0,
+              materialIcons: parsedInfo.icons?.materialIcons?.length || 0,
+              customClasses: parsedInfo.customClasses?.length || 0,
+              hasDarkMode: parsedInfo.hasDarkMode || false,
+              textContent: {
+                buttons: parsedInfo.textContent?.buttons?.length || 0,
+                labels: parsedInfo.textContent?.labels?.length || 0,
+                menuItems: parsedInfo.textContent?.menuItems?.length || 0,
+                cardTitles: parsedInfo.textContent?.cardTitles?.length || 0,
+                cardContent: parsedInfo.textContent?.cardContent?.length || 0,
+                allTextLength: parsedInfo.textContent?.allText?.length || 0,
+              },
+              domStructureLength: parsedInfo.domStructure?.length || 0,
+            });
+            
+            // 根据用户意图构建不同的提示词
+            let htmlReferencePrompt: string;
+            
+            if (shouldExactClone) {
+              // 精确复刻模式 - 使用解析出的结构化信息
+              htmlReferencePrompt = `**任务：精确复刻HTML文件为React组件（100%一致）**
+
+用户上传了一个HTML文件，要求精确复刻其UI设计，包括所有颜色、布局、样式、字体、图标等细节。
+
+文件名：${htmlAttachment.name}
+
+HTML完整内容：
+\`\`\`html
+${htmlContentForPrompt}${isTruncated ? '\n\n...(内容已截断，但请基于已有内容尽可能精确复刻)' : ''}
+\`\`\`
+
+${prompt.trim() ? `用户额外要求：${prompt.trim()}` : ''}
+
+**=== HTML解析结果（必须严格遵守） ===**
+
+${structuredInfo}
+
+${iconMapping}
+
+**=== 核心要求（必须严格遵守 - 精确复刻模式） ===**
+
+1. **精确复刻原则（最高优先级）**：
+   - **必须100%忠实还原HTML文件的所有视觉元素**，包括：
+     - **DOM结构**：**必须严格按照**上述解析结果中的DOM结构树生成React组件，不能改变容器层次、嵌套关系和元素顺序
+     - **背景色**：**必须使用**上述解析结果中的背景色，不能改变或替换
+     - **文本颜色**：**必须使用**上述解析结果中的文本颜色，确保文本在背景上清晰可见
+     - **字体大小**：**必须使用**上述解析结果中的字体大小类名
+     - **布局结构**：精确匹配HTML的DOM结构、容器层次、Flex/Grid布局
+     - **间距**：精确匹配 padding、margin、gap 值（使用解析结果中的间距类名）
+     - **圆角和阴影**：精确匹配 rounded 和 shadow 类名（使用解析结果中的样式类名）
+     - **边框和定位**：精确匹配 border 和 position 类名（使用解析结果中的样式类名）
+     - **图标**：**必须使用**上述图标映射关系，不能自行选择其他图标
+     - **尺寸**：精确匹配 width、height 类名（使用解析结果中的尺寸类名）
+
+2. **颜色处理（严格）**：
+   - **必须使用**解析结果中提取的颜色值，不能改变或替换
+   - 如果HTML使用了自定义Tailwind颜色（如 \`bg-background-light\`），**必须使用相同的颜色值**（如 \`bg-[#F3F4F6]\`）
+   - 如果HTML中有颜色定义，必须使用相同的颜色值
+   - **文本颜色与背景色匹配**：确保所有文本在背景上清晰可见（浅色背景用深色文本，深色背景用浅色文本）
+
+3. **图标处理（严格）**：
+   - **如果HTML中使用的是 Material Icons**（如 \`<span class="material-icons-round">icon_name</span>\`）：**必须保留为 Material Icons 格式**，使用 \`<span className="material-icons-round">icon_name</span>\`，**不要替换为 Lucide 图标**
+   - **如果HTML中使用的是其他图标**：使用上述图标映射关系转换为 Lucide 图标
+   - 确保图标的视觉样式（大小、颜色、位置）与HTML完全一致
+   - **HTML 转 React 时**：将 \`class\` 改为 \`className\`，但**保持 Material Icons 格式不变**
+
+4. **布局结构精确还原（关键）**：
+   - **必须严格按照**上述解析结果中的DOM结构树生成React组件
+   - 精确匹配所有容器的类名和样式（使用解析结果中的所有类名）
+   - 精确匹配上述解析结果中的布局信息（Flex/Grid/间距）
+   - **不能简化或合并**容器结构，必须保持与HTML完全一致的嵌套层次
+   - **不能改变**元素的顺序和位置关系
+
+5. **自定义CSS样式**：
+   - 如果HTML中有自定义CSS类（如上述解析结果中的自定义类），**必须在代码中实现相同的样式**
+   - 可以使用内联样式或style标签（如果Tailwind无法实现）
+   - 必须包含所有自定义样式，不能省略
+
+6. **深色模式支持**：
+   ${parsedInfo.hasDarkMode ? '- HTML支持深色模式，生成的代码也必须支持深色模式\n   - 使用 \`dark:\` 前缀实现深色模式样式\n   - 默认显示模式必须与HTML一致（通常是浅色模式）' : '- HTML不支持深色模式，生成的代码也不需要支持深色模式'}
+
+7. **技术实现要求**：
+   - 使用React + Tailwind CSS
+   - 使用React Hooks管理状态（useState, useEffect等）
+   - 所有交互元素必须可交互
+   - 代码必须可以直接运行
+
+8. **代码格式要求**：
+   - 只返回完整的 .tsx 代码
+   - 不要包含markdown标记（\`\`\`tsx等）
+   - 不要包含注释或说明文字
+
+**=== 重要提醒（必须遵守） ===**
+- **不要"改进"或"优化"设计**，必须精确复刻
+- **不要改变颜色方案**（即使是浅灰色背景也要保持）
+- **不要简化布局结构**，必须保持与HTML完全一致的嵌套层次
+- **不要合并或拆分容器**，必须保持与HTML完全一致的元素结构
+- **必须包含所有自定义样式**
+- **必须使用解析结果中的颜色、字体、图标、样式信息**，不能自行选择
+- **必须严格按照DOM结构树生成代码**，不能改变元素顺序和层次关系
+
+**=== 复刻检查清单（生成代码前必须验证） ===**
+- [ ] DOM结构是否与HTML完全一致（容器层次、嵌套关系、元素顺序）
+- [ ] 背景色是否使用了解析结果中的颜色值
+- [ ] 文本颜色是否使用了解析结果中的颜色值，且确保在背景上清晰可见
+- [ ] 字体大小是否使用了解析结果中的类名
+- [ ] 布局（Flex/Grid）是否使用了解析结果中的类名
+- [ ] 间距（padding/margin/gap）是否使用了解析结果中的类名
+- [ ] 圆角、阴影、边框是否使用了解析结果中的类名
+- [ ] 图标是否使用了映射关系中的Lucide图标
+- [ ] 自定义CSS类是否都已实现
+- [ ] 所有视觉元素（颜色、大小、位置、间距）是否与HTML完全一致
+
+请基于上述HTML内容和解析结果，生成一个100%精确复刻的React组件代码。`;
+            } else {
+              // 改进/优化模式（或线框图模式）
+              htmlReferencePrompt = `**任务：基于HTML文件生成优化的React组件**
+
+用户上传了一个HTML文件${isWireframe ? '（线框图）' : ''}，要求基于此生成或改进React组件代码。
+
+文件名：${htmlAttachment.name}
+
+HTML内容：
+\`\`\`html
+${htmlContentForPrompt}${isTruncated ? '\n\n...(内容已截断)' : ''}
+\`\`\`
+
+${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件生成现代化的React组件代码。'}
+
+**核心要求：**
+
+1. **理解HTML结构**：
+   - 分析HTML文件的布局结构和功能模块
+   - 理解页面的核心功能和用户场景
+   - ${isWireframe ? '如果这是线框图，需要在保持基本布局的前提下，完善视觉设计和交互细节' : '如果HTML是完整的设计，可以在保持核心布局的基础上进行优化'}
+
+2. **设计改进（如果适用）**：
+   - ${isImprovement ? '根据用户要求进行设计改进和优化' : '保持HTML的核心布局和功能结构'}
+   - 使用现代化的UI设计模式
+   - 优化颜色方案、间距、圆角等视觉元素
+   - 确保响应式设计和移动端友好
+
+3. **技术实现要求**：
+   - 使用React + Tailwind CSS
+   - 使用React Hooks管理状态（useState, useEffect等）
+   - **图标处理规则**：
+     - **如果HTML使用 Material Icons**（如 \`material-icons-round\`）：**必须保留为 Material Icons 格式**，使用 \`<span className="material-icons-round">icon_name</span>\`，**不要替换为 Lucide 图标**
+     - **如果HTML使用其他图标**：使用 Lucide React 图标库，选择最接近的图标
+     - **HTML 转 React 时**：将 \`class\` 改为 \`className\`，但**保持 Material Icons 格式不变**
+   - 所有交互元素必须可交互
+   - 添加hover和active状态的视觉反馈
+
+4. **背景色和文本颜色（重要）**：
+   - **默认使用白色背景**（\`bg-white\`），除非用户明确要求其他颜色
+   - **所有文本元素必须明确设置Tailwind的text-*颜色类名**
+   - 在白色背景上，文本颜色必须足够深（至少 \`text-gray-600\` 或更深）
+
+5. **代码格式要求**：
+   - 只返回完整的 .tsx 代码
+   - 不要包含markdown标记
+   - 不要包含注释或说明文字
+   - **所有文本内容必须使用中文**
+
+请基于上述HTML内容，生成一个${isImprovement ? '优化改进后的' : '现代化的'}React组件代码。`;
+            }
+
+            // 🚨 保存目标节点ID和标签（防止用户在生成过程中切换节点）
+            const targetNodeId = selectedNode.id;
+            const targetNodeLabel = selectedNode.data.label || selectedNode.id;
+            
+            // 🚨 添加调用前日志和状态检查
+            log('🚀 [CommandBar] 准备调用 executeUIText...');
+            log('📋 [CommandBar] executeUIText 调用参数:', {
+              promptLength: htmlReferencePrompt.length,
+              promptPreview: htmlReferencePrompt.substring(0, 200),
+              nodeLabel: targetNodeLabel,
+              targetNodeId: targetNodeId,
+              hasProjectMeta: !!useCanvasStore.getState().projectMeta,
+              hasThemeConfig: !!currentTheme,
+              hasAIConfig: !!aiConfig,
+              timestamp: new Date().toISOString(),
+            });
+            
+            setLoadingStep('🤖 正在调用AI生成UI代码...');
+            setProgress(20);
+            
+            // 🚨 添加超时检测
+            const callStartTime = Date.now();
+            let uiResult: any;
+            
+            try {
+              log('⏱️ [CommandBar] executeUIText 调用开始，时间戳:', callStartTime);
+              log('🔍 [CommandBar] executeUIText 函数检查:', {
+                isFunction: typeof executeUIText === 'function',
+                isUndefined: typeof executeUIText === 'undefined',
+                isNull: executeUIText === null,
+              });
+              
+              // CRITICAL: 在调用前输出日志，确认客户端代码正在执行
+              console.log('📤 [CommandBar] 准备调用 executeUIText，参数:', {
+                promptLength: htmlReferencePrompt.length,
+                nodeLabel: targetNodeLabel,
+                hasProjectMeta: !!useCanvasStore.getState().projectMeta,
+                hasThemeConfig: !!currentTheme,
+                hasAiConfig: !!aiConfig,
+              });
+              
+              if (typeof executeUIText !== 'function') {
+                throw new Error(`executeUIText 不是一个函数: ${typeof executeUIText}`);
+              }
+              
+              uiResult = await executeUIText({
+                prompt: htmlReferencePrompt,
+                nodeLabel: targetNodeLabel,
+                projectMeta: useCanvasStore.getState().projectMeta,
+                themeConfig: currentTheme,
+                aiConfig: aiConfig,
+              });
+              
+              const callDuration = Date.now() - callStartTime;
+              log('✅ [CommandBar] executeUIText 调用完成，耗时:', callDuration, 'ms');
+              
+            } catch (executeError: any) {
+              const callDuration = Date.now() - callStartTime;
+              logError('❌ [CommandBar] executeUIText 调用失败，耗时:', callDuration, 'ms');
+              logError('❌ [CommandBar] executeUIText 错误详情:', executeError);
+              
+              // 检查是否是网络错误（Failed to fetch）
+              let errorMessage = executeError?.message || executeError?.error || String(executeError);
+              
+              if (errorMessage.includes('Failed to fetch') || errorMessage.includes('fetch')) {
+                errorMessage = '网络连接失败。请检查：1. 服务器是否正常运行 (npm run dev) 2. 网络连接是否正常 3. 防火墙设置';
+                logError('❌ [CommandBar] ========== 网络错误诊断 ==========');
+                logError('❌ [CommandBar] 网络连接失败，可能的原因：');
+                logError('❌ [CommandBar] 1. 开发服务器未运行 - 请在终端运行: npm run dev');
+                logError('❌ [CommandBar] 2. 服务器端口被占用 - 请检查端口 3000 是否可用');
+                logError('❌ [CommandBar] 3. 网络连接问题 - 请检查网络状态');
+                logError('❌ [CommandBar] 4. 防火墙阻止连接 - 请检查防火墙设置');
+                logError('❌ [CommandBar] ====================================');
+                
+                toast.error('网络连接失败', {
+                  description: '无法连接到服务器。请确保开发服务器正在运行 (npm run dev)',
+                  duration: 8000,
+                });
+                
+                // 重置状态
+                setIsProcessingVideo(false);
+                setIsTimeoutOverride(false);
+                clearLoadingTimers();
+                if (timeoutRef.current) {
+                  clearTimeout(timeoutRef.current);
+                  timeoutRef.current = null;
+                }
+                return;
+              }
+              
+              // 重新抛出错误，让外层 catch 处理
+              throw executeError;
+            }
+            
+            // 处理返回结果（与原有逻辑相同）
+            log('📥 [CommandBar] executeUIText 原始返回:', {
+              result: uiResult,
+              resultType: typeof uiResult,
+              isArray: Array.isArray(uiResult),
+            });
+            
+            let uiCode = '';
+            if (Array.isArray(uiResult)) {
+              uiCode = uiResult[0]?.code || uiResult[0] || '';
+            } else if (uiResult && typeof uiResult === 'object') {
+              uiCode = (uiResult as any).code || '';
+            }
+            
+            if (uiCode && uiCode.length > 50) {
+              // 更新节点的 view.code（使用保存的目标节点ID，确保即使切换节点也能更新到正确的节点）
+              updateNodeData(targetNodeId, {
+                artifacts: {
+                  view: {
+                    code: uiCode,
+                  },
+                },
+              });
+              
+              setLoadingStep('✅ UI代码生成完成');
+              setProgress(100);
+              toast.success('UI代码生成成功', {
+                description: `已基于HTML文件为"${targetNodeLabel}"生成UI代码`,
+                duration: 3000,
+              });
+              
+              // 清除超时定时器
+              if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+                timeoutRef.current = null;
+              }
+              
+              // 重置状态
+              setPrompt('');
+              setAttachment(null);
+              setAttachments([]);
+              setIsProcessingVideo(false);
+              setIsTimeoutOverride(false);
+              clearLoadingTimers();
+              if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+              }
+              if (textareaRef.current) {
+                textareaRef.current.style.height = 'auto';
+              }
+              return; // 成功生成UI，直接返回
+            } else {
+              logWarn('⚠️ [CommandBar] UI代码生成失败或为空');
+              toast.warning('UI代码生成失败', {
+                description: '生成的代码为空，请重试',
+                duration: 3000,
+              });
+              // 清除超时定时器
+              if (timeoutRef.current) {
+                clearTimeout(timeoutRef.current);
+                timeoutRef.current = null;
+              }
+              setIsProcessingVideo(false);
+              setIsTimeoutOverride(false);
+              clearLoadingTimers();
+              return;
+            }
+          } catch (error: any) {
+            logError('❌ [CommandBar] UI代码生成失败:', error);
+            
+            // 处理网络错误（Failed to fetch）
+            let errorMessage = error instanceof Error ? error.message : '未知错误';
+            
+            // 检测 Failed to fetch 错误
+            if (errorMessage.includes('Failed to fetch') || errorMessage.includes('fetch')) {
+              errorMessage = '网络连接失败。请检查：1. 服务器是否正常运行 (npm run dev) 2. 网络连接是否正常 3. 防火墙设置';
+              logError('❌ [CommandBar] ========== 网络错误诊断 ==========');
+              logError('❌ [CommandBar] 网络连接失败，可能的原因：');
+              logError('❌ [CommandBar] 1. 开发服务器未运行 - 请在终端运行: npm run dev');
+              logError('❌ [CommandBar] 2. 服务器端口被占用 - 请检查端口 3000 是否可用');
+              logError('❌ [CommandBar] 3. 网络连接问题 - 请检查网络状态');
+              logError('❌ [CommandBar] 4. 防火墙阻止连接 - 请检查防火墙设置');
+              logError('❌ [CommandBar] ====================================');
+            }
+            
+            toast.error('UI代码生成失败', {
+              description: errorMessage,
+              duration: 8000,
+            });
+            // 清除超时定时器
+            if (timeoutRef.current) {
+              clearTimeout(timeoutRef.current);
+              timeoutRef.current = null;
+            }
+            setIsProcessingVideo(false);
+            setIsTimeoutOverride(false);
+            clearLoadingTimers();
+            return;
+          }
+        } else {
+          // project-info 或 uncertain：走 updateNodeArtifacts 流程
+          log('📄 [CommandBar] HTML文件识别为项目信息，使用 updateNodeArtifacts 流程');
+          // 继续执行后面的 updateNodeArtifacts 逻辑
+        }
+      }
+
       // ========== 检查用户意图：是否要求生成UI ==========
       // 如果用户提示词中包含"生成UI"、"生成本页面"等关键词，且没有图片，则使用 generateUIFromText
       const userPromptLower = prompt.trim().toLowerCase();
@@ -1764,63 +2361,128 @@ Generate the complete .tsx code now.`;
         }, uiGenerationTimeout);
         
         try {
+          // 🚨 保存目标节点ID和标签（防止用户在生成过程中切换节点）
+          const targetNodeId = selectedNode.id;
+          const targetNodeLabel = selectedNode.data.label || selectedNode.id;
+          
+          // 🚨 添加调用前日志
+          log('🚀 [CommandBar] 准备调用 executeUIText (文本模式)...');
+          log('📋 [CommandBar] executeUIText 调用参数 (文本模式):', {
+            promptLength: (prompt.trim() || `请为"${targetNodeLabel}"页面生成完整的React组件代码，包含现代化的UI设计和完整的交互功能。`).length,
+            nodeLabel: targetNodeLabel,
+            targetNodeId: targetNodeId,
+            hasProjectMeta: !!useCanvasStore.getState().projectMeta,
+            hasThemeConfig: !!currentTheme,
+            hasAIConfig: !!aiConfig,
+            timestamp: new Date().toISOString(),
+          });
+          
+          setLoadingStep('🤖 正在调用AI生成UI代码...');
+          setProgress(20);
+          
+          const callStartTime = Date.now();
+          log('⏱️ [CommandBar] executeUIText 调用开始 (文本模式)，时间戳:', callStartTime);
+          
+          // 验证 executeUIText 函数是否存在
+          if (typeof executeUIText !== 'function') {
+            throw new Error(`executeUIText 不是一个函数: ${typeof executeUIText}。请检查 useServerAction 是否正确初始化。`);
+          }
+          
+          console.log('✅ [CommandBar] executeUIText 函数验证通过 (文本模式)，开始调用...');
+          
           const uiResult = await executeUIText({
-            prompt: prompt.trim() || `请为"${selectedNode.data.label}"页面生成完整的React组件代码，包含现代化的UI设计和完整的交互功能。`,
-            nodeLabel: selectedNode.data.label || selectedNode.id,
+            prompt: prompt.trim() || `请为"${targetNodeLabel}"页面生成完整的React组件代码，包含现代化的UI设计和完整的交互功能。`,
+            nodeLabel: targetNodeLabel,
             projectMeta: useCanvasStore.getState().projectMeta,
             themeConfig: currentTheme,
             aiConfig: aiConfig,
+            generationMode: 'skeleton', // Always use skeleton mode for fast response
+            explicitEnhance: false, // Default: DIRECT mode (no RATIONALIZE)
           });
           
-          // 处理返回结果
-          log('📥 [CommandBar] executeUIText 原始返回:', {
-            result: uiResult,
-            resultType: typeof uiResult,
-            isArray: Array.isArray(uiResult),
-            arrayLength: Array.isArray(uiResult) ? uiResult.length : undefined,
-            keys: uiResult && typeof uiResult === 'object' ? Object.keys(uiResult) : [],
-          });
+          const callDuration = Date.now() - callStartTime;
+          log('✅ [CommandBar] executeUIText 调用完成 (文本模式)，耗时:', callDuration, 'ms');
           
-          let uiCode = '';
-          if (Array.isArray(uiResult)) {
-            uiCode = uiResult[0]?.code || uiResult[0] || '';
-            log('📦 [CommandBar] 检测到数组格式返回，提取code:', {
-              hasFirstElement: !!uiResult[0],
-              firstElementType: typeof uiResult[0],
-              firstElementKeys: uiResult[0] && typeof uiResult[0] === 'object' ? Object.keys(uiResult[0]) : [],
-              extractedCode: uiCode.substring(0, 100),
+          // Handle discriminated union response
+          if (!uiResult || typeof uiResult !== 'object' || !('type' in uiResult)) {
+            logError('❌ [CommandBar] 返回格式错误：不是有效的响应对象', { uiResult });
+            toast.error('返回格式错误', {
+              description: '服务器返回了无效的响应格式',
+              duration: 5000,
             });
-          } else if (uiResult && typeof uiResult === 'object') {
-            uiCode = (uiResult as any).code || '';
-            log('📦 [CommandBar] 检测到对象格式返回，提取code:', {
-              hasCode: !!(uiResult as any).code,
-              codeType: typeof (uiResult as any).code,
-              codeLength: (uiResult as any).code?.length || 0,
-              extractedCode: uiCode.substring(0, 100),
-            });
-          } else {
-            logWarn('⚠️ [CommandBar] 未知的返回格式:', {
-              result: uiResult,
-              resultType: typeof uiResult,
-            });
+            forceResetLoading();
+            return;
           }
           
-          log('🔍 [CommandBar] 提取的UI代码:', {
-            codeLength: uiCode.length,
-            codePreview: uiCode.substring(0, 200),
-            isValid: uiCode && uiCode.length > 50,
-          });
+          const response = uiResult as UIGenerationResponse;
           
-          if (uiCode && uiCode.length > 50) {
-            // 更新节点的 view.code
-            log('💾 [CommandBar] 准备更新节点:', {
-              nodeId: selectedNode.id,
-              nodeLabel: selectedNode.data.label,
-              codeLength: uiCode.length,
-              codePreview: uiCode.substring(0, 100),
-            });
+          // Handle all response types using discriminated union
+          switch (response.type) {
+            case 'rate_limit': {
+              toast.error('请求过多', {
+                description: `请在 ${response.cooldownSeconds} 秒后重试`,
+                duration: Math.max(response.cooldownSeconds * 1000, 5000),
+              });
+              forceResetLoading();
+              return;
+            }
             
-            updateNodeData(selectedNode.id, {
+            case 'network_error': {
+              toast.error('网络不稳定', {
+                description: response.message,
+                duration: 5000,
+              });
+              forceResetLoading();
+              return;
+            }
+            
+            case 'validation_error':
+            case 'api_error': {
+              toast.error('生成失败', {
+                description: response.message,
+                duration: 5000,
+              });
+              forceResetLoading();
+              return;
+            }
+            
+            case 'timeout': {
+              toast.error('请求超时', {
+                description: response.message,
+                duration: 5000,
+              });
+              forceResetLoading();
+              return;
+            }
+            
+            case 'skeleton':
+            case 'success': {
+              // Only extract code for success cases
+              const uiCode = response.code;
+              
+              log('✅ [CommandBar] UI代码生成成功 (skeleton/success)', {
+                type: response.type,
+                codeLength: uiCode.length,
+                requestId: response.requestId,
+                stages: response.stages,
+              });
+              
+              log('🔍 [CommandBar] 提取的UI代码:', {
+                codeLength: uiCode.length,
+                codePreview: uiCode.substring(0, 200),
+                isValid: uiCode && uiCode.length > 50,
+              });
+              
+              if (uiCode && uiCode.length > 50) {
+                // 更新节点的 view.code（使用保存的目标节点ID，确保即使切换节点也能更新到正确的节点）
+                log('💾 [CommandBar] 准备更新节点:', {
+                  nodeId: targetNodeId,
+                  nodeLabel: targetNodeLabel,
+                  codeLength: uiCode.length,
+                  codePreview: uiCode.substring(0, 100),
+                });
+            
+            updateNodeData(targetNodeId, {
               artifacts: {
                 view: {
                   code: uiCode,
@@ -1830,11 +2492,11 @@ Generate the complete .tsx code now.`;
             
             // 验证更新是否成功
             setTimeout(() => {
-              const updatedNode = useCanvasStore.getState().nodes.find(n => n.id === selectedNode.id);
+              const updatedNode = useCanvasStore.getState().nodes.find(n => n.id === targetNodeId);
               if (updatedNode) {
                 const savedCode = updatedNode.data.artifacts?.view?.code || '';
                 log('✅ [CommandBar] 节点更新验证:', {
-                  nodeId: selectedNode.id,
+                  nodeId: targetNodeId,
                   savedCodeLength: savedCode.length,
                   savedCodePreview: savedCode.substring(0, 100),
                   isMatch: savedCode === uiCode,
@@ -1843,7 +2505,7 @@ Generate the complete .tsx code now.`;
                 
                 if (savedCode.length === 0 || savedCode === '// PLACEHOLDER') {
                   logError('❌ [CommandBar] 节点更新失败！代码未保存:', {
-                    nodeId: selectedNode.id,
+                    nodeId: targetNodeId,
                     savedCode,
                   });
                   toast.error('UI代码更新失败', {
@@ -1855,7 +2517,7 @@ Generate the complete .tsx code now.`;
                 }
               } else {
                 logError('❌ [CommandBar] 节点更新验证失败：找不到节点:', {
-                  nodeId: selectedNode.id,
+                  nodeId: targetNodeId,
                 });
               }
             }, 100);
@@ -1888,25 +2550,38 @@ Generate the complete .tsx code now.`;
             if (textareaRef.current) {
               textareaRef.current.style.height = 'auto';
             }
-            return; // 成功生成UI，直接返回
-          } else {
-            logWarn('⚠️ [CommandBar] UI代码生成失败或为空');
-            toast.warning('UI代码生成失败', {
-              description: '生成的代码为空，请重试',
-              duration: 3000,
-            });
-            // 生成失败后重置状态，允许用户重试
-            // 清除UI生成专用的超时定时器
-            if (timeoutRef.current) {
-              clearTimeout(timeoutRef.current);
-              timeoutRef.current = null;
-              log('❌ [CommandBar] UI生成失败，已清除超时定时器');
+                return; // 成功生成UI，直接返回
+              } else {
+                logWarn('⚠️ [CommandBar] UI代码生成失败或为空');
+                toast.warning('UI代码生成失败', {
+                  description: '生成的代码为空，请重试',
+                  duration: 3000,
+                });
+                // 生成失败后重置状态，允许用户重试
+                // 清除UI生成专用的超时定时器
+                if (timeoutRef.current) {
+                  clearTimeout(timeoutRef.current);
+                  timeoutRef.current = null;
+                  log('❌ [CommandBar] UI生成失败，已清除超时定时器');
+                }
+                setIsProcessingVideo(false);
+                setIsTimeoutOverride(false);
+                clearLoadingTimers();
+                // 不清空 prompt，让用户可以重试
+                return; // 生成失败，但不继续执行 updateNodeArtifacts
+              }
             }
-            setIsProcessingVideo(false);
-            setIsTimeoutOverride(false);
-            clearLoadingTimers();
-            // 不清空 prompt，让用户可以重试
-            return; // 生成失败，但不继续执行 updateNodeArtifacts
+            
+            default: {
+              const r = response as { type?: string };
+              logError('❌ [CommandBar] 未知的响应类型', { type: r.type });
+              toast.error('未知返回类型', {
+                description: `服务器返回了未知的响应类型: ${r.type ?? 'unknown'}`,
+                duration: 5000,
+              });
+              forceResetLoading();
+              return;
+            }
           }
         } catch (error) {
           logError('❌ [CommandBar] UI代码生成失败:', error);
@@ -2013,7 +2688,7 @@ Generate the complete .tsx code now.`;
         nodeTitle: selectedNode.data.label,
         userPrompt: prompt.trim() || '',
           attachmentsCount: attachmentsForAPI.length,
-        attachments: attachmentsForAPI.map(att => ({ type: att.type, name: att.name, hasContent: !!att.content })),
+        attachments: (Array.isArray(attachmentsForAPI) ? attachmentsForAPI : []).map(att => ({ type: att.type, name: att.name, hasContent: !!att.content })),
       });
 
       try {
@@ -2167,7 +2842,7 @@ Generate the complete .tsx code now.`;
       isGeneratingUIText,
       buttonDisabled: !hasContent || isLoading,
     });
-  }, [prompt, attachments, hasContent, isLoading, isCreating, isUpdating, isProcessingVideo, isGeneratingUIText]);
+  }, [prompt, attachments, attachment, hasContent, isLoading, isCreating, isUpdating, isProcessingVideo, isGeneratingUIText]);
 
   // 处理取消选择节点
   const handleClearSelection = () => {
@@ -2418,7 +3093,7 @@ Generate the complete .tsx code now.`;
                   
                   if (processedAttachments.length === fileArray.length) {
                     toast.success(`成功上传 ${processedAttachments.length} 个文件`, {
-                      description: processedAttachments.map(a => a.name).join('、'),
+                      description: (Array.isArray(processedAttachments) ? processedAttachments : []).map(a => a.name).join('、'),
                       duration: 4000,
                     });
                   } else {

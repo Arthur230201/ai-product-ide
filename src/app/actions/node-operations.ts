@@ -2,39 +2,98 @@
 
 import { createServerAction } from 'zsa';
 import { z } from 'zod';
-import { createOpenAI } from '@ai-sdk/openai';
-import { generateText } from 'ai';
 import { log, logError } from '@/lib/logger';
 import { getVisionModel, getTextModel } from '@/lib/ai-config';
+import { callText, callObject } from '@/lib/ai/llm';
+import type { AIResult } from '@/lib/ai/llm';
 
-// 创建自定义 OpenAI 客户端，通过自定义 fetch 增加超时时间
-const openaiClient = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  fetch: async (url, options) => {
-    // 创建带超时的 fetch
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 360000); // 6 分钟超时
-    
-    try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      return response;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw error;
-    }
-  },
-});
+/** UI 生成接口返回类型（generateUIFromText / generateUIFromImage） */
+export type UIGenerationResponse =
+  | { type: 'success'; code: string; requestId?: string; stages?: unknown }
+  | { type: 'skeleton'; code: string; requestId?: string; stages?: unknown }
+  | { type: 'rate_limit'; cooldownSeconds: number; requestId?: string; message?: string }
+  | { type: 'network_error'; requestId?: string; message?: string; retryable?: boolean }
+  | { type: 'api_error'; requestId?: string; message?: string }
+  | { type: 'validation_error'; requestId?: string; message?: string }
+  | { type: 'timeout'; requestId?: string; message?: string };
 
 // ==================== 直接调用的函数（用于 NodeDetailPanel）====================
 
-export async function refineUI(code: string, prompt: string): Promise<{ code: string }> {
-  // TODO: 实现 UI 优化逻辑
-  return { code };
+export async function refineUI(
+  htmlCode: string,
+  refinementPrompt: string = "Please refine styling and consistency."
+): Promise<AIResult<{ code: string }>> {
+  try {
+    if (!process.env.OPENAI_API_KEY) {
+      return {
+        ok: false,
+        type: 'PROVIDER',
+        message: 'OPENAI_API_KEY 未配置',
+        metrics: { queuedMs: 0, dedupHit: false, totalMs: 0 },
+      };
+    }
+
+    const textModel = getTextModel();
+    
+    const systemPrompt = `You are a UI code refinement expert. Your task is to refine and improve HTML/React code based on user feedback.
+
+Requirements:
+1. Maintain the original functionality
+2. Improve styling consistency
+3. Fix any layout issues
+4. Ensure responsive design
+5. Return ONLY the refined code, no markdown or explanations`;
+
+    const userPrompt = `Refine the following code based on this feedback: "${refinementPrompt}"
+
+Original code:
+\`\`\`tsx
+${htmlCode}
+\`\`\`
+
+Return ONLY the refined code without any markdown or explanations.`;
+
+    // ✅ 使用 callText 统一 gateway
+    const result = await callText({
+      model: textModel,
+      prompt: `${systemPrompt}\n\n${userPrompt}`,
+      temperature: 0.3,
+      actionName: 'refineUI',
+      aiConfig: {},
+    });
+
+    if (!result.ok) {
+      return result;
+    }
+
+    const refinedCode = result.data.trim();
+    
+    // Remove markdown code blocks if present
+    const cleanedCode = refinedCode
+      .replace(/^```(?:tsx|jsx|ts|js)?\n?/gm, '')
+      .replace(/```$/gm, '')
+      .trim();
+
+    return {
+      ok: true,
+      data: { code: cleanedCode },
+      metrics: result.metrics,
+    };
+  } catch (error) {
+    logError('❌ [refineUI] Error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'UI优化失败';
+    return {
+      ok: false,
+      type: 'PROVIDER',
+      message: errorMessage,
+      metrics: { queuedMs: 0, dedupHit: false, totalMs: 0 },
+    };
+  }
 }
+
+export type ReverseGenerateSpecResult = 
+  | { ok: true; title: string; requirements: string[] }
+  | { ok: false; type: 'RATE_LIMIT' | 'NETWORK' | 'PROVIDER' | 'PARSE'; message: string; cooldownSeconds?: number };
 
 export async function reverseGenerateSpec(input: {
   code: string;
@@ -121,23 +180,22 @@ ${input.code}
 
     // 获取模型配置
     const textModel = getTextModel(input.aiConfig);
-    const result = await generateText({
-      model: openaiClient(textModel),
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt,
-        },
-        {
-          role: 'user',
-          content: userPrompt,
-        },
-      ],
+    
+    // ✅ 使用 callText 统一 gateway
+    const result = await callText({
+      model: textModel,
+      prompt: `${systemPrompt}\n\n${userPrompt}`,
       temperature: 0.5,
+      actionName: 'reverseGenerateSpec',
+      aiConfig: input.aiConfig,
     });
 
+    if (!result.ok) {
+      throw new Error(result.message || '需求生成失败');
+    }
+
     // 解析生成的文本，提取标题和需求列表
-    const generatedText = result.text.trim();
+    const generatedText = result.data.trim();
     
     // 尝试提取标题（通常在文本开头，可能是 "标题：xxx" 或 "# xxx" 或直接是标题）
     let title = nodeLabel;
@@ -199,7 +257,7 @@ export async function generateImplementation(input: {
 export async function generateTestCases(input: {
   title: string;
   requirements: string[];
-}): Promise<{ cases: string[] }> {
+}): Promise<AIResult<{ cases: string[] }>> {
   try {
     // 检查环境变量
     if (!process.env.OPENAI_API_KEY) {
@@ -254,24 +312,26 @@ ${requirementsText}
     // 获取模型配置（使用默认文本模型）
     const textModel = getTextModel();
     
-    // 调用 OpenAI 生成测试用例
-    const result = await generateText({
-      model: openaiClient(textModel),
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt,
-        },
-        {
-          role: 'user',
-          content: userPrompt,
-        },
-      ],
+    // ✅ 使用 callText 统一 gateway
+    const result = await callText({
+      model: textModel,
+      prompt: `${systemPrompt}\n\n${userPrompt}`,
       temperature: 0.7, // 稍微高一点的温度，鼓励创造性
+      actionName: 'generateTestCases',
+      aiConfig: {},
     });
 
+    if (!result.ok) {
+      return {
+        ok: false,
+        type: result.type,
+        message: result.message || '测试用例生成失败',
+        metrics: result.metrics,
+      };
+    }
+
     // 解析生成的测试用例
-    const generatedText = result.text.trim();
+    const generatedText = result.data.trim();
     
     // 提取测试用例（按行分割，过滤空行和标记）
     const cases = generatedText
@@ -307,12 +367,19 @@ ${requirementsText}
     log(`✅ [generateTestCases] 成功生成 ${cases.length} 个测试用例`);
     
     return {
-      cases: cases,
+      ok: true,
+      data: { cases },
+      metrics: { queuedMs: 0, dedupHit: false, totalMs: 0 },
     };
   } catch (error) {
     logError('❌ [generateTestCases] Error:', error);
     const errorMessage = error instanceof Error ? error.message : '测试用例生成失败';
-    throw new Error(`测试用例生成失败: ${errorMessage}`);
+    return {
+      ok: false,
+      type: 'PROVIDER',
+      message: `测试用例生成失败: ${errorMessage}`,
+      metrics: { queuedMs: 0, dedupHit: false, totalMs: 0 },
+    };
   }
 }
 
@@ -598,10 +665,12 @@ Generate the complete .tsx code now.`;
       // 获取模型配置
       const visionModel = getVisionModel(input.aiConfig);
       log(`🤖 [generateUIFromImage] 开始调用 OpenAI API (${visionModel})...`);
-      log('⏱️ [generateUIFromImage] 超时设置: 360秒 (6分钟), 最大重试次数: 2次');
+      log('⏱️ [generateUIFromImage] 超时设置: 600秒 (10分钟)');
       const apiStartTime = Date.now();
-      const result = await generateText({
-        model: openaiClient(visionModel), // 使用自定义客户端，支持视觉输入
+      
+      // Use unified LLM gateway with messages (including image parts)
+      const result = await callText({
+        model: visionModel,
         messages: [
           {
             role: 'system',
@@ -622,15 +691,54 @@ Generate the complete .tsx code now.`;
           },
         ],
         temperature: 0.1, // 极低温度确保严格遵循指令，实现像素级精确复刻
-        maxRetries: 2, // 减少重试次数以提高响应速度
+        timeoutMs: 600000, // 10 minutes for vision API
+        actionName: 'generateUIFromImage',
+        mode: 'vision',
+        aiConfig: input.aiConfig,
       });
+      
+      // Handle error result (return union, don't throw)
+      if (!result.ok) {
+        const apiDuration = Date.now() - apiStartTime;
+        log('❌ [generateUIFromImage] LLM call failed', {
+              requestId,
+              model: visionModel,
+          errorType: result.type,
+          elapsedMs: apiDuration,
+            });
+        
+        // Map AIResult error types to return format
+        if (result.type === 'RATE_LIMIT') {
+            return {
+              type: 'rate_limit' as const,
+            cooldownSeconds: result.cooldownSeconds || 10,
+              requestId,
+            message: result.message,
+          };
+        }
+        if (result.type === 'NETWORK') {
+            return {
+              type: 'network_error' as const,
+              requestId,
+            message: result.message,
+            retryable: true,
+          };
+        }
+        // Other errors map to api_error
+        return {
+          type: 'api_error' as const,
+          requestId,
+          message: result.message,
+        };
+      }
+      
       const apiDuration = Date.now() - apiStartTime;
       log(`✅ [generateUIFromImage] OpenAI API 调用完成，耗时: ${apiDuration}ms`);
 
       // 提取生成的代码
-      let generatedCode = result.text.trim();
+      let generatedCode = result.data.trim();
       log('📝 [generateUIFromImage] 原始生成结果:', {
-        textLength: result.text.length,
+        textLength: result.data.length,
         trimmedLength: generatedCode.length,
         preview: generatedCode.substring(0, 200),
       });
@@ -669,7 +777,9 @@ Generate the complete .tsx code now.`;
       });
 
       return {
+        type: 'success' as const,
         code: generatedCode,
+        requestId,
       };
     } catch (error) {
       const errorDuration = Date.now() - startTime;
@@ -987,28 +1097,59 @@ ${designSystemEnforcement}
       log(`🤖 [generateUIFromText] 使用模型: ${textModel}`);
       
       const apiStartTime = Date.now();
-      const result = await generateText({
-        model: openaiClient(textModel),
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: userPrompt,
-          },
-        ],
+      
+      // ✅ 使用 callText 统一 gateway
+      const result = await callText({
+        model: textModel,
+        prompt: `${systemPrompt}\n\n${userPrompt}`,
         temperature: 0.5,
-        maxRetries: 3,
+        maxOutputTokens: 8000,
+        actionName: 'generateUIFromText',
+        aiConfig: input.aiConfig,
       });
+      
+      if (!result.ok) {
+        // Handle error result (return union, don't throw)
+        const apiDuration = Date.now() - apiStartTime;
+        log('❌ [generateUIFromText] LLM call failed', {
+          requestId,
+          model: textModel,
+          errorType: result.type,
+          elapsedMs: apiDuration,
+        });
+        
+        // Map AIResult error types to return format
+        if (result.type === 'RATE_LIMIT') {
+          return {
+            type: 'rate_limit' as const,
+            cooldownSeconds: result.cooldownSeconds || 10,
+            requestId,
+            message: result.message,
+          };
+        }
+        if (result.type === 'NETWORK') {
+          return {
+            type: 'network_error' as const,
+            requestId,
+            message: result.message,
+            retryable: true,
+          };
+        }
+        // Other errors map to api_error
+        return {
+          type: 'api_error' as const,
+          requestId,
+          message: result.message,
+        };
+      }
+      
       const apiDuration = Date.now() - apiStartTime;
       log(`✅ [generateUIFromText] OpenAI API 调用完成，耗时: ${apiDuration}ms`);
 
       // 提取生成的代码
-      let generatedCode = result.text.trim();
+      let generatedCode = result.data.trim();
       log('📝 [generateUIFromText] 原始生成结果:', {
-        textLength: result.text.length,
+        textLength: result.data.length,
         trimmedLength: generatedCode.length,
         preview: generatedCode.substring(0, 200),
       });
@@ -1047,7 +1188,9 @@ ${designSystemEnforcement}
       });
 
       return {
+        type: 'success' as const,
         code: generatedCode,
+        requestId,
       };
     } catch (error) {
       const errorDuration = Date.now() - startTime;
@@ -1098,83 +1241,49 @@ export const generateAnalysisFromCode = createServerAction()
         functionIdExample = 'F001开始递增（F001, F002, F003...）';
       }
 
-      // 构建系统提示词
+      // 构建系统提示词（精简版，目标 <= 8k chars）
       const systemPrompt = `# Role
 Product Manager (Client-Facing)
 
-你是一个专业的产品经理，面向客户和业务团队。你的任务是根据React组件代码，生成或更新结构化的业务需求规格表（PRD）。
+你是一个专业的产品经理，面向客户和业务团队。根据React/HTML代码生成结构化的业务需求规格表（PRD）。
 
 # Task
-Generate a **Business Requirement Specification Table** based on the provided UI Code.
+生成Markdown表格格式的业务需求规格表。
 
-# Input
-React/Tailwind Code (JSX).
-
-# Output Format (Strict Markdown Table)
+# Output Format
 | 功能ID | UI区域 | 元素名称 | 功能说明 | 展示规范 |
 | :--- | :--- | :--- | :--- | :--- |
 
-# Content Filling Rules
+# Content Rules
 
-## Column 4: 功能说明 (Function Description)
-**Focus**: What is the **Purpose** or **Interaction** of this element?
-- **Case A: Interactive Elements (Buttons, Inputs)**
-  - Describe the user action and system response.
-  - *Example*: "点击后跳转至详情页。" or "支持输入关键词进行模糊搜索。"
-- **Case B: Read-Only Elements (Labels, Titles, Status)**
-  - Describe the **Business Purpose** (What info does it convey?).
-  - *Example*: "用于展示当前指令的流转状态。" or "标识该指令的来源渠道。"
-  - **Do NOT** write "No interaction" or "None" or "无交互". Always define its purpose.
+## 功能说明 (Column 4)
+- **交互元素**：描述用户操作和系统响应（如"点击后跳转至详情页"）
+- **只读元素**：描述业务目的（如"用于展示当前指令的流转状态"）
+- **禁止**写"无交互"、"None"，必须定义其目的
 
-## Column 5: 展示规范 (Display Specs)
-**Focus**: Visual Style, Formats, and Defaults.
-- **Visuals (Use Emojis)**:
-  - Colors: Use emojis (🟢, 🔴, 🔵, 🟣, ⚪️) based on Tailwind classes.
-    - \`bg-red-100\` / \`text-red-500\` -> 🔴 警示/高亮
-    - \`bg-green-100\` / \`text-green-500\` -> 🟢 成功/进行中
-    - \`bg-blue-500\` / \`text-blue-500\` -> 🔵 信息/链接
-    - \`bg-purple-600\` / \`text-purple-600\` -> 🟣 品牌色/强调色
-    - \`text-gray-400\` / \`text-slate-400\` -> ⚪️ 次要信息/置灰
-    - \`rounded-full\` -> 💊 胶囊样式
-    - \`rounded-lg\` -> 📦 圆角卡片
-  - Icons: Describe logically (e.g., "🔍 搜索图标", "⬅️ 返回箭头", "🌍 地球图标").
-- **Data Formats**:
-  - Time: "YYYY-MM-DD HH:mm" or "YYYY-MM-DD HH:mm:ss"
-  - Currency: "¥0.00"
-  - Date: "YYYY年MM月DD日"
-- **Defaults & States**:
-  - "默认为空" or "超出一行显示省略号(...)" or "默认占位文本：xxx"
+## 展示规范 (Column 5)
+- **视觉样式**：使用Emoji表示颜色（🟢成功、🔴警示、🔵信息、🟣强调、⚪️次要）
+- **数据格式**：时间"YYYY-MM-DD HH:mm"，货币"¥0.00"，日期"YYYY年MM月DD日"
+- **默认状态**：说明默认值、占位文本、空状态等
 
-# Extraction Rules (Code-to-Business Translation)
+# Extraction Rules
+- **UI区域**：根据DOM结构识别（Header->顶部导航，.map()->列表区）
+- **元素名称**：将组件名转为业务术语（Input->搜索框）
 
-## 1. Analyze the Code Structure
-- **Identify Zones**: Map DOM depth to "UI区域" (e.g., \`<Header>\` -> 顶部导航, \`.map()\` list -> 列表区).
-- **Identify Elements**: Translate component names to business terms (e.g., \`<Input>\` -> 搜索框).
-
-# Example Rows
+# Examples
 | ZLL001 | 顶部导航 | 返回按钮 | 点击后返回上一级页面。 | ⬅️ 黑色图标；位于左上角。 |
-| ZLL002 | 列表区 | 状态标签 | 用于标识指令处理进度。 | 1. 样式规则：<br>   - 🟢 进行中 (绿色)<br>   - ⚪️ 已结束 (灰色)<br>2. 默认显示：进行中 |
-| ZLL003 | 列表卡片 | 发布时间 | 展示指令的创建或发布时间，辅助用户判断时效性。 | 格式：YYYY-MM-DD HH:mm:ss |
+| ZLL002 | 列表区 | 状态标签 | 用于标识指令处理进度。 | 🟢 进行中 / ⚪️ 已结束 |
 
-# Feature ID Logic
+# Feature ID
 ${functionIdPrefixInstruction}
 
-# Tone
-Professional, non-technical. Make it look like a manual, not a code comment. Use business language that clients and non-technical stakeholders can understand.
-
-# Additional Requirements
-- **所有内容必须使用中文**，确保非技术人员也能轻松理解
-- **易读性要求**：
-   - 功能描述要清晰具体，避免技术术语，使用通俗易懂的语言
-   - 交互逻辑要说明用户操作和系统响应
-  - 展示规范要说明视觉样式、默认状态、占位文本等
-   - 每个功能点独立一行，便于阅读和追踪
-- **分析要求**：
-   - 仔细分析代码中的所有UI元素、交互逻辑、状态管理
-   - 识别所有可交互的组件（按钮、输入框、卡片、菜单等）
-  - 识别所有只读元素（标题、标签、状态指示器等）
-  - 识别所有视觉样式和默认状态
-- **如果提供了现有需求**，必须在保持原有表格格式和内容的基础上，补充新增的需求`;
+# Requirements
+- 所有内容使用中文，避免技术术语
+- 功能描述清晰具体，说明用户操作和系统响应
+- 展示规范说明视觉样式、默认状态、占位文本
+- 分析所有UI元素、交互逻辑、状态管理
+- 识别可交互组件（按钮、输入框、卡片、菜单）和只读元素（标题、标签、状态指示器）
+- 如果提供了现有需求，必须保留原有内容并补充新增需求`;
 
       // 构建用户提示词
       const hasExistingRequirements = input.existingRequirements && input.existingRequirements.length > 0;
@@ -1229,24 +1338,25 @@ ${!hasExistingRequirements ? `**输出要求：**
 
       // 获取模型配置
       const textModel = getTextModel(input.aiConfig);
-      // 调用 OpenAI 生成 PRD
-      const result = await generateText({
-        model: openaiClient(textModel), // 使用自定义客户端
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: userPrompt,
-          },
-        ],
+      
+      // ✅ 使用 callText 统一 gateway
+      const result = await callText({
+        model: textModel,
+        prompt: `${systemPrompt}\n\n${userPrompt}`,
         temperature: 0.5,
+        actionName: 'generateAnalysisFromCode',
+        aiConfig: input.aiConfig,
       });
 
+      if (!result.ok) {
+        const errorMessage = result.type === 'RATE_LIMIT' 
+          ? `请求过多，请在 ${result.cooldownSeconds || 10} 秒后重试`
+          : result.message || 'PRD生成失败';
+        throw new Error(errorMessage);
+      }
+
       // 提取生成的 Markdown
-      let markdown = result.text.trim();
+      let markdown = result.data.trim();
 
       // 清理 Markdown（移除可能的代码块标记）
       markdown = markdown
