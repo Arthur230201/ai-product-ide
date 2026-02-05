@@ -1,0 +1,27 @@
+{
+  "timestamp": "2026-02-05T14:14:50.419Z",
+  "score": 60,
+  "scores": {
+    "structure": 100,
+    "userRoles": 25,
+    "moduleDetails": 25,
+    "nfr": 25,
+    "acceptance": 25,
+    "deliverableVisual": 0
+  },
+  "meta": {
+    "length": 2333,
+    "headingCount": 19,
+    "hasUIPerPage": false,
+    "usedBrowserCheck": true,
+    "hasVisibleUIFromBrowser": false
+  },
+  "issues": [
+    {
+      "severity": "P0",
+      "title": "无 UI 设计图/界面示意",
+      "message": "交付物质量审核标准（deliverable-quality-auditor）：PRD 每页须含 UI 设计图/界面示意，否则不符合可交付标准。读者无法从 PRD 看出「到底要做成什么样的东西」。总分已封顶。",
+      "type": "prd_deliverable"
+    }
+  ]
+}

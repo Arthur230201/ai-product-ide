@@ -1,0 +1,18 @@
+{
+  "timestamp": "2026-02-05T13:46:39.675Z",
+  "score": 100,
+  "scores": {
+    "structure": 100,
+    "userRoles": 25,
+    "moduleDetails": 25,
+    "nfr": 25,
+    "acceptance": 25,
+    "deliverableVisual": 40
+  },
+  "meta": {
+    "length": 2187,
+    "headingCount": 11,
+    "hasUIPerPage": true
+  },
+  "issues": []
+}
