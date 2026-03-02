@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>购物软件</title>
+  <style>
+    :root {
+      --primary-color: #1a1a1a;
+      --accent-color: #c00;
+      --neutral-light: #f9f9f9;
+      --neutral-dark: #333;
+      --border-color: #ddd;
+      
+      --font-size-base: 1rem;
+      --font-size-large: 1.5rem;
+      --font-size-medium: 1.25rem;
+      --font-size-small: 0.875rem;
+      
+      --spacing-base: 8px;
+      --spacing-large: 16px;
+      --spacing-medium: 12px;
+      --spacing-small: 4px;
+
+      --border-radius: 8px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      margin: 0 auto;
+      padding: var(--spacing-large);
+      max-width: 640px;
+      background-color: var(--neutral-light);
+      color: var(--primary-color);
+      line-height: 1.6;
+    }
+    h1 {
+      font-size: var(--font-size-large);
+      font-weight: bold;
+      margin-bottom: var(--spacing-large);
+      color: var(--primary-color);
+      text-align: center;
+    }
+
+    .products {
+      display: grid;
+      gap: var(--spacing-large);
+    }
+    .product {
+      border: 1px solid var(--border-color);
+      background-color: #fff;
+      padding: var(--spacing-large);
+      border-radius: var(--border-radius);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      transition: box-shadow 0.2s ease-in-out;
+    }
+    .product:hover {
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    }
+    .product h2 {
+      font-size: var(--font-size-medium);
+      margin-bottom: var(--spacing-small);
+      color: var(--primary-color);
+    }
+    .product .price {
+      font-size: var(--font-size-base);
+      font-weight: 600;
+      color: var(--accent-color);
+    }
+    .product button {
+      margin-top: var(--spacing-medium);
+      padding: var(--spacing-small) var(--spacing-medium);
+      font-size: var(--font-size-small);
+      background-color: var(--accent-color);
+      color: #fff;
+      border: none;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      transition: background-color 0.2s ease-in-out;
+    }
+    .product button:hover {
+      background-color: #900;
+    }
+
+    .cart-entry {
+      position: fixed;
+      top: var(--spacing-large);
+      right: var(--spacing-large);
+      padding: var(--spacing-small) var(--spacing-medium);
+      font-size: var(--font-size-small);
+      background-color: var(--neutral-dark);
+      color: #fff;
+      border-radius: var(--border-radius);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background-color: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.2s ease, visibility 0.2s ease;
+    }
+    .modal[data-state="open"] {
+      opacity: 1;
+      visibility: visible;
+    }
+    .modal-content {
+      background-color: #fff;
+      padding: var(--spacing-large);
+      border-radius: var(--border-radius);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+      width: 90%;
+      max-width: 500px;
+    }
+    .modal-close {
+      background: transparent;
+      border: none;
+      font-size: var(--font-size-large);
+      cursor: pointer;
+      color: var(--primary-color);
+      float: right;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: var(--spacing-medium);
+      }
+      h1 {
+        font-size: var(--font-size-medium);
+      }
+      .products {
+        gap: var(--spacing-medium);
+      }
+      .product {
+        padding: var(--spacing-medium);
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>购物软件</h1>
+  <div class="cart-entry" aria-label="购物车">购物车 (0)</div>
+  <section class="products" aria-label="商品列表">
+    <article class="product">
+      <h2>示例商品 A</h2>
+      <p class="price">¥99.00</p>
+      <button type="button" data-action="add-to-cart">加入购物车</button>
+    </article>
+    <article class="product">
+      <h2>示例商品 B</h2>
+      <p class="price">¥199.00</p>
+      <button type="button" data-action="add-to-cart">加入购物车</button>
+    </article>
+  </section>
+  <div class="modal" role="dialog" aria-modal="true" data-state="closed" aria-hidden="true">
+    <div class="modal-content">
+      <button class="modal-close" data-action="close-modal" aria-label="关闭">✖</button>
+      <p>商品已加入购物车！</p>
+    </div>
+  </div>
+  <script>
+    document.addEventListener('click', (event) => {
+      const action = event.target.dataset.action;
+      const modal = document.querySelector('.modal');
+      const cartEntry = document.querySelector('.cart-entry');
+      let cartCount = parseInt(cartEntry.innerText.match(/\d+/), 10);
+
+      if (action === 'add-to-cart') {
+        cartCount++;
+        cartEntry.innerText = `购物车 (${cartCount})`;
+        modal.dataset.state = 'open';
+        modal.setAttribute('aria-hidden', 'false');
+        modal.querySelector('.modal-close').focus();
+      }
+
+      if (action === 'close-modal' || event.target === modal) {
+        modal.dataset.state = 'closed';
+        modal.setAttribute('aria-hidden', 'true');
+        const addButton = document.querySelector('[data-action="add-to-cart"]');
+        if (addButton) addButton.focus();
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        const modal = document.querySelector('.modal[data-state="open"]');
+        if (modal) {
+          modal.dataset.state = 'closed';
+          modal.setAttribute('aria-hidden', 'true');
+          const addButton = document.querySelector('[data-action="add-to-cart"]');
+          if (addButton) addButton.focus();
+        }
+      }
+    });
+  </script>
+</body>
+</html>
+
+<!-- UI_PIPELINE:STAGE=INTERACT;FORMAT=HTML_SINGLE_FILE;SCRIPT=TRUE;DATA_ACTION=TRUE;EVENT_DELEGATION=TRUE -->

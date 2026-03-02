@@ -22,6 +22,48 @@ interface FileAttachment {
   rawTextContent?: string; // 原始文本内容（用于HTML文件分类分析）
 }
 
+/**
+ * 从节点在「建项目/生成画布」时已保存的 spec 与 userStories 拼出页面描述，供「生成UI」使用。
+ * 用户仅说「生成UI」时用此描述；用户有输入时用用户输入（作为对描述的调整）。
+ */
+function getNodePageDescription(node: { data: { label?: string; artifacts?: { spec?: { title?: string; requirements?: string[] }; userStories?: Array<{ role: string; activity: string; value: string; acceptanceCriteria?: string[] }> } } }): string {
+  const spec = node?.data?.artifacts?.spec;
+  const userStories = node?.data?.artifacts?.userStories;
+  const title = spec?.title || node?.data?.label || '';
+
+  const parts: string[] = [];
+  if (title) parts.push(`页面：${title}`);
+
+  if (userStories?.length) {
+    userStories.forEach((us, i) => {
+      const line = `作为${us.role}，${us.activity}，以便${us.value}`;
+      parts.push(line);
+      if (us.acceptanceCriteria?.length) {
+        parts.push(`验收标准：${us.acceptanceCriteria.join('；')}`);
+      }
+    });
+  } else if (spec?.requirements?.length) {
+    parts.push(`需求：${spec.requirements.join('；')}`);
+  }
+
+  return parts.length ? parts.join('。') : '';
+}
+
+/** 仅当节点没有任何描述时的兜底 prompt */
+function getDefaultUIPrompt(nodeLabel: string): string {
+  return `请为「${nodeLabel}」页面生成完整、可用的 React 组件，界面内容与页面名称匹配，包含现代化 UI 与完整交互。`;
+}
+
+/** 判断用户输入是否仅为「生成UI」类触发语（无具体页面描述）。此类情况必须用节点名+节点描述作 prompt，避免生成成首页/概览。 */
+function isUIGenerationTriggerOnly(text: string): boolean {
+  const t = text.trim().replace(/\s+/g, ' ').toLowerCase();
+  const triggers = [
+    '生成ui', '生成 ui', '生成本页', '生成本页面', '生成页面', '生成页面ui',
+    '生成页面 ui', '生成本页ui', '生成本页 ui', '生成 本页', '生成 本页面',
+  ];
+  return triggers.includes(t) || (t.length <= 20 && /^(生成|生成本页|生成页面)\s*(ui)?\s*$/.test(t));
+}
+
 export function CommandBar() {
   const [prompt, setPrompt] = useState('');
   const [attachment, setAttachment] = useState<FileAttachment | null>(null);
@@ -48,6 +90,9 @@ export function CommandBar() {
 
   // 输入框聚焦状态 - 必须在所有其他 hooks 之前定义
   const [isFocused, setIsFocused] = useState(false);
+
+  /** Stitch 双模型分轨：draft=快速预览，quality=高质量，仅编辑模式生效 */
+  const [uiGenerationTier, setUIGenerationTier] = useState<'draft' | 'quality'>('quality');
 
   // 自动调整textarea高度的函数
   const adjustTextareaHeight = useCallback(() => {
@@ -1422,6 +1467,7 @@ export function CommandBar() {
           // ========== Step 1: 生成 UI 代码（使用高智能视觉模型）==========
           setLoadingStep('🎨 正在生成 UI 代码...');
           setProgress(10);
+          toast.info('正在生成完整页面（质量优先），请稍候…', { duration: 4000 });
           
           // 初始化 UI 代码状态（用于实时更新）
           accumulatedCode = '';
@@ -1461,13 +1507,13 @@ Generate the complete .tsx code now.`;
           }
           
 
-          // zsa-react 的 execute 函数可能返回 [data, error] 数组格式或直接返回数据
-          let uiResult: any;
+          // zsa-react 的 execute 返回 [data, err] 元组，需解构后使用 data
+          let uiResult: UIGenerationResponse | null = null;
           const executeStartTime = Date.now();
           
           // 添加请求超时检测（10分钟）
           const requestTimeout = 600000; // 600秒 (10分钟)
-          const timeoutPromise = new Promise((_, reject) => {
+          const timeoutPromise = new Promise<never>((_, reject) => {
             setTimeout(() => {
               reject(new Error(`请求超时：超过 ${requestTimeout / 1000} 秒未收到服务器响应。请检查：1. 服务器是否正常运行 2. 终端是否有日志输出 3. 网络连接是否正常`));
             }, requestTimeout);
@@ -1478,24 +1524,35 @@ Generate the complete .tsx code now.`;
               throw new Error(`executeUI 不是一个函数: ${typeof executeUI}`);
             }
             
-            uiResult = await Promise.race([
+            const uiResultRaw = await Promise.race([
               executeUI({
                 prompt: optimizedPrompt,
                 imageBase64: imageBase64Data,
-                themeConfig: currentTheme,
+                themeConfig: undefined,
+                tier: uiGenerationTier,
                 aiConfig: aiConfig,
-                generationMode: 'skeleton', // Always use skeleton mode for fast response
-                explicitEnhance: false, // Default: DIRECT mode (no RATIONALIZE)
               }),
               timeoutPromise,
-            ]) as UIGenerationResponse | any;
+            ]);
             
             const executeDuration = Date.now() - executeStartTime;
             log(`✅ [CommandBar] executeUI 完成，耗时: ${executeDuration}ms`);
             
+            const [data, err] = Array.isArray(uiResultRaw) ? uiResultRaw : [uiResultRaw, null];
+            if (err) {
+              logError('❌ [CommandBar] executeUI 返回错误', { err });
+              toast.error('生成失败', {
+                description: err instanceof Error ? err.message : '未知错误',
+                duration: 5000,
+              });
+              forceResetLoading();
+              return;
+            }
+            uiResult = data as UIGenerationResponse;
+            
             // Handle typed response
             if (uiResult && typeof uiResult === 'object' && 'type' in uiResult) {
-              const response = uiResult as UIGenerationResponse;
+              const response = uiResult;
               
               if (response.type === 'rate_limit') {
                 toast.error('请求过多', {
@@ -1607,12 +1664,12 @@ Generate the complete .tsx code now.`;
             timestamp: new Date().toISOString(),
           });
 
-          // 处理 zsa-react 的返回格式（可能是数组 [data, error] 或直接是数据对象）
-          let resultData: { code?: string } | null = null;
-          let resultError: any = null;
+          // 处理 zsa-react 的返回格式（已在上方解构为 [data, err]，此处 uiResult 为 data）
+          let resultData: UIGenerationResponse | { code?: string } | null = null;
+          let resultError: unknown = null;
 
           if (Array.isArray(uiResult)) {
-            // 数组格式：[data, error]
+            // 兼容：若仍收到数组则再解构一次
             log('📦 [CommandBar] 检测到数组格式返回，解析中...');
             resultData = uiResult[0] || null;
             resultError = uiResult[1] || null;
@@ -1623,7 +1680,7 @@ Generate the complete .tsx code now.`;
               errorType: typeof resultError,
             });
           } else if (uiResult && typeof uiResult === 'object') {
-            // 对象格式：直接是返回值
+            // 对象格式：已解构后的 data（UIGenerationResponse）
             log('📦 [CommandBar] 检测到对象格式返回');
             resultData = uiResult;
           } else {
@@ -1637,22 +1694,24 @@ Generate the complete .tsx code now.`;
           // 检查是否有错误
           if (resultError) {
             logError('❌ [CommandBar] 返回中包含错误:', resultError);
-            const errorMessage = resultError instanceof Error 
-              ? resultError.message 
-              : (resultError?.message || resultError?.error || String(resultError));
+            const errObj = resultError as { message?: string; error?: string };
+            const errorMessage = resultError instanceof Error
+              ? resultError.message
+              : (errObj?.message || errObj?.error || String(resultError));
             throw new Error(`UI 代码生成失败: ${errorMessage}`);
           }
 
+          const codeFromResult = resultData && 'code' in resultData ? (resultData as { code?: string }).code : undefined;
           log('📥 [CommandBar] executeUI 解析后的结果:', {
             hasData: !!resultData,
-            hasCode: !!resultData?.code,
-            codeLength: resultData?.code?.length || 0,
-            codePreview: resultData?.code?.substring(0, 100),
+            hasCode: !!codeFromResult,
+            codeLength: codeFromResult?.length || 0,
+            codePreview: codeFromResult?.substring(0, 100),
             dataKeys: resultData ? Object.keys(resultData) : [],
           });
 
-          // 如果没有数据，抛出错误
-          if (!resultData || !resultData.code) {
+          // 如果没有数据或没有 code，抛出错误
+          if (!resultData || !codeFromResult) {
             logError('❌ [CommandBar] UI generation failed: no code in result', {
               originalResult: uiResult,
               parsedData: resultData,
@@ -1662,7 +1721,7 @@ Generate the complete .tsx code now.`;
           }
 
           // 提取代码
-          const code = resultData.code;
+          const code = codeFromResult;
           
           // 检查代码是否有效（不是占位符）
           const placeholderCode = 'function App() { return <div>待生成</div>; }';
@@ -2117,6 +2176,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
             
             setLoadingStep('🤖 正在调用AI生成UI代码...');
             setProgress(20);
+            toast.info('正在生成完整页面（质量优先），请稍候…', { duration: 4000 });
             
             // 🚨 添加超时检测
             const callStartTime = Date.now();
@@ -2147,7 +2207,8 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                 prompt: htmlReferencePrompt,
                 nodeLabel: targetNodeLabel,
                 projectMeta: useCanvasStore.getState().projectMeta,
-                themeConfig: currentTheme,
+                themeConfig: undefined,
+                tier: uiGenerationTier,
                 aiConfig: aiConfig,
               });
               
@@ -2192,18 +2253,28 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
               throw executeError;
             }
             
-            // 处理返回结果（与原有逻辑相同）
+            // 处理返回结果：zsa execute 返回 [data, err]，解构后取 data
             log('📥 [CommandBar] executeUIText 原始返回:', {
               result: uiResult,
               resultType: typeof uiResult,
               isArray: Array.isArray(uiResult),
             });
             
+            const [htmlData, htmlErr] = Array.isArray(uiResult) ? uiResult : [uiResult, null];
+            if (htmlErr) {
+              toast.error('生成失败', {
+                description: htmlErr instanceof Error ? htmlErr.message : '未知错误',
+                duration: 5000,
+              });
+              setIsProcessingVideo(false);
+              setIsTimeoutOverride(false);
+              clearLoadingTimers();
+              return;
+            }
+            
             let uiCode = '';
-            if (Array.isArray(uiResult)) {
-              uiCode = uiResult[0]?.code || uiResult[0] || '';
-            } else if (uiResult && typeof uiResult === 'object') {
-              uiCode = (uiResult as any).code || '';
+            if (htmlData && typeof htmlData === 'object' && 'code' in htmlData) {
+              uiCode = (htmlData as { code?: string }).code || '';
             }
             
             if (uiCode && uiCode.length > 50) {
@@ -2364,11 +2435,22 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
           // 🚨 保存目标节点ID和标签（防止用户在生成过程中切换节点）
           const targetNodeId = selectedNode.id;
           const targetNodeLabel = selectedNode.data.label || selectedNode.id;
+          const baseDesc = getNodePageDescription(selectedNode);
+          // 仅触发语（如「生成UI」「生成本页面」）或无输入时：强制用节点名+描述，避免生成成首页/概览
+          const isTriggerOnly = !prompt.trim() || isUIGenerationTriggerOnly(prompt.trim());
+          const effectivePrompt = isTriggerOnly
+            ? (baseDesc
+                ? `请生成【${targetNodeLabel}】页的 UI。页面名称即页面类型，必须与之一致。本页说明：${baseDesc}`
+                : getDefaultUIPrompt(targetNodeLabel))
+            : prompt.trim();
           
           // 🚨 添加调用前日志
           log('🚀 [CommandBar] 准备调用 executeUIText (文本模式)...');
           log('📋 [CommandBar] executeUIText 调用参数 (文本模式):', {
-            promptLength: (prompt.trim() || `请为"${targetNodeLabel}"页面生成完整的React组件代码，包含现代化的UI设计和完整的交互功能。`).length,
+            promptLength: effectivePrompt.length,
+            hasUserPrompt: !!prompt.trim(),
+            isTriggerOnly,
+            usedNodeDescription: isTriggerOnly && !!getNodePageDescription(selectedNode),
             nodeLabel: targetNodeLabel,
             targetNodeId: targetNodeId,
             hasProjectMeta: !!useCanvasStore.getState().projectMeta,
@@ -2379,6 +2461,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
           
           setLoadingStep('🤖 正在调用AI生成UI代码...');
           setProgress(20);
+          toast.info('正在生成完整页面（质量优先），请稍候…', { duration: 4000 });
           
           const callStartTime = Date.now();
           log('⏱️ [CommandBar] executeUIText 调用开始 (文本模式)，时间戳:', callStartTime);
@@ -2390,18 +2473,29 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
           
           console.log('✅ [CommandBar] executeUIText 函数验证通过 (文本模式)，开始调用...');
           
-          const uiResult = await executeUIText({
-            prompt: prompt.trim() || `请为"${targetNodeLabel}"页面生成完整的React组件代码，包含现代化的UI设计和完整的交互功能。`,
+          const uiResultRaw = await executeUIText({
+            prompt: effectivePrompt,
             nodeLabel: targetNodeLabel,
             projectMeta: useCanvasStore.getState().projectMeta,
-            themeConfig: currentTheme,
+            themeConfig: undefined,
+            tier: uiGenerationTier,
             aiConfig: aiConfig,
-            generationMode: 'skeleton', // Always use skeleton mode for fast response
-            explicitEnhance: false, // Default: DIRECT mode (no RATIONALIZE)
           });
           
           const callDuration = Date.now() - callStartTime;
           log('✅ [CommandBar] executeUIText 调用完成 (文本模式)，耗时:', callDuration, 'ms');
+          
+          // zsa-react execute() 返回 [data, err] 元组，需解构后使用 data
+          const [uiResult, uiErr] = Array.isArray(uiResultRaw) ? uiResultRaw : [uiResultRaw, null];
+          if (uiErr) {
+            logError('❌ [CommandBar] executeUIText 返回错误', { uiErr });
+            toast.error('生成失败', {
+              description: uiErr instanceof Error ? uiErr.message : '未知错误',
+              duration: 5000,
+            });
+            forceResetLoading();
+            return;
+          }
           
           // Handle discriminated union response
           if (!uiResult || typeof uiResult !== 'object' || !('type' in uiResult)) {
@@ -2972,11 +3066,35 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
         </div>
       )}
 
-      {/* 编辑模式提示 */}
+      {/* 编辑模式提示 + 生成档位开关（Stitch 双模型分轨） */}
       {isEditMode && selectedNode && (
-        <div className="mb-2 flex items-center justify-center">
+        <div className="mb-2 flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-4">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-400">
             <span>编辑中：{selectedNode.data.label}</span>
+          </div>
+          <div className="inline-flex p-0.5 bg-zinc-800 border border-zinc-700 rounded-lg" role="group" aria-label="UI 生成档位">
+            <button
+              type="button"
+              onClick={() => setUIGenerationTier('draft')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                uiGenerationTier === 'draft'
+                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
+                  : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
+              }`}
+            >
+              快速预览
+            </button>
+            <button
+              type="button"
+              onClick={() => setUIGenerationTier('quality')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                uiGenerationTier === 'quality'
+                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
+                  : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
+              }`}
+            >
+              高质量
+            </button>
           </div>
         </div>
       )}

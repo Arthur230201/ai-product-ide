@@ -1,0 +1,313 @@
+---
+description: TypeScript best practices, patterns, and type system mastery for modern applications
+alwaysApply: false
+---
+# TypeScript Best Practices
+
+Comprehensive guide for TypeScript development with focus on type safety, performance, and maintainability.
+
+## 1. Type System Mastery
+
+### 1.1 Type Inference and Annotations
+
+```typescript
+// Let TypeScript infer when obvious
+const numbers = [1, 2, 3]; // number[]
+const config = { host: 'localhost', port: 3000 }; // inferred shape
+
+// Annotate when inference isn't sufficient
+const processValue = <T>(value: T): T & { processed: true } => {
+  return { ...value, processed: true };
+};
+
+// Use satisfies for type checking without widening
+const routes = {
+  home: '/',
+  users: '/users',
+  profile: '/users/:id'
+} satisfies Record<string, string>;
+```
+
+### 1.2 Discriminated Unions and Type Narrowing
+
+```typescript
+// Discriminated unions for state management
+type AsyncState<T> =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'success'; data: T }
+  | { status: 'error'; error: Error };
+
+// Type guards for narrowing
+function isSuccess<T>(state: AsyncState<T>): state is Extract<AsyncState<T>, { status: 'success' }> {
+  return state.status === 'success';
+}
+
+// Pattern matching with exhaustive checks
+function handleState<T>(state: AsyncState<T>): string {
+  switch (state.status) {
+    case 'idle': return 'Ready';
+    case 'loading': return 'Loading...';
+    case 'success': return `Data: ${JSON.stringify(state.data)}`;
+    case 'error': return `Error: ${state.error.message}`;
+    default: {
+      const _exhaustive: never = state;
+      return _exhaustive;
+    }
+  }
+}
+```
+
+### 1.3 Advanced Type Patterns
+
+```typescript
+// Conditional types
+type IsArray<T> = T extends readonly any[] ? true : false;
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
+
+// Mapped types with modifiers
+type DeepReadonly<T> = {
+  readonly [P in keyof T]: T[P] extends object ? DeepReadonly<T[P]> : T[P];
+};
+
+// Template literal types
+type HTTPMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
+type APIEndpoint = `/api/${Lowercase<string>}/${string}`;
+
+// Branded types for nominal typing
+type UserId = string & { __brand: 'UserId' };
+type PostId = string & { __brand: 'PostId' };
+
+const createUserId = (id: string): UserId => id as UserId;
+```
+
+### 1.4 Utility Type Cookbook
+
+```typescript
+// Deep partial with arrays
+type DeepPartial<T> = T extends readonly any[] ? T : {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
+};
+
+// Type-safe object paths
+type Path<T> = T extends object ? {
+  [K in keyof T]: K extends string
+    ? T[K] extends object
+      ? K | `${K}.${Path<T[K]>}`
+      : K
+    : never;
+}[keyof T] extends infer P ? P : never;
+
+// Type-safe event emitter
+type EventMap = Record<string, unknown>;
+type EventKey<T> = string & keyof T;
+type EventReceiver<T> = (params: T) => void;
+
+interface Emitter<T extends EventMap> {
+  on<K extends EventKey<T>>(eventName: K, fn: EventReceiver<T[K]>): void;
+  emit<K extends EventKey<T>>(eventName: K, params: T[K]): void;
+}
+```
+
+## 2. Strict Mode Best Practices
+
+### 2.1 Null Safety
+
+```typescript
+// Handle null/undefined explicitly
+interface User {
+  id: string;
+  name: string;
+  email?: string; // Optional
+  metadata: Record<string, unknown> | null; // Nullable
+}
+
+// Non-null assertion when you're certain
+function processUser(user: User | null) {
+  if (!user) throw new Error('User required');
+
+  console.log(user.name.toUpperCase());
+  const domain = user.email?.split('@')[1];
+}
+
+// Nullish coalescing
+const getDisplayName = (user: User) => {
+  return user.name ?? user.email ?? 'Anonymous';
+};
+```
+
+### 2.2 Type Assertions and Guards
+
+```typescript
+// Avoid type assertions, prefer type guards
+function isUser(value: unknown): value is User {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'name' in value &&
+    typeof (value as User).id === 'string' &&
+    typeof (value as User).name === 'string'
+  );
+}
+
+// When assertions are necessary, be explicit
+const config = JSON.parse(configString) as unknown;
+if (!isValidConfig(config)) {
+  throw new Error('Invalid configuration');
+}
+```
+
+## 3. Error Handling
+
+### 3.1 Result Type Pattern
+
+```typescript
+type Result<T, E = Error> =
+  | { ok: true; value: T }
+  | { ok: false; error: E };
+
+// Type-safe error handling with discriminated unions
+type AppError =
+  | { type: 'ValidationError'; field: string; message: string }
+  | { type: 'NotFoundError'; resource: string; id: string }
+  | { type: 'UnauthorizedError'; reason: string }
+  | { type: 'NetworkError'; code: string; retryable: boolean };
+
+function handleError(error: AppError): number {
+  switch (error.type) {
+    case 'ValidationError': return 400;
+    case 'NotFoundError': return 404;
+    case 'UnauthorizedError': return 401;
+    case 'NetworkError': return error.retryable ? 503 : 500;
+  }
+}
+```
+
+## 4. React/JSX Patterns
+
+### 4.1 Component Patterns
+
+```typescript
+// Polymorphic components
+type PolymorphicRef<C extends React.ElementType> = React.ComponentPropsWithRef<C>['ref'];
+
+type PolymorphicProps<C extends React.ElementType, P = object> = P &
+  Omit<React.ComponentPropsWithoutRef<C>, keyof P> & {
+    as?: C;
+    ref?: PolymorphicRef<C>;
+  };
+
+const Button = <C extends React.ElementType = 'button'>({
+  as,
+  ...props
+}: PolymorphicProps<C, { children?: React.ReactNode }>) => {
+  const Component = as || 'button';
+  return <Component {...props} />;
+};
+```
+
+### 4.2 Hook Patterns
+
+```typescript
+// Type-safe context
+function createContext<T>() {
+  const Context = React.createContext<T | undefined>(undefined);
+
+  function useContext() {
+    const context = React.useContext(Context);
+    if (context === undefined) {
+      throw new Error('useContext must be used within Provider');
+    }
+    return context;
+  }
+
+  return [Context.Provider, useContext] as const;
+}
+
+// Generic hooks with AsyncState
+function useAsync<T>(asyncFn: () => Promise<T>, deps: React.DependencyList = []): AsyncState<T> {
+  const [state, setState] = useState<AsyncState<T>>({ status: 'idle' });
+
+  useEffect(() => {
+    setState({ status: 'loading' });
+    asyncFn()
+      .then(data => setState({ status: 'success', data }))
+      .catch(error => setState({ status: 'error', error }));
+  }, deps);
+
+  return state;
+}
+```
+
+## 5. Configuration and Build
+
+### 5.1 TSConfig Best Practices
+
+```json
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"], "@components/*": ["src/components/*"], "@utils/*": ["src/utils/*"] }
+  }
+}
+```
+
+### 5.2 Type-Safe Environment (Zod)
+
+```typescript
+import { z } from 'zod';
+
+const envSchema = z.object({
+  NODE_ENV: z.enum(['development', 'production', 'test']),
+  API_URL: z.string().url(),
+  API_KEY: z.string().min(1),
+  PORT: z.string().transform(Number).pipe(z.number().positive()),
+});
+
+export const env = envSchema.parse(process.env);
+
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv extends z.infer<typeof envSchema> {}
+  }
+}
+```
+
+## 6. Do's and Don'ts
+
+### Do's ✅
+- Use `unknown` instead of `any`
+- Enable all strict compiler options
+- Write type guards for runtime validation
+- Use discriminated unions for state
+- Leverage const assertions
+- Use branded types for domain modeling
+
+### Don'ts ❌
+- Don't use `any` without comment justification
+- Don't use `!` non-null assertion without checks
+- Don't overuse type assertions
+- Don't create overly complex generic types
+- Don't ignore compiler errors
+- Don't mix `null` and `undefined` unnecessarily
+
+### Type Utilities Cheatsheet
+```typescript
+type Nullable<T> = T | null;
+type Optional<T> = T | undefined;
+type Maybe<T> = T | null | undefined;
+type ValueOf<T> = T[keyof T];
+type AsyncReturnType<T> = T extends (...args: any) => Promise<infer R> ? R : never;
+type UnpackArray<T> = T extends (infer U)[] ? U : T;
+```

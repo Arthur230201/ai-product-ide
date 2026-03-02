@@ -1,0 +1,17 @@
+{
+  "testCase": "prd-payload-shopping-3pages.json",
+  "timestamp": "2026-02-05T09:03:10.847Z",
+  "auditScore": 100,
+  "auditScores": {
+    "structure": 100,
+    "userRoles": 25,
+    "moduleDetails": 25,
+    "nfr": 25,
+    "acceptance": 25
+  },
+  "auditMeta": {
+    "length": 2579,
+    "headingCount": 18
+  },
+  "auditIssues": []
+}

@@ -9,12 +9,12 @@ import ReactFlow, {
   MiniMap,
   NodeTypes,
   EdgeTypes,
-  Panel,
   NodeMouseHandler,
   useReactFlow,
   ReactFlowProvider,
 } from 'reactflow';
 import { useCanvasStore } from '@/store/canvas-store';
+import { EMPTY_CANVAS_PRIMARY, EMPTY_CANVAS_SECONDARY, NO_NODE_SELECTED_MESSAGE } from '@/lib/user-facing-messages';
 import { FractalNode } from './FractalNode';
 import { SmartEdge } from './SmartEdge';
 import { CommandBar } from './CommandBar';
@@ -26,9 +26,7 @@ import { AIConfigButton } from './AIConfigButton';
 import { NodeDetailPanel } from './NodeDetailPanel';
 import { PresentationMode } from './PresentationMode';
 import { ContextMenu } from './ContextMenu';
-import { toast } from 'sonner';
 import { Play } from 'lucide-react';
-import type { FractalNode as FractalNodeType } from '@/types/fractal';
 
 // 注册自定义节点类型（必须在组件外部定义，避免每次渲染重新创建）
 const nodeTypes: NodeTypes = {
@@ -58,8 +56,15 @@ function CanvasContent() {
     selectedNodeId,
     isDetailPanelOpen,
     deleteNode,
+    addChildNode,
+    addSiblingNode,
+    addBlankNode,
   } = useCanvasStore();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; flowX: number; flowY: number } | null>(null);
+  // 用于区分单击和双击的定时器和标志
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isDoubleClickRef = useRef<boolean>(false);
+  const lastClickNodeIdRef = useRef<string | null>(null);
 
   const handleNodesChange = useCallback(
     (changes: Parameters<typeof onNodesChange>[0]) => {
@@ -82,11 +87,82 @@ function CanvasContent() {
     [onConnect]
   );
 
+  // 彻底重写：单击只选中，双击才打开详情面板
   const handleNodeClick: NodeMouseHandler = useCallback(
-    (_event, node) => {
-      // 统一交互：单击直接打开节点详情面板
+    (event, node) => {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      console.log('🔍 [InfiniteCanvas] handleNodeClick 被调用', { nodeId: node.id });
+      
+      // 如果这是双击后的单击事件，直接忽略
+      if (isDoubleClickRef.current && lastClickNodeIdRef.current === node.id) {
+        console.log('✅ [InfiniteCanvas] 检测到双击后的单击，忽略', { nodeId: node.id });
+        isDoubleClickRef.current = false;
+        lastClickNodeIdRef.current = null;
+        return;
+      }
+
+      // 如果已有定时器，说明这是第二次点击（可能是双击）
+      if (clickTimeoutRef.current) {
+        console.log('✅ [InfiniteCanvas] 检测到第二次点击，可能是双击，清除定时器', { nodeId: node.id });
+        clearTimeout(clickTimeoutRef.current);
+        clickTimeoutRef.current = null;
+        // 设置双击标志，等待双击事件
+        isDoubleClickRef.current = true;
+        lastClickNodeIdRef.current = node.id;
+        return;
+      }
+
+      // 第一次点击，设置定时器
+      lastClickNodeIdRef.current = node.id;
+      clickTimeoutRef.current = setTimeout(() => {
+        // 检查是否是双击
+        if (isDoubleClickRef.current && lastClickNodeIdRef.current === node.id) {
+          console.log('✅ [InfiniteCanvas] 定时器执行时检测到双击，取消单击', { nodeId: node.id });
+          isDoubleClickRef.current = false;
+          lastClickNodeIdRef.current = null;
+          clickTimeoutRef.current = null;
+          return;
+        }
+
+        // 单击：只选中节点，不打开详情面板
+        console.log('✅ [InfiniteCanvas] 执行单击：只选中节点', { nodeId: node.id });
+        selectNode(node.id);
+        clickTimeoutRef.current = null;
+        lastClickNodeIdRef.current = null;
+      }, 250); // 250ms 延迟
+    },
+    [selectNode]
+  );
+
+  const handleNodeDoubleClick: NodeMouseHandler = useCallback(
+    (event, node) => {
+      event.preventDefault();
+      event.stopPropagation();
+      
+      console.log('✅ [InfiniteCanvas] handleNodeDoubleClick 被调用', { nodeId: node.id });
+      
+      // 清除单击定时器
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+        clickTimeoutRef.current = null;
+      }
+      
+      // 设置双击标志
+      isDoubleClickRef.current = true;
+      lastClickNodeIdRef.current = node.id;
+
+      // 双击：选中节点并打开详情面板
+      console.log('✅ [InfiniteCanvas] 执行双击：选中并打开详情面板', { nodeId: node.id });
       selectNode(node.id);
       openNodeDetail(node.id);
+
+      // 延迟重置标志
+      setTimeout(() => {
+        isDoubleClickRef.current = false;
+        lastClickNodeIdRef.current = null;
+      }, 300);
     },
     [selectNode, openNodeDetail]
   );
@@ -167,25 +243,43 @@ function CanvasContent() {
         return;
       }
 
-      // Tab 键：在节点间切换（改进的快捷键）
-      if (e.key === 'Tab' && selectedNodeId && !isDetailPanelOpen && !e.shiftKey) {
+      // Tab 键：添加子节点（使用选中节点作为父节点）
+      if (e.key === 'Tab' && !e.shiftKey && !isDetailPanelOpen) {
         e.preventDefault();
-        // 边界检查：确保有节点可以切换
-        if (nodes.length === 0) return;
+        e.stopPropagation(); // 防止事件冒泡，避免重复触发
         
-        const currentIndex = nodes.findIndex(n => n.id === selectedNodeId);
-        // 如果当前节点不存在，直接返回
-        if (currentIndex === -1) return;
+        // 使用最新的状态，避免状态更新延迟问题
+        const currentState = useCanvasStore.getState();
+        const currentSelectedNodeId = currentState.selectedNodeId;
+        const currentNodes = currentState.nodes;
         
-        const nextIndex = (currentIndex + 1) % nodes.length;
-        if (nodes[nextIndex]) {
-          selectNode(nodes[nextIndex].id);
-          openNodeDetail(nodes[nextIndex].id);
+        console.log('✅ [InfiniteCanvas] Tab 键被按下', {
+          selectedNodeId: currentSelectedNodeId,
+          nodesCount: currentNodes.length,
+          isDetailPanelOpen,
+        });
+        
+        if (currentSelectedNodeId) {
+          // 如果有选中节点，创建子节点
+          console.log('✅ [InfiniteCanvas] 调用 addChildNode');
+          currentState.addChildNode();
+        } else {
+          // 如果没有选中节点，创建新的根节点
+          console.log('✅ [InfiniteCanvas] 调用 addBlankNode（新根节点）');
+          // 计算新节点的位置（放在现有节点的右侧）
+          const maxX = currentNodes.length > 0 
+            ? Math.max(...currentNodes.map(n => n.position.x)) 
+            : 0;
+          const newX = maxX + 400;
+          const newY = currentNodes.length > 0 
+            ? currentNodes[0].position.y 
+            : 250;
+          currentState.addBlankNode({ x: newX, y: newY });
         }
         return;
       }
 
-      // Shift + Tab: 反向切换节点
+      // Shift + Tab: 反向切换节点（保留原有功能）
       if (e.key === 'Tab' && selectedNodeId && !isDetailPanelOpen && e.shiftKey) {
         e.preventDefault();
         // 边界检查：确保有节点可以切换
@@ -203,6 +297,13 @@ function CanvasContent() {
         return;
       }
 
+      // Enter 键：添加同级节点（与选中节点同级）
+      if (e.key === 'Enter' && selectedNodeId && !isDetailPanelOpen && !e.shiftKey) {
+        e.preventDefault();
+        addSiblingNode();
+        return;
+      }
+
       // Delete 或 Backspace 键删除选中的节点
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNodeId && !isDetailPanelOpen) {
         e.preventDefault();
@@ -213,16 +314,22 @@ function CanvasContent() {
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      // 清理定时器和标志
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+        clickTimeoutRef.current = null;
+      }
+      isDoubleClickRef.current = false;
+      lastClickNodeIdRef.current = null;
     };
-  }, [selectedNodeId, isDetailPanelOpen, deleteNode, nodes, selectNode, openNodeDetail]);
+  }, [selectedNodeId, isDetailPanelOpen, deleteNode, nodes, selectNode, openNodeDetail, addChildNode, addSiblingNode, addBlankNode]);
 
-  // 空状态组件 - 极简设计
+  // 空状态组件（最终执行版口径）
   const EmptyState = () => (
     <div className="fixed inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 1 }}>
       <div className="text-center max-w-lg px-8">
-        <p className="text-lg text-zinc-400">
-          描述你的产品想法，或上传设计稿
-        </p>
+        <p className="text-lg text-zinc-400">{EMPTY_CANVAS_PRIMARY}</p>
+        <p className="text-sm text-zinc-500 mt-2">{EMPTY_CANVAS_SECONDARY}</p>
       </div>
     </div>
   );
@@ -236,13 +343,15 @@ function CanvasContent() {
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
         onNodeClick={handleNodeClick}
+        onNodeDoubleClick={handleNodeDoubleClick}
         nodeTypes={memoizedNodeTypes}
         edgeTypes={memoizedEdgeTypes}
         fitView
         className="react-flow-dark"
         nodesDraggable={true}
         nodesConnectable={true}
-        elementsSelectable={true}
+        elementsSelectable={false}
+        selectNodesOnDrag={false}
         onPaneClick={handlePaneClick}
         onPaneContextMenu={handlePaneContextMenu}
         style={{ width: '100%', height: '100%' }}
@@ -254,6 +363,11 @@ function CanvasContent() {
         <MiniMap className="react-flow__minimap-dark" />
       </ReactFlow>
       {nodes.length === 0 && <EmptyState />}
+      {nodes.length > 0 && !selectedNodeId && (
+        <div className="fixed right-4 top-1/2 -translate-y-1/2 text-zinc-500 text-sm pointer-events-none" style={{ zIndex: 2 }}>
+          {NO_NODE_SELECTED_MESSAGE}
+        </div>
+      )}
       {contextMenu && (
         <ContextMenu
           x={contextMenu.x}

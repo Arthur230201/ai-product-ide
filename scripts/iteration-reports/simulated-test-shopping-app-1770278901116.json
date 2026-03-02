@@ -1,0 +1,35 @@
+{
+  "testCase": "shopping-app",
+  "timestamp": "2026-02-05T08:08:21.115Z",
+  "skipProduceInteract": false,
+  "thirdParty": {
+    "score": 85,
+    "issues": [
+      {
+        "source": "third-party",
+        "type": "deliverable_no_script_static",
+        "severity": "P1",
+        "title": "Stage 1 禁止 script",
+        "message": "单次生成静态阶段无 script",
+        "description": "质量门：Stage 1 无 <script>"
+      }
+    ]
+  },
+  "deliverableUsability": {
+    "score": 65,
+    "scores": {
+      "A": 15,
+      "B": 25,
+      "C": 10,
+      "D": 5,
+      "E": 10
+    },
+    "issues": []
+  },
+  "artifactSummary": {
+    "hasStageMarker": true,
+    "hasScript": true,
+    "hasDataAction": true,
+    "length": 4780
+  }
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
 
 /**
@@ -9,6 +9,8 @@ import { useCanvasStore } from '@/store/canvas-store';
  * 由于设置了 skipHydration: true，需要手动调用 rehydrate
  */
 export function StoreHydration() {
+  const [isHydrated, setIsHydrated] = useState(false);
+
   useEffect(() => {
     // 手动触发 hydration，使用 try-catch 确保不会阻塞
     const rehydrate = async () => {
@@ -21,15 +23,27 @@ export function StoreHydration() {
           // 如果没有 persist 方法，直接访问 store 触发初始化
           useCanvasStore.getState();
         }
+        // 标记 hydration 完成
+        setIsHydrated(true);
       } catch (error) {
-        // 静默处理错误，不阻塞页面渲染
+        // 即使出错也标记为完成，避免阻塞页面
         console.warn('Store hydration error (non-blocking):', error);
+        setIsHydrated(true);
       }
     };
 
-    // 立即执行，不等待
+    // 立即执行
     rehydrate();
   }, []);
+
+  // 将 hydration 状态存储到全局，供其他组件使用
+  useEffect(() => {
+    if (isHydrated && typeof window !== 'undefined') {
+      (window as any).__canvasStoreHydrated = true;
+      // 触发自定义事件，通知其他组件
+      window.dispatchEvent(new CustomEvent('canvas-store-hydrated'));
+    }
+  }, [isHydrated]);
 
   // 不渲染任何内容，不阻塞页面
   return null;

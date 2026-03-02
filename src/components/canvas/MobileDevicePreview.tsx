@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { LivePreview } from './LivePreview';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useMemo } from 'react';
@@ -40,19 +41,37 @@ export function MobileDevicePreview({
         transformOrigin: 'top center',
       }}
     >
-      {/* 手机外框 - 简单样式 */}
-      <div className="relative w-full h-full border-[12px] border-gray-900 rounded-[45px] shadow-2xl overflow-hidden bg-gray-900">
-        {/* 内屏包装器 */}
+      {/* 外层包装：手机外框 - 仅用于视觉框架（边框、圆角、阴影），不填充背景色 */}
+      <div 
+        className="relative w-full h-full border-[12px] border-gray-900 rounded-[45px] shadow-2xl overflow-hidden"
+        style={{
+          // 只保留边框，不填充背景色，减少底部黑色区域
+          backgroundColor: 'transparent',
+        }}
+      >
+        {/* 中层：内屏包装器 - 完全贴合边框，无缝隙 */}
         <div 
-          className="bg-white w-full h-full rounded-[32px] overflow-hidden relative flex flex-col"
+          className="w-full h-full rounded-[32px] overflow-hidden relative flex flex-col bg-white"
           style={{
-            margin: '3px',
-            width: 'calc(100% - 6px)',
-            height: 'calc(100% - 6px)',
+            margin: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: '#ffffff',
           }}
         >
-        {/* 屏幕内容区域 */}
-          <div className="w-full h-full overflow-hidden relative">
+        {/* 内层容器：完全干净，不应用任何视觉修饰符 */}
+          <div 
+            className="w-full h-full overflow-hidden relative"
+            style={{
+              // CRITICAL: 内层容器必须没有以下任何视觉修饰符，确保渐变、阴影、背景色以完整强度渲染
+              opacity: undefined,
+              filter: undefined,
+              backdropFilter: undefined,
+              transform: undefined,
+              backgroundColor: undefined,
+              background: undefined,
+            }}
+          >
           {code ? (
               <div className="w-full h-full overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-transparent">
               <div className="w-full min-h-full max-w-full break-words">
@@ -60,11 +79,14 @@ export function MobileDevicePreview({
               </div>
             </div>
           ) : imageUrl ? (
-            <img 
+            <Image 
               src={imageUrl} 
               alt="Preview" 
+              width={width}
+              height={height}
               className="w-full h-full object-contain"
               loading="lazy"
+              unoptimized
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';

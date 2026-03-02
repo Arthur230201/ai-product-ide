@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronDown, ChevronRight } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvas-store';
@@ -128,7 +128,7 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
   }, [isOpen, initialTab]);
 
   // 标签页切换动画
-  const handleTabChange = (tabId: TabType) => {
+  const handleTabChange = useCallback((tabId: TabType) => {
     if (tabId === activeTab) return;
     setIsTransitioning(true);
     setTimeout(() => {
@@ -139,7 +139,7 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
       }
       setTimeout(() => setIsTransitioning(false), 150);
     }, 50);
-  };
+  }, [activeTab]);
 
   // 键盘快捷键支持
   useEffect(() => {
@@ -165,7 +165,7 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, handleTabChange]);
 
   // 确保打开模态框时不会锁定全局滚动
   useEffect(() => {
@@ -199,13 +199,13 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
   }, [isOpen, activeTab]);
   
   // 项目画像本地状态 - 提供默认值防止 undefined
-  const defaultProjectMeta = {
+  const defaultProjectMeta = useMemo(() => ({
     projectName: '未命名项目',
     industry: '通用互联网',
     targetAudience: '通用用户',
     description: '',
     version: '1.0.0',
-  };
+  }), []);
   const [localProjectMeta, setLocalProjectMeta] = useState(projectMeta || defaultProjectMeta);
   
   // 同步 store 中的 projectMeta 到本地状态，并在打开时应用初始数据
@@ -215,7 +215,7 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
     } else {
       setLocalProjectMeta(defaultProjectMeta);
     }
-  }, [projectMeta]);
+  }, [projectMeta, defaultProjectMeta]);
 
   // 当组件打开且有初始数据时，自动填充到项目画像（只执行一次）
   const initialDataAppliedRef = React.useRef(false);
@@ -262,7 +262,7 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
   }, [nodes, edges]);
 
   // 生成业务泳道图（Sequence Diagram格式）
-  const generateSwimlaneCode = (): string => {
+  const generateSwimlaneCode = React.useCallback((): string => {
     if (nodes.length === 0 || edges.length === 0) {
       return '';
     }
@@ -396,12 +396,12 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
       });
 
       return lines.join('\n');
-  };
+  }, [nodes, edges]);
 
   // 生成业务泳道图（基于角色）
   const businessProcessDiagram = useMemo(() => {
     return generateSwimlaneCode();
-  }, [nodes, edges]);
+  }, [generateSwimlaneCode]);
 
   // 生成用户旅程图数据（用于表格和图表）
   const generateUserJourneyTable = useMemo(() => {

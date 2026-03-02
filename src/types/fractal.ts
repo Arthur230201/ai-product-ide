@@ -9,6 +9,7 @@ import { Node, Edge, XYPosition } from 'reactflow';
 export const ViewArtifactSchema = z.object({
   code: z.string().describe('可运行的 React/Tailwind 代码'),
   previewUrl: z.string().url().optional().describe('预览 URL（如果已生成）'),
+  htmlTemplate: z.string().optional().describe('原始 HTML 模板（如果提供，将自动转换为 React 代码）'),
 });
 
 export type ViewArtifact = z.infer<typeof ViewArtifactSchema>;
@@ -208,8 +209,8 @@ export interface FractalNode extends Node<FractalNodeData> {
  * AI Config - AI 模型配置
  */
 export interface AIConfig {
-  visionModel: string; // 视觉模型（用于 UI 生成、拓扑解析等），默认: "gpt-5-2025-08-07"
-  textModel: string; // 文本模型（用于 PRD 生成、代码分析等），默认: "gpt-5-2025-08-07"
+  visionModel: string; // 视觉模型（用于 UI 生成、拓扑解析等），默认: "gpt-5.2-2025-12-11"
+  textModel: string; // 文本模型（用于 PRD 生成、代码分析等），默认: "gpt-5.2-2025-12-11"
 }
 
 /**
@@ -242,6 +243,42 @@ export interface GlobalRules {
 }
 
 /**
+ * Edge Navigation Metadata - 边导航元数据（动作/跳转逻辑）
+ */
+export const EdgeNavMetaSchema = z.object({
+  trigger: z.enum(['ROLE_ENTRY', 'PERMISSION_ENTRY', 'UI_CLICK', 'SYSTEM_REDIRECT']).describe('触发类型'),
+  conditionType: z.enum(['role', 'permission', 'expression', 'none']).describe('条件类型'),
+  condition: z.object({
+    roles: z.array(z.string()).optional().describe('角色列表（conditionType=role 时必需）'),
+    permissions: z.array(z.string()).optional().describe('权限列表（conditionType=permission 时必需）'),
+    expr: z.string().optional().describe('表达式（conditionType=expression 时必需）'),
+  }).describe('条件配置'),
+  sourceHint: z.object({
+    elementText: z.string().optional().describe('触发元素文本（如按钮文案）'),
+    elementId: z.string().optional().describe('触发元素 ID'),
+    elementSelector: z.string().optional().describe('触发元素选择器'),
+  }).optional().describe('触发来源提示（用于 UI_CLICK 类型）'),
+  priority: z.number().optional().describe('优先级（多分支时选择顺序，数字越大优先级越高）'),
+});
+
+export type EdgeNavMeta = z.infer<typeof EdgeNavMetaSchema>;
+
+/**
+ * Edge Data - 扩展 Edge 的 data 字段
+ */
+export const EdgeDataSchema = z.object({
+  label: z.string().optional().describe('边标签'),
+  nav: EdgeNavMetaSchema.optional().describe('导航元数据（动作/跳转逻辑）'),
+});
+
+export type EdgeData = z.infer<typeof EdgeDataSchema>;
+
+/**
+ * Fractal Edge - 扩展的 Edge 类型
+ */
+export type FractalEdge = Edge<EdgeData>;
+
+/**
  * Canvas State - Zustand Store 接口
  */
 export interface CanvasState {
@@ -253,6 +290,13 @@ export interface CanvasState {
   globalRules: GlobalRules;
   aiConfig: AIConfig; // AI 模型配置
 }
+
+/**
+ * 用于 updateNodeData 的载荷：允许深层部分更新（artifacts 及其子字段均可部分提供）
+ */
+export type UpdateNodeDataPayload = Partial<Omit<FractalNodeData, 'artifacts'>> & {
+  artifacts?: Partial<NodeArtifacts>;
+};
 
 /**
  * 辅助类型：用于创建新节点

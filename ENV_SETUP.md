@@ -2,7 +2,8 @@
 
 ## 必需的环境变量
 
-在项目根目录创建 `.env.local` 文件，并添加以下内容：
+可复制项目根目录的 `.env.example` 为 `.env.local`，再填写实际值。  
+或在项目根目录直接创建 `.env.local` 文件，并添加以下内容：
 
 ```
 OPENAI_API_KEY=your_openai_api_key_here

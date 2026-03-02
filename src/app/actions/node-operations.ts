@@ -3,7 +3,9 @@
 import { createServerAction } from 'zsa';
 import { z } from 'zod';
 import { log, logError } from '@/lib/logger';
-import { getVisionModel, getTextModel } from '@/lib/ai-config';
+import { getTextModel, getModelForTier, getOpenAIKey, ensureOpenAIKey } from '@/lib/ai-config';
+import type { GenerationTier } from '@/lib/ai-config';
+import { UI_CONSTITUTION } from '@/lib/prompts/ui-constitution';
 import { callText, callObject } from '@/lib/ai/llm';
 import type { AIResult } from '@/lib/ai/llm';
 
@@ -24,7 +26,7 @@ export async function refineUI(
   refinementPrompt: string = "Please refine styling and consistency."
 ): Promise<AIResult<{ code: string }>> {
   try {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!getOpenAIKey()) {
       return {
         ok: false,
         type: 'PROVIDER',
@@ -111,11 +113,7 @@ export async function reverseGenerateSpec(input: {
   };
 }): Promise<{ title: string; requirements: string[] }> {
   try {
-    // 检查环境变量
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY 未配置。请在 .env.local 文件中添加 OPENAI_API_KEY=your_api_key');
-    }
-
+    ensureOpenAIKey();
     // 获取项目画像配置
     const projectMeta = input.projectMeta || {
       projectName: '未命名项目',
@@ -259,11 +257,7 @@ export async function generateTestCases(input: {
   requirements: string[];
 }): Promise<AIResult<{ cases: string[] }>> {
   try {
-    // 检查环境变量
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY 未配置。请在 .env.local 文件中添加 OPENAI_API_KEY=your_api_key');
-    }
-
+    ensureOpenAIKey();
     if (!input.requirements || input.requirements.length === 0) {
       throw new Error('需求列表为空，无法生成测试用例');
     }
@@ -389,6 +383,8 @@ const GenerateUIFromImageInputSchema = z.object({
   prompt: z.string(),
   imageBase64: z.string(),
   themeConfig: z.any().optional().describe('UI主题配置，用于应用设计系统'),
+  /** Stitch 方案：draft=快速模型，quality=重量模型，默认 quality */
+  tier: z.enum(['draft', 'quality']).optional().describe('生成档位'),
   aiConfig: z.object({
     visionModel: z.string().optional(),
     textModel: z.string().optional(),
@@ -413,11 +409,7 @@ export const generateUIFromImage = createServerAction()
       log('='.repeat(80));
 
     try {
-      // 检查环境变量
-      if (!process.env.OPENAI_API_KEY) {
-        logError('❌ [generateUIFromImage] OPENAI_API_KEY 未配置');
-        throw new Error('OPENAI_API_KEY 未配置。请在 .env.local 文件中添加 OPENAI_API_KEY=your_api_key');
-      }
+      ensureOpenAIKey();
       log('✅ [generateUIFromImage] OPENAI_API_KEY 已配置');
 
       // 处理 base64 图片数据
@@ -534,7 +526,7 @@ Senior Frontend Architect & UI/UX Expert.
 ${projectMeta.description ? `- 项目简介: ${projectMeta.description}` : ''}
 
 # Task
-Generate production-ready **React + Tailwind CSS** code based on the uploaded image.
+Generate production-ready **React + Tailwind CSS** code based on the uploaded image. **质量优先**：生成完整、可直接使用的页面，不要为求快而省略区块或使用占位内容。
 
 # 核心要求
 
@@ -602,6 +594,12 @@ Generate production-ready **React + Tailwind CSS** code based on the uploaded im
 - 标签可切换，使用 useState 管理激活状态
 - 添加 hover 和 active 状态反馈
 
+## 5.1 视觉样式（必须应用）
+- **主按钮/CTA**：使用 \`bg-cyan-500 hover:bg-cyan-600 text-white\` 或 \`bg-teal-500\` 等统一强调色，禁止泛用 \`bg-blue-500\` 无品牌感。
+- **卡片/列表项**：必须带 \`rounded-lg\`/\`rounded-xl\`、\`shadow-md\`/\`shadow-lg\`、内边距 \`p-4\`，禁止无圆角无阴影的白块。
+- **字体层级**：标题 \`font-semibold\`/\`font-bold\` + \`text-lg\`/\`text-xl\`，正文 \`text-gray-600\`/\`text-gray-500\`，形成清晰层次。
+- 页面整体需有明确「有设计」的视觉风格，不能无样式。
+
 ## 6. 语言要求（强制）
 ⚠️ **关键要求：所有文本内容必须使用中文**
 - **所有UI文本必须使用中文**：包括按钮文字、标签、提示信息、标题、描述等
@@ -661,10 +659,10 @@ Generate the complete .tsx code now.`;
         promptPreview: userPrompt.substring(0, 100),
       });
 
-      // 调用 OpenAI 视觉模型生成代码
-      // 获取模型配置
-      const visionModel = getVisionModel(input.aiConfig);
-      log(`🤖 [generateUIFromImage] 开始调用 OpenAI API (${visionModel})...`);
+      // Stitch 双模型分轨：draft=快速模型，quality=重量模型
+      const tier: GenerationTier = input.tier === 'draft' ? 'draft' : 'quality';
+      const visionModel = getModelForTier(tier, 'vision', input.aiConfig);
+      log(`🤖 [generateUIFromImage] 开始调用 OpenAI API (${visionModel}, tier=${tier})...`);
       log('⏱️ [generateUIFromImage] 超时设置: 600秒 (10分钟)');
       const apiStartTime = Date.now();
       
@@ -841,6 +839,8 @@ const GenerateUIFromTextInputSchema = z.object({
     version: z.string(),
   }).optional().describe('项目画像配置'),
   themeConfig: z.any().optional().describe('UI主题配置'),
+  /** Stitch 方案：draft=快速模型，quality=重量模型，默认 quality */
+  tier: z.enum(['draft', 'quality']).optional().describe('生成档位'),
   aiConfig: z.object({
     visionModel: z.string().optional(),
     textModel: z.string().optional(),
@@ -864,12 +864,7 @@ export const generateUIFromText = createServerAction()
     log('='.repeat(80));
 
     try {
-      // 检查环境变量
-      if (!process.env.OPENAI_API_KEY) {
-        logError('❌ [generateUIFromText] OPENAI_API_KEY 未配置');
-        throw new Error('OPENAI_API_KEY 未配置。请在 .env.local 文件中添加 OPENAI_API_KEY=your_api_key');
-      }
-
+      ensureOpenAIKey();
       // 获取项目画像配置
       const projectMeta = input.projectMeta || {
         projectName: '未命名项目',
@@ -958,6 +953,8 @@ ${projectMeta.description ? `- 项目简介: ${projectMeta.description}` : ''}
 Generate production-ready **React + Tailwind CSS** code based on the page description.
 
 # 核心要求
+
+${UI_CONSTITUTION}
 
 ## 1. 基于描述生成UI
 - **理解需求**：仔细分析页面描述，理解页面的核心功能和用户场景
@@ -1071,30 +1068,60 @@ ${toneInstruction}
 - 使用合适的间距、圆角、阴影等视觉元素
 ${designSystemEnforcement}
 
+## 6.1 视觉样式（必须应用，禁止无风格页面）
+⚠️ **生成的页面必须有明确的视觉风格，禁止白底+黑字无层次的「无样式」效果。**
+
+- **统一强调色（品牌感）**：
+  - 主按钮、主要 CTA：**必须使用** \`bg-cyan-500 hover:bg-cyan-600 text-white\` 或 \`bg-teal-500 hover:bg-teal-600 text-white\`，形成统一主色，**禁止**泛用 \`bg-blue-500\` 无区分。
+  - 链接、标签、高亮信息：使用 \`text-cyan-600\` 或 \`text-teal-600\`。
+  - 次要按钮/边框：可使用 \`border-cyan-500\` 或 \`ring-cyan-500/30\`。
+- **卡片与容器**：
+  - 列表项、内容块、表单区域：**必须**带 \`rounded-lg\` 或 \`rounded-xl\`、\`shadow-md\` 或 \`shadow-lg\`、\`p-4\` 或 \`p-5\`，可选 \`border border-gray-100\`，**禁止**光秃秃白块无圆角无阴影。
+- **字体层级**：
+  - 页面/区块标题：\`font-bold\` 或 \`font-semibold\`，\`text-lg\`/\`text-xl\`/\`text-2xl\`。
+  - 正文/描述：\`text-base text-gray-600\` 或 \`text-sm text-gray-500\`。
+  - 价格/重点数字：可加 \`font-semibold text-gray-900\` 或强调色。
+- **间距与节奏**：区块之间使用 \`gap-4\`/\`gap-6\`、\`space-y-4\` 等，避免内容挤在一起或整屏单一灰底。
+- **检查**：最终页面应一眼看出「有设计」：有主色、有卡片感、有层次，而不是默认无样式。
+
+## 7. 禁止占位与示例文案（强制）
+- **严禁**出现以下或类似文案：
+  - 「这里是示例界面」「没有提供具体的页面描述」「因此展示一个基础布局」
+  - 「内容区域」「示例界面」「占位内容」「暂无描述」
+- **必须**根据【页面名称/用户描述】生成**真实、具体、可用**的界面内容：
+  - 页面标题/顶栏标题**必须与页面类型一致**：节点名/描述是「商品详情」则顶栏和内容必须是商品详情（商品图、价格、规格、购买按钮等），**禁止**输出「主页」「首页」「概览」等与页面类型不符的标题或内容。
+  - 主体内容必须与页面类型匹配：如「商品详情」需有商品图、标题、价格、规格、购买/加入购物车等；列表页需有列表项、筛选/搜索；表单页需有完整表单字段。
+  - **禁止**：当页面类型为商品详情/订单/表单等具体页时，生成「主页」「首页」「智能推荐」「最新资讯」等通用首页/概览内容。
+  - 使用合理的模拟数据（如商品名、价格、状态文案），让界面看起来像真实产品，而不是空壳
+- **审美要求**：层次清晰、主次分明；至少一处强调色（如主按钮、标签）形成焦点；避免整块空白或单一灰底，用卡片、分割、留白营造节奏
+
+## 8. 质量优先（强制）
+- **生成完整、可直接使用的静态页面**：以输出质量为优先，不要为求快而省略区块、使用占位内容或示例文案。
+- 完整实现描述中的主要模块与交互，代码可直接运行、内容充实，让用户感受到「成品」而非草稿。
+
 # Output
 - Return **ONLY** the full \`.tsx\` code.
+- **禁止**输出向用户提问、索要描述或说明性的文字（例如「我需要你提供…」「请告诉我…」「才能为你生成」等）。**必须直接输出可运行的 React 组件代码**，不要用任何理由要求用户补充信息。
 - Ensure all icons are imported from \`lucide-react\`.
 - 不要包含 \`\`\`tsx 或 \`\`\`jsx 等markdown标记
 - 不要包含任何注释或说明文字`;
 
-      // 构建用户提示词
-      const userPrompt = input.prompt.trim() || `请为"${input.nodeLabel}"页面生成完整的React组件代码。
+      // 构建用户提示词：强调真实内容与页面类型匹配，禁止占位/示例文案
+      const nodeLabel = input.nodeLabel || '页面';
+      const userPrompt = input.prompt.trim() || `请为【${nodeLabel}】页面生成**完整、可用、有真实内容**的 React 组件代码。
 
 要求：
-1. 根据页面名称和描述，设计合理的UI布局
-2. 实现所有必要的交互功能
-3. 使用现代化的设计风格
-4. 确保代码可以直接运行
-5. **背景色要求（重要）**：
-   - **默认使用白色背景**（\`bg-white\`），这是统一要求
-   - **除非用户特别要求其他颜色**（如"深色模式"、"黑色背景"、"dark theme"等），否则必须使用白色背景
-   - 禁止使用深色背景（如 \`bg-gray-900\`、\`bg-slate-900\` 等），除非用户明确要求
-6. **所有文本内容必须使用中文**，包括按钮、标签、提示信息等
-7. **确保内容在移动端屏幕内完整显示，不超出屏幕范围**（使用 \`w-full overflow-x-hidden\`）`;
+1. **内容必须具体**：根据页面名称「${nodeLabel}」生成与之匹配的真实界面内容，不要生成「示例界面」「没有提供具体描述」等占位文案。例如：商品详情页需包含商品图、标题、价格、规格、购买按钮；列表页需包含列表项、搜索/筛选；表单页需包含完整表单项。
+2. **标题与品牌**：顶栏或主标题**必须**使用页面名「${nodeLabel}」（与当前节点一致），禁止使用「主页」「首页」「概览」等与页面类型不符的标题；可搭配搜索、通知等常用入口，使界面像真实产品。
+3. 布局合理、层次清晰，实现所有必要的交互（点击、输入、切换等），使用现代化设计风格。
+4. **背景色**：默认使用白色背景（\`bg-white\`）；仅当用户明确要求深色主题时才使用深色背景。
+5. **视觉样式**：主按钮用 \`bg-cyan-500\` 或 \`bg-teal-500\`；卡片用 \`rounded-lg shadow-md p-4\`；标题加粗、字号层级分明；整体要有明确设计感，禁止无样式白底黑字。
+6. 所有文案使用中文；移动端内完整显示（\`w-full overflow-x-hidden\`），不出现大块空白或单一灰底。`;
 
-      // 获取模型配置
-      const textModel = getTextModel(input.aiConfig);
-      log(`🤖 [generateUIFromText] 使用模型: ${textModel}`);
+      // Stitch 双模型分轨：draft=快速模型，quality=重量模型
+      const tier: GenerationTier = input.tier === 'draft' ? 'draft' : 'quality';
+      const textModel = getModelForTier(tier, 'text', input.aiConfig);
+      log(`🤖 [generateUIFromText] 使用模型: ${textModel}, tier=${tier}`);
       
       const apiStartTime = Date.now();
       
@@ -1103,7 +1130,7 @@ ${designSystemEnforcement}
         model: textModel,
         prompt: `${systemPrompt}\n\n${userPrompt}`,
         temperature: 0.5,
-        maxOutputTokens: 8000,
+        maxOutputTokens: 16000, // 静态页完整输出，优先质量避免截断
         actionName: 'generateUIFromText',
         aiConfig: input.aiConfig,
       });
@@ -1164,18 +1191,35 @@ ${designSystemEnforcement}
         preview: generatedCode.substring(0, 200),
       });
 
-      // 验证代码是否有效
-      if (!generatedCode || generatedCode.length < 50) {
+      // 拒绝「向用户索要描述」的模型回复（模型有时会输出说明文字而非代码）
+      const refusalPatterns = [
+        /我需要你提供[\s\S]{0,80}(描述|信息|内容)/i,
+        /请告诉我[\s\S]{0,80}(页面|功能|内容)/i,
+        /才能为你(重新)?生成/i,
+        /只要你给我[\s\S]{0,40}描述/i,
+      ];
+      const isRefusal = refusalPatterns.some((re) => re.test(generatedCode));
+      if (isRefusal) {
+        logError('❌ [generateUIFromText] 模型返回了说明/提问文字而非代码', {
+          preview: generatedCode.substring(0, 300),
+        });
+        throw new Error(
+          '模型返回了说明文字而非 UI 代码。请在下拉或节点中补充页面描述（如：商品详情页、列表页、包含的模块），再点击「生成本页 UI」重试。'
+        );
+      }
+
+      // 验证代码是否有效（最小长度提高，避免接受极短或非代码内容）
+      if (!generatedCode || generatedCode.length < 400) {
         logError('❌ [generateUIFromText] 生成的代码太短:', {
           codeLength: generatedCode?.length || 0,
         });
-        throw new Error('生成的代码太短或不完整，请重试');
+        throw new Error('生成的代码太短或不完整，请补充页面描述后重试');
       }
 
       // 确保代码包含 React 组件
       if (!generatedCode.includes('function') && !generatedCode.includes('const') && !generatedCode.includes('=>')) {
         logError('❌ [generateUIFromText] 生成的代码不包含有效的React组件');
-        throw new Error('生成的代码不包含有效的React组件');
+        throw new Error('生成的代码不包含有效的React组件，请补充页面描述后重试');
       }
 
       const totalDuration = Date.now() - startTime;
@@ -1218,11 +1262,7 @@ export const generateAnalysisFromCode = createServerAction()
   .input(GenerateAnalysisFromCodeInputSchema)
   .handler(async ({ input }) => {
     try {
-      // 检查环境变量
-      if (!process.env.OPENAI_API_KEY) {
-        throw new Error('OPENAI_API_KEY 未配置。请在 .env.local 文件中添加 OPENAI_API_KEY=your_api_key');
-      }
-
+      ensureOpenAIKey();
       // 获取页面标题，用于生成功能ID前缀
       const pageTitle = input.pageTitle || '';
       

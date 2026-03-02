@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { openai } from '@ai-sdk/openai';
 import { generateText } from 'ai';
+import { getOpenAIKey } from '@/lib/ai-config';
 
 export async function POST(request: NextRequest) {
   try {
-    // 检查环境变量
-    if (!process.env.OPENAI_API_KEY) {
+    if (!getOpenAIKey()) {
       return NextResponse.json(
         { error: 'OPENAI_API_KEY 未配置' },
         { status: 500 }

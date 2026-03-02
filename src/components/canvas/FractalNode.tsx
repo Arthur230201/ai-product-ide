@@ -5,6 +5,7 @@ import { Handle, Position, NodeProps } from 'reactflow';
 import { Layout, Server } from 'lucide-react';
 import type { FractalNodeData } from '@/types/fractal';
 import { clsx } from 'clsx';
+import { SYNC_STATE_TOOLTIP } from '@/lib/user-facing-messages';
 
 export const FractalNode = memo(
   ({ data, selected, type }: NodeProps<FractalNodeData>) => {
@@ -27,6 +28,8 @@ export const FractalNode = memo(
 
     return (
       <div
+        data-testid={`canvas-node-${data.label?.replace(/\s+/g, '-').toLowerCase() || 'unknown'}`}
+        data-node-id={data.label}
         className={clsx(
           'group w-64 rounded-lg border-2 bg-zinc-900 p-4 shadow-md transition-all cursor-pointer',
           selected
@@ -34,6 +37,8 @@ export const FractalNode = memo(
             : 'border-zinc-800 hover:border-zinc-700 hover:shadow-lg'
         )}
         title={selected ? '已选中 - 双击查看详情' : '单击选中，双击查看详情'}
+        // 移除节点内部的点击处理，完全依赖 React Flow 的 onNodeClick
+        // onClick 和 onDoubleClick 由 React Flow 的 onNodeClick/onNodeDoubleClick 处理
       >
         {/* Header */}
         <div className="flex items-center gap-3 mb-3">
@@ -59,8 +64,11 @@ export const FractalNode = memo(
             {sourceLabel}
           </span>
 
-          {/* Sync Status Indicator */}
-          <div className="flex items-center gap-1.5">
+          {/* Sync Status Indicator（最终执行版口径） */}
+          <div
+            className="flex items-center gap-1.5"
+            title={SYNC_STATE_TOOLTIP}
+          >
             <div
               className={clsx(
                 'w-2 h-2 rounded-full',
@@ -68,11 +76,6 @@ export const FractalNode = memo(
                   ? 'bg-green-500'
                   : 'bg-yellow-500'
               )}
-              title={
-                data.syncState.isSynced
-                  ? '已同步'
-                  : '未同步'
-              }
             />
             <span className="text-xs text-zinc-400">
               {data.syncState.isSynced ? '已同步' : '未同步'}

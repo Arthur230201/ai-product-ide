@@ -1,0 +1,29 @@
+{
+  "totalRounds": 2,
+  "targetReached": true,
+  "finalScores": {
+    "system": 100,
+    "domainExpert": 100,
+    "thirdParty": 100,
+    "overall": 100,
+    "build": 100,
+    "lint": 100,
+    "tsc": 100,
+    "deliverableUsability": null
+  },
+  "totalProblems": 2,
+  "totalFixes": 1,
+  "rounds": [
+    {
+      "round": 1,
+      "success": true,
+      "targetReached": false
+    },
+    {
+      "round": 2,
+      "success": true,
+      "targetReached": true
+    }
+  ],
+  "timestamp": "2026-02-05T07:16:14.005Z"
+}

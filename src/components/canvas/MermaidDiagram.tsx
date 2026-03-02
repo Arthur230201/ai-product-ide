@@ -1,23 +1,41 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import mermaid from 'mermaid';
 
-// 初始化配置：使用中性色调，符合企业级风格
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'base',
-  themeVariables: {
-    primaryColor: '#1e293b', // zinc-800
-    primaryTextColor: '#e4e4e7', // zinc-200
-    primaryBorderColor: '#52525b', // zinc-600
-    lineColor: '#71717a', // zinc-500
-    secondaryColor: '#0f172a', // zinc-950
-    tertiaryColor: '#18181b', // zinc-900
-    fontFamily: 'monospace'
-  },
-  securityLevel: 'loose',
-});
+// 动态导入 mermaid，避免 SSR 问题
+let mermaidInstance: typeof import('mermaid') | null = null;
+let mermaidInitialized = false;
+
+const initializeMermaid = async () => {
+  if (mermaidInitialized && mermaidInstance) {
+    return mermaidInstance;
+  }
+  
+  try {
+    mermaidInstance = await import('mermaid');
+    if (mermaidInstance && !mermaidInitialized) {
+      mermaidInstance.default.initialize({
+        startOnLoad: false,
+        theme: 'base',
+        themeVariables: {
+          primaryColor: '#1e293b', // zinc-800
+          primaryTextColor: '#e4e4e7', // zinc-200
+          primaryBorderColor: '#52525b', // zinc-600
+          lineColor: '#71717a', // zinc-500
+          secondaryColor: '#0f172a', // zinc-950
+          tertiaryColor: '#18181b', // zinc-900
+          fontFamily: 'monospace'
+        },
+        securityLevel: 'loose',
+      });
+      mermaidInitialized = true;
+    }
+    return mermaidInstance;
+  } catch (error) {
+    console.error('Failed to load mermaid:', error);
+    return null;
+  }
+};
 
 interface MermaidDiagramProps {
   code?: string;
@@ -38,7 +56,20 @@ export function MermaidDiagram({ code, definition, compact = false }: MermaidDia
   useEffect(() => {
     const renderDiagram = async () => {
       if (!diagramCode) return;
+      
+      // 确保只在客户端执行
+      if (typeof window === 'undefined') return;
+      
       try {
+        // 动态加载 mermaid
+        const mermaidModule = await initializeMermaid();
+        if (!mermaidModule || !mermaidModule.default) {
+          setError(true);
+          return;
+        }
+        
+        const mermaid = mermaidModule.default;
+        
         // 生成唯一ID防止冲突
         const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
         const { svg } = await mermaid.render(id, diagramCode);

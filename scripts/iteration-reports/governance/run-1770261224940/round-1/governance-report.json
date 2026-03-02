@@ -1,0 +1,98 @@
+{
+  "round": 1,
+  "timestamp": "2026-02-05T03:13:44.942Z",
+  "tests": {
+    "success": true,
+    "durationMs": 136,
+    "message": "self-check 通过"
+  },
+  "internalAudit": {
+    "overallScore": 50,
+    "scores": {
+      "system": 0,
+      "domainExpert": 100,
+      "overall": 50
+    },
+    "issues": [
+      {
+        "source": "system",
+        "type": "build_fail",
+        "severity": "P0",
+        "title": "Build 失败",
+        "message": "pnpm run build 未通过",
+        "description": "见 docs/self-check/raw/build.log",
+        "fixActions": [
+          {
+            "strategy": "fix_build_fail",
+            "metric": "build_fail",
+            "description": "修复 Build 失败"
+          }
+        ]
+      },
+      {
+        "source": "system",
+        "type": "lint_fail",
+        "severity": "P1",
+        "title": "Lint 失败",
+        "message": "pnpm run lint 未通过",
+        "description": "见 docs/self-check/raw/lint.log",
+        "fixActions": [
+          {
+            "strategy": "fix_lint_fail",
+            "metric": "lint_fail",
+            "description": "修复 Lint 失败"
+          }
+        ]
+      },
+      {
+        "source": "system",
+        "type": "tsc_fail",
+        "severity": "P0",
+        "title": "TSC 失败",
+        "message": "tsc --noEmit 未通过",
+        "description": "见 docs/self-check/raw/tsc.log",
+        "fixActions": [
+          {
+            "strategy": "fix_tsc_fail",
+            "metric": "tsc_fail",
+            "description": "修复 TSC 失败"
+          }
+        ]
+      }
+    ],
+    "fixActions": [
+      {
+        "strategy": "fix_build_fail",
+        "metric": "build_fail",
+        "description": "修复 Build 失败"
+      },
+      {
+        "strategy": "fix_lint_fail",
+        "metric": "lint_fail",
+        "description": "修复 Lint 失败"
+      },
+      {
+        "strategy": "fix_tsc_fail",
+        "metric": "tsc_fail",
+        "description": "修复 TSC 失败"
+      }
+    ],
+    "source": "internal"
+  },
+  "ruling": {
+    "passed": false,
+    "reason": "存在 P0 问题，裁决不通过",
+    "overall": 50,
+    "hasP0": true,
+    "threshold": 85
+  },
+  "thirdPartyReview": null,
+  "optimizationPlan": null,
+  "optimizationResult": null,
+  "internalOptimization": {
+    "success": true,
+    "fixesCount": 0,
+    "fixes": [],
+    "error": null
+  }
+}

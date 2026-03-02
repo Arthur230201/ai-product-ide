@@ -14,6 +14,7 @@ import {
 import type {
   FractalNode,
   FractalNodeData,
+  UpdateNodeDataPayload,
   CanvasState,
   NodeArtifacts,
   ProjectMeta,
@@ -23,6 +24,8 @@ import type {
 import { getLayoutedElements } from '@/lib/layout';
 import type { UIThemeConfig } from '@/types/theme';
 import { defaultTheme } from '@/types/theme';
+import { preview } from '@/lib/safe/preview';
+import { log, logError, logWarn } from '@/lib/logger';
 
 type BlueprintTabType = 'profile' | 'business' | 'interaction' | 'data' | 'topology' | 'rules' | 'events' | 'userStories';
 
@@ -38,7 +41,7 @@ interface CanvasStore extends CanvasState {
   addNodes: (nodes: FractalNode[]) => void;
   addEdges: (edges: Edge[]) => void;
   // 支持部分更新，包括深层 artifacts 更新
-  updateNodeData: (id: string, data: any) => void;
+  updateNodeData: (id: string, data: UpdateNodeDataPayload) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect: (connection: Connection) => void;
@@ -72,19 +75,27 @@ interface CanvasStore extends CanvasState {
 }
 
 /**
+ * 生成空白节点UI代码模板
+ */
+const generateBlankNodeCode = (nodeLabel: string): string => {
+  return `export default function BlankPage() {
+  return (
+    <div className="w-full h-full bg-white border border-gray-200 flex items-center justify-center overflow-hidden">
+      <div className="p-8">
+        <h1 className="text-2xl font-semibold text-gray-900">${nodeLabel}</h1>
+      </div>
+    </div>
+  );
+}`;
+};
+
+/**
  * 创建初始 mock 数据 - 一个 'page' 节点
  */
 const createMockNode = (): FractalNode => {
   const mockArtifacts: NodeArtifacts = {
     view: {
-      code: `export default function HomePage() {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold">欢迎使用 AI-Native IDE</h1>
-      <p className="mt-4 text-gray-600">这是一个示例页面节点</p>
-    </div>
-  );
-}`,
+      code: generateBlankNodeCode('首页'),
     },
     spec: {
       title: '首页',
@@ -181,8 +192,8 @@ export const useCanvasStore = create<CanvasStore>()(
             dataTracking: '',
           },
           aiConfig: {
-            visionModel: 'gpt-5-2025-08-07',
-            textModel: 'gpt-5-2025-08-07',
+            visionModel: 'gpt-5.1-chat-2025-11-13',
+            textModel: 'gpt-5.1-chat-2025-11-13',
           },
         } as unknown as CanvasStore;
       }
@@ -206,17 +217,41 @@ export const useCanvasStore = create<CanvasStore>()(
 
       // 初始化 AI 配置（优先使用环境变量，否则使用默认值）
       const initialAIConfig: AIConfig = {
-        visionModel: process.env.NEXT_PUBLIC_AI_VISION_MODEL || 'gpt-5-2025-08-07',
-        textModel: process.env.NEXT_PUBLIC_AI_TEXT_MODEL || 'gpt-5-2025-08-07',
+        visionModel: process.env.NEXT_PUBLIC_AI_VISION_MODEL || 'gpt-5.1-chat-2025-11-13',
+        textModel: process.env.NEXT_PUBLIC_AI_TEXT_MODEL || 'gpt-5.1-chat-2025-11-13',
       };
 
-      // 从 localStorage 恢复状态
-      const stored = typeof window !== 'undefined' ? localStorage.getItem('canvas-store') : null;
+      // 从 localStorage 恢复状态（仅在客户端）
+      let stored: string | null = null;
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          stored = localStorage.getItem('canvas-store');
+        } catch (e) {
+          // localStorage 可能被安全策略阻止
+          stored = null;
+        }
+      }
+      
       let initialState: CanvasState;
       
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
+          
+          // 自动迁移旧模型配置到新模型
+          let migratedAIConfig = parsed.aiConfig || initialAIConfig;
+          const oldModel = 'gpt-5-2025-08-07';
+          const oldModel2 = 'gpt-5.2-2025-12-11';
+          const newModel = 'gpt-5.1-chat-2025-11-13';
+          
+          // 如果使用的是旧模型，自动更新为新模型
+          if (migratedAIConfig.visionModel === oldModel || migratedAIConfig.visionModel === oldModel2) {
+            migratedAIConfig = { ...migratedAIConfig, visionModel: newModel };
+          }
+          if (migratedAIConfig.textModel === oldModel || migratedAIConfig.textModel === oldModel2) {
+            migratedAIConfig = { ...migratedAIConfig, textModel: newModel };
+          }
+          
           initialState = {
             nodes: parsed.nodes || [],
             edges: parsed.edges || [],
@@ -224,7 +259,7 @@ export const useCanvasStore = create<CanvasStore>()(
             currentTheme: parsed.currentTheme || defaultTheme,
             projectMeta: parsed.projectMeta || initialProjectMeta,
             globalRules: parsed.globalRules || initialGlobalRules,
-            aiConfig: parsed.aiConfig || initialAIConfig,
+            aiConfig: migratedAIConfig,
           };
         } catch (e) {
           console.error('Failed to parse stored state:', e);
@@ -517,7 +552,7 @@ export const useCanvasStore = create<CanvasStore>()(
     }));
   },
 
-  updateNodeData: (id: string, data: Partial<FractalNodeData>) => {
+  updateNodeData: (id: string, data: UpdateNodeDataPayload) => {
     set((state) => ({
       nodes: state.nodes.map((node) => {
         if (node.id !== id) return node;
@@ -533,14 +568,14 @@ export const useCanvasStore = create<CanvasStore>()(
               const incomingView = data.artifacts.view;
               const existingView = node.data.artifacts.view;
               
-              // 调试日志
-              if (process.env.NODE_ENV === 'development' && incomingView) {
-                console.log('🔍 [canvas-store] updateNodeData view merge:', {
+              // 调试日志（仅开发环境，避免生产噪音）
+              if (incomingView && process.env.NODE_ENV === 'development') {
+                log('🔍 [canvas-store] updateNodeData view merge:', {
                   nodeId: id,
                   incomingCodeLength: incomingView.code?.length || 0,
-                  incomingCodePreview: incomingView.code?.substring(0, 50) || 'N/A',
+                  incomingCodePreview: incomingView.code ? preview(incomingView.code, 50) : 'N/A',
                   existingCodeLength: existingView?.code?.length || 0,
-                  existingCodePreview: existingView?.code?.substring(0, 50) || 'N/A',
+                  existingCodePreview: existingView?.code ? preview(existingView.code, 50) : 'N/A',
                   incomingIsValid: incomingView.code && incomingView.code.length > 0 && incomingView.code !== '// PLACEHOLDER',
                   existingIsValid: existingView?.code && existingView.code.length > 0 && existingView.code !== '// PLACEHOLDER',
                 });
@@ -571,9 +606,9 @@ export const useCanvasStore = create<CanvasStore>()(
                     code: incomingView.code,
                   };
                   if (process.env.NODE_ENV === 'development') {
-                    console.log('✅ [canvas-store] 使用传入的有效view.code，合并结果:', {
+                    log('✅ [canvas-store] 使用传入的有效 view.code，合并结果:', {
                       mergedCodeLength: merged.code?.length || 0,
-                      mergedCodePreview: merged.code?.substring(0, 50) || 'N/A',
+                      mergedCodePreview: merged.code ? preview(merged.code, 50) : 'N/A',
                       hasPreviewUrl: !!merged.previewUrl,
                       incomingCodeLength: incomingView.code?.length || 0,
                       existingCodeLength: existingView?.code?.length || 0,
@@ -581,24 +616,19 @@ export const useCanvasStore = create<CanvasStore>()(
                   }
                   // 最终验证：确保合并后的code有效
                   if (!merged.code || merged.code.length === 0 || merged.code === '// PLACEHOLDER') {
-                    console.error('❌ [canvas-store] 合并后code仍然无效，这不应该发生！', {
-                      incomingCode: incomingView.code?.substring(0, 50),
-                      existingCode: existingView?.code?.substring(0, 50),
+                    logError('❌ [canvas-store] 合并后code仍然无效，这不应该发生！', {
+                      incomingCode: incomingView.code ? preview(incomingView.code, 50) : 'N/A',
+                      existingCode: existingView?.code ? preview(existingView.code, 50) : 'N/A',
                     });
                   }
                   return merged;
                 }
                 // 如果传入的view.code为空或无效，保留原有view（不覆盖）
                 if (existingCodeIsValid) {
-                  if (process.env.NODE_ENV === 'development') {
-                    console.log('⚠️ [canvas-store] 传入的view.code无效，保留原有view');
-                  }
+                  if (process.env.NODE_ENV === 'development') logWarn('⚠️ [canvas-store] 传入的 view.code 无效，保留原有 view');
                   return existingView; // 保留原有有效view
                 }
-                // 如果原有view也无效，使用传入的view（至少保留previewUrl等）
-                if (process.env.NODE_ENV === 'development') {
-                  console.log('⚠️ [canvas-store] 原有view也无效，使用传入的view');
-                }
+                if (process.env.NODE_ENV === 'development') logWarn('⚠️ [canvas-store] 原有 view 也无效，使用传入的 view');
                 // 如果传入的view.code虽然无效，但至少尝试保留previewUrl等其他属性
                 const mergedInvalid = { ...existingView, ...incomingView };
                 // 即使传入的code无效，也不要用空字符串覆盖，至少保留原有的code
@@ -608,9 +638,7 @@ export const useCanvasStore = create<CanvasStore>()(
                 return mergedInvalid;
               }
               // 如果没有传入view，保留原有view
-              if (process.env.NODE_ENV === 'development') {
-                console.log('⚠️ [canvas-store] 没有传入view，保留原有view');
-              }
+              if (process.env.NODE_ENV === 'development') logWarn('⚠️ [canvas-store] 没有传入 view，保留原有 view');
               return existingView;
             })(),
             spec: data.artifacts.spec
@@ -644,7 +672,7 @@ export const useCanvasStore = create<CanvasStore>()(
           };
         }
         
-        return {
+        const updatedNode = {
           ...node,
           data: {
             ...updatedData,
@@ -652,14 +680,43 @@ export const useCanvasStore = create<CanvasStore>()(
             artifacts: updatedData.artifacts,
           },
         };
+        
+        // 验证更新后的节点数据（始终输出日志，便于调试）
+        if (data.artifacts?.view?.code) {
+          const savedCode = updatedNode.data.artifacts?.view?.code || '';
+          if (process.env.NODE_ENV === 'development') log('✅ [canvas-store] 节点更新完成:', {
+            nodeId: id,
+            savedCodeLength: savedCode.length,
+            savedCodePreview: savedCode ? preview(savedCode, 50) : 'N/A',
+            hasView: !!updatedNode.data.artifacts?.view,
+            hasCode: !!updatedNode.data.artifacts?.view?.code,
+          });
+        }
+        
+        return updatedNode;
       }),
     }));
   },
 
   onNodesChange: (changes: NodeChange[]) => {
-    set((state) => ({
-      nodes: applyNodeChanges(changes, state.nodes) as FractalNode[],
-    }));
+    set((state) => {
+      // 完全禁用 React Flow 的默认选择行为
+      // 节点选择完全由我们的 handleNodeClick 和 handleNodeDoubleClick 控制
+      // 这里只处理节点位置、尺寸等变化，不处理选择变化
+      const filteredChanges = changes.filter(change => change.type !== 'select');
+      
+      // 如果有选择变化，忽略它（不更新 selectedNodeId）
+      // 选择状态完全由 selectNode 和 openNodeDetail 控制
+      const updatedNodes = filteredChanges.length > 0 
+        ? applyNodeChanges(filteredChanges, state.nodes) as FractalNode[]
+        : state.nodes;
+      
+      return {
+        nodes: updatedNodes,
+        // 不更新 selectedNodeId，保持当前选择状态
+        // 选择完全由 handleNodeClick/handleNodeDoubleClick 控制
+      };
+    });
   },
 
   onEdgesChange: (changes: EdgeChange[]) => {
@@ -827,25 +884,17 @@ export const useCanvasStore = create<CanvasStore>()(
         nodePosition = { x: 250, y: 250 };
       }
       
+      const nodeLabel = '新节点';
       const blankNode: FractalNode = {
         id: `manual-${timestamp}`,
         type: 'page',
         position: nodePosition,
         selected: false,
         data: {
-          label: '新节点',
+          label: nodeLabel,
           artifacts: {
             view: {
-              code: `function App() {
-  const { useState } = React;
-  
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-4">新节点</h1>
-      <p className="text-gray-600">这是一个空白节点，你可以编辑它</p>
-    </div>
-  );
-}`,
+              code: generateBlankNodeCode(nodeLabel),
             },
             spec: {
               title: '新节点',
@@ -934,6 +983,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
       // 使用 addBlankNode 的逻辑，但不传 position，让自动布局处理
       const timestamp = Date.now();
+      const nodeLabel = '新节点';
       const blankNode: FractalNode = {
         id: `manual-${timestamp}`,
         type: 'page',
@@ -943,19 +993,10 @@ export const useCanvasStore = create<CanvasStore>()(
         },
         selected: false,
         data: {
-          label: '新节点',
+          label: nodeLabel,
           artifacts: {
             view: {
-              code: `function App() {
-  const { useState } = React;
-  
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-4">新节点</h1>
-      <p className="text-gray-600">这是一个空白节点，你可以编辑它</p>
-    </div>
-  );
-}`,
+              code: generateBlankNodeCode(nodeLabel),
             },
             spec: {
               title: '新节点',
@@ -1044,6 +1085,7 @@ export const useCanvasStore = create<CanvasStore>()(
       }
 
       const timestamp = Date.now();
+      const nodeLabel = '新节点';
       const blankNode: FractalNode = {
         id: `manual-${timestamp}`,
         type: 'page',
@@ -1053,19 +1095,10 @@ export const useCanvasStore = create<CanvasStore>()(
         },
         selected: false,
         data: {
-          label: '新节点',
+          label: nodeLabel,
           artifacts: {
             view: {
-              code: `function App() {
-  const { useState } = React;
-  
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-4">新节点</h1>
-      <p className="text-gray-600">这是一个空白节点，你可以编辑它</p>
-    </div>
-  );
-}`,
+              code: generateBlankNodeCode(nodeLabel),
             },
             spec: {
               title: '新节点',

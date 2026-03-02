@@ -4,6 +4,7 @@ import { asBlob } from 'html-docx-js-typescript';
 import type { ProjectMeta, GlobalRules } from '@/types/fractal';
 import type { FractalNode } from '@/types/fractal';
 import type { Edge } from 'reactflow';
+import { extractBodyContent, extractStylesFromHtml, isHtmlCode } from './html-body-extractor';
 
 // 1. 定义文档的样式 (打印友好 + 屏幕阅读友好)
 const STYLES = `
@@ -270,7 +271,8 @@ export interface RequirementSection {
 export interface PageNode {
   title: string;          // e.g., "订单列表页"
   uiPreview: string;      // Base64 图片
-  uiCode?: string;        // React 组件代码（用于交互式 UI）
+  uiCode?: string;        // React 组件代码或 HTML（含 style+body，用于界面示意）
+  isHtml?: boolean;       // 为 true 时用 innerHTML 渲染，避免当 React 导致空白
   nodeId?: string;        // 节点唯一标识符（用于生成挂载点 ID）
   sections: RequirementSection[]; // 动态需求章节列表
   userStories?: Array<{   // 用户故事列表（用户故事模型 - 核心）
@@ -395,6 +397,9 @@ export function generateFullPrdHtml(data: FullPrdData): string {
             border-radius: 3px;
         }
         .main-content { margin-left: 280px; min-height: 100vh; background: #fff; }
+        .device-sandbox { position: relative; width: 100%; min-height: 400px; height: 100%; overflow: hidden; border-radius: 1rem; border: 2px solid #e2e8f0; background: #fff; }
+        .device-sandbox > div { width: 100%; height: 100%; min-height: 100%; box-sizing: border-box; }
+        .prd-ui-viewport { min-height: 100%; box-sizing: border-box; }
         
         /* Typography & Tables - 企业级文档标题层级 */
         /* 使用 !important 确保样式优先级，覆盖 Tailwind 和 markdown-body 的默认样式 */
@@ -1069,6 +1074,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                 nodeId: node.nodeId || `node-${idx}`,
                 uiCode: node.uiCode || '',
                 title: node.title || '未命名页面',
+                isHtml: !!node.isHtml,
               }))
           )};
 
@@ -1102,6 +1108,27 @@ export function generateFullPrdHtml(data: FullPrdData): string {
             }
 
             try {
+              if (nodeData.isHtml) {
+                var htmlContent = nodeData.uiCode.trim();
+                htmlContent = htmlContent.replace(/<style([^>]*)>([\\s\\S]*?)<\\/style>/gi, function(_, attrs, inner) {
+                  var r = inner.replace(/\\b(html\\s*,\\s*)?body\\b/g, '.prd-ui-viewport');
+                  return '<style' + attrs + '>' + r + '</style>';
+                });
+                var styleEnd = htmlContent.indexOf('</style>');
+                if (styleEnd !== -1) {
+                  var after = htmlContent.slice(styleEnd + 8).trim();
+                  htmlContent = htmlContent.slice(0, styleEnd + 8) + '<div class="prd-ui-viewport">' + after + '</div>';
+                }
+                container.innerHTML = '';
+                container.className = 'device-sandbox';
+                var innerDiv = document.createElement('div');
+                innerDiv.className = 'prd-ui-sandbox-inner';
+                innerDiv.style.cssText = 'width:100%;height:100%;min-height:100%;box-sizing:border-box;';
+                innerDiv.innerHTML = htmlContent;
+                container.appendChild(innerDiv);
+                return;
+              }
+
               console.log('🔄 [mountComponents] Transforming code for:', nodeData.title);
               
               // Transform component code: ensure it's a valid React component
@@ -1331,9 +1358,21 @@ ${globalRules.dataTracking || '（待补充）'}
   const nodeData: PageNode[] = nodes.map((node) => {
     const spec = node.data?.artifacts?.spec;
     const view = node.data?.artifacts?.view;
-    
-    // 获取 UI 预览图
-    const uiPreview = view?.previewUrl || (view?.code ? 
+    let uiCode: string | undefined;
+    let rawHtml: string | undefined;
+    if (view?.htmlTemplate?.trim()) {
+      rawHtml = view.htmlTemplate;
+    } else if (view?.code && isHtmlCode(view.code)) {
+      rawHtml = view.code;
+    } else if (view?.code) {
+      uiCode = view.code;
+    }
+    if (rawHtml) {
+      const styles = extractStylesFromHtml(rawHtml);
+      const bodyContent = extractBodyContent(rawHtml);
+      uiCode = styles ? `${styles}\n${bodyContent}` : bodyContent;
+    }
+    const uiPreview = view?.previewUrl || (uiCode ?
       'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==' :
       'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==');
     
@@ -1390,8 +1429,9 @@ ${globalRules.dataTracking || '（待补充）'}
     return {
       title: spec?.title || node.data.label || '未命名页面',
       uiPreview,
-      uiCode: view?.code, // 保存 React 组件代码
-      nodeId: (node as any).id || (node.data as any).id || node.data.label || 'node', // 保存节点 ID
+      uiCode,
+      isHtml: !!rawHtml,
+      nodeId: (node as any).id || (node.data as any).id || node.data.label || 'node',
       sections,
       // 用户故事模型（新 - 核心）
       userStories: userStories ? userStories.map(story => ({
@@ -1449,4 +1489,92 @@ ${globalRules.dataTracking || '（待补充）'}
   // 下载文件
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
   saveAs(blob, `${projectMeta.projectName}_Full_PRD.html`);
-};
+}
+
+/**
+ * 仅生成 PRD HTML 字符串（不触发下载），供 API / 脚本使用。
+ */
+export async function buildFullPrdHtmlString(options: {
+  projectMeta: ProjectMeta;
+  globalRules: GlobalRules;
+  nodes: FractalNode[];
+  edges?: Edge[];
+  architectureImage?: string;
+  topologyImage?: string;
+  swimlaneChart?: string;
+  dataDictionary?: string;
+}): Promise<string> {
+  const { projectMeta, globalRules, nodes, edges = [], architectureImage, topologyImage, swimlaneChart, dataDictionary } = options;
+  const globalRulesMarkdown = `
+### 性能要求
+${globalRules.performance || '（待补充）'}
+
+### 安全要求
+${globalRules.security || '（待补充）'}
+
+### 兼容性要求
+${globalRules.compatibility || '（待补充）'}
+
+### 错误处理
+${globalRules.errorHandling || '（待补充）'}
+
+### 数据追踪
+${globalRules.dataTracking || '（待补充）'}
+  `.trim();
+  const dictionaryMarkdown = dataDictionary || '| 字段名 | 类型 | 说明 |\n|--------|------|------|\n| （暂无数据字典） | - | - |';
+
+  const nodeData: PageNode[] = nodes.map((node) => {
+    const spec = node.data?.artifacts?.spec;
+    const view = node.data?.artifacts?.view;
+    let uiCode: string | undefined;
+    let rawHtml: string | undefined;
+    if (view?.htmlTemplate?.trim()) rawHtml = view.htmlTemplate;
+    else if (view?.code && isHtmlCode(view.code)) rawHtml = view.code;
+    else if (view?.code) uiCode = view.code;
+    if (rawHtml) {
+      const styles = extractStylesFromHtml(rawHtml);
+      const bodyContent = extractBodyContent(rawHtml);
+      uiCode = styles ? `${styles}\n${bodyContent}` : bodyContent;
+    }
+    const uiPreview = view?.previewUrl || (uiCode ? 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==' : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==');
+    const sections: RequirementSection[] = [];
+    if (spec?.requirements) {
+      const requirements = Array.isArray(spec.requirements) ? spec.requirements.join('\n') : spec.requirements;
+      const isTable = requirements.includes('|') && (requirements.includes('功能ID') || requirements.includes('UI区域') || requirements.includes('元素名称'));
+      if (isTable) sections.push({ title: '功能列表', type: 'table', content: requirements });
+      else if (requirements.trim().length > 0) sections.push({ title: '功能需求说明', type: 'text', content: requirements });
+    }
+    if (sections.length === 0) sections.push({ title: '功能需求说明', type: 'text', content: '（暂无功能需求说明）' });
+    const userStories = node.data?.artifacts?.userStories;
+    const businessContext = node.data?.artifacts?.businessContext;
+    const events = node.data?.artifacts?.events;
+    return {
+      title: spec?.title || node.data?.label || '未命名页面',
+      uiPreview,
+      uiCode,
+      isHtml: !!rawHtml,
+      nodeId: (node as any).id || (node.data as any).id || node.data?.label || 'node',
+      sections,
+      userStories: userStories?.map((s) => ({ id: s.id, role: s.role, activity: s.activity, value: s.value, acceptanceCriteria: s.acceptanceCriteria || [] })),
+      businessContext: businessContext ? { domain: businessContext.domain, role: businessContext.role, goal: businessContext.goal } : undefined,
+      events: events?.map((e) => ({ id: e.id, name: e.name, trigger: e.trigger, type: e.type, processFlow: e.processFlow || [], outcome: e.outcome })),
+    };
+  });
+
+  const fullPrdData: FullPrdData = {
+    meta: {
+      name: projectMeta.projectName,
+      version: projectMeta.version || 'V1.0.0',
+      updateTime: new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }),
+      author: 'Project Owner',
+      industry: projectMeta.industry || 'General Internet',
+      desc: projectMeta.description || '（暂无项目背景描述）',
+      targetUser: projectMeta.targetAudience || '通用用户',
+    },
+    images: { architecture: architectureImage, topology: topologyImage },
+    charts: { swimlane: swimlaneChart },
+    docs: { globalRules: globalRulesMarkdown, dictionary: dictionaryMarkdown },
+    nodes: nodeData,
+  };
+  return generateFullPrdHtml(fullPrdData);
+}

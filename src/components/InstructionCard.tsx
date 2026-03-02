@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { User, Calendar } from 'lucide-react';
 
 interface InstructionCardProps {
@@ -69,10 +70,13 @@ export function InstructionCard({
         {/* Meta Row: Avatar + Name + Date */}
         <div className="flex items-center gap-2 mb-2">
           {avatar ? (
-            <img 
+            <Image 
               src={avatar} 
               alt={name}
+              width={20}
+              height={20}
               className="w-5 h-5 rounded-full"
+              unoptimized
             />
           ) : (
             <div className="w-5 h-5 rounded-full bg-gray-200 flex items-center justify-center">

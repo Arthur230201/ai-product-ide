@@ -1,0 +1,30 @@
+{
+  "totalRounds": 4,
+  "targetReached": false,
+  "finalScores": {
+    "build": 0,
+    "lint": 0,
+    "tsc": 0,
+    "overall": 0
+  },
+  "totalProblems": 9,
+  "totalFixes": 0,
+  "rounds": [
+    {
+      "round": 1,
+      "success": true,
+      "targetReached": false
+    },
+    {
+      "round": 2,
+      "success": true,
+      "targetReached": false
+    },
+    {
+      "round": 3,
+      "success": true,
+      "targetReached": false
+    }
+  ],
+  "timestamp": "2026-02-05T03:06:12.887Z"
+}

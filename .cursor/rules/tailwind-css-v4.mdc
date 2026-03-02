@@ -1,0 +1,75 @@
+---
+name: tailwind_v4
+description: Guide for using Tailwind CSS v4 instead of v3.x
+globs: ["**/*.{js,ts,jsx,tsx,mdx,css}"]
+alwaysApply: false
+---
+
+# Tailwind CSS v4
+
+## Core Changes
+
+- **CSS-first configuration**: Configuration is done in CSS by default. Legacy JS config is still supported via `@config`.
+- Use `@theme` directive in CSS instead of `tailwind.config.js` for new features.
+- Example:
+```css
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Satoshi", "sans-serif";
+  --breakpoint-3xl: 1920px;
+  --color-avocado-500: oklch(0.84 0.18 117.33);
+  --ease-fluid: cubic-bezier(0.3, 0, 0, 1);
+}
+```
+- Legacy `tailwind.config.js` can be imported: `@config "../../tailwind.config.js";`
+- **CSS import**: Use `@import "tailwindcss";` instead of `@tailwind base; @tailwind components; @tailwind utilities;`
+- **Packages**: PostCSS plugin `@tailwindcss/postcss`, CLI `@tailwindcss/cli`, Vite plugin `@tailwindcss/vite`. No need for `postcss-import` or `autoprefixer`.
+- Uses native CSS `@layer`.
+
+## Theme Configuration
+
+- All design tokens as CSS variables: `--category-name` (e.g. `--color-blue-500`, `--font-sans`). Use `var(--color-blue-500)`.
+- Namespaces: `--color-*`, `--font-*`, `--text-*`, `--font-weight-*`, `--tracking-*`, `--leading-*`, `--breakpoint-*`, `--container-*`, `--spacing-*`, `--radius-*`, `--shadow-*`, `--inset-shadow-*`, `--drop-shadow-*`, `--blur-*`, `--ease-*`, `--animate-*`.
+- Utilities like `grid-cols-12`, `z-40`, `opacity-70` work without config. Data attributes `data-selected:opacity-100` don't need config.
+- Spacing: `--spacing: 0.25rem`; multiples like `mt-21` work automatically.
+
+## New Features
+
+- **Container queries**: Built-in `@container`, `@sm:`, `@md:`, `@max-md:`, ranges like `@min-md:@max-xl:hidden`.
+- **3D transforms**: `transform-3d`, `rotate-x-*`, `rotate-y-*`, `rotate-z-*`, `scale-z-*`, `translate-z-*`, `perspective-*`, `backface-visible`/`backface-hidden`.
+- **Gradients**: `bg-linear-45` (angles), `bg-linear-to-r/oklch`, `bg-conic`, `bg-radial-[at_25%_25%]`.
+- **Shadows**: `inset-shadow-*`, `inset-ring-*` composable with `shadow-*` and `ring-*`.
+- **New utilities**: `field-sizing-content`, `scheme-light`/`scheme-dark`, `font-stretch-*`.
+
+## New Variants
+
+- Composable: `group-has-data-potato:opacity-100`.
+- New: `starting`, `not-*`, `inert`, `nth-*`/`nth-last-*`/`nth-of-type-*`, `in-*`, `open` (popover), `**` (all descendants).
+
+## Custom Extensions
+
+```css
+@utility tab-4 {
+  tab-size: 4;
+}
+
+@variant pointer-coarse (@media (pointer: coarse));
+@variant theme-midnight (&&:where([data-theme="midnight"] *));
+
+@plugin "@tailwindcss/typography";
+```
+
+## Breaking Changes
+
+- **Removed**: `bg-opacity-*` → use `bg-black/50`; same for `text-opacity-*`, `border-opacity-*`, etc.
+- **Renamed**: `shadow-sm`→`shadow-xs` (and `shadow`→`shadow-sm`); `drop-shadow-sm`→`drop-shadow-xs`; `blur-sm`→`blur-xs`; `rounded-sm`→`rounded-xs`; `outline-none`→`outline-hidden`.
+- **Defaults**: Border color `currentColor`; ring width 1px; placeholder 50% opacity; hover only where `@media (hover: hover)`.
+- **Syntax**: Arbitrary values `bg-(--brand-color)`; stacked variants apply left-to-right; use CSS variables instead of `theme()`.
+
+## Advanced
+
+- **Prefix**: `@import "tailwindcss" prefix(tw);` → `tw:flex`, `tw:bg-red-500`.
+- **Sources**: `@source "../node_modules/@my-company/ui-lib";` or `@import "tailwindcss" source(none);`.
+- **Dark mode**: `@variant dark (&&:where(.dark, .dark *));`
+- **Vue/Svelte @apply**: `@import "../../my-theme.css" theme(reference);` or `@import "tailwindcss/theme" theme(reference);` then `@apply font-bold text-2xl text-red-500;`

@@ -1,0 +1,14 @@
+{
+  "totalRounds": 2,
+  "targetReached": false,
+  "roundSummaries": [
+    {
+      "round": 1,
+      "ruling": false,
+      "internalOverall": 50,
+      "thirdPartyScore": null
+    }
+  ],
+  "timestamp": "2026-02-05T03:13:45.321Z",
+  "reportDir": "/Users/qingflow/Documents/自研项目/ai-product-ide/scripts/iteration-reports/governance/run-1770261224940"
+}

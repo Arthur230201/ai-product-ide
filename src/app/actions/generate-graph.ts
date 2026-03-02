@@ -2,11 +2,13 @@
 
 import { createServerAction } from 'zsa';
 import { z } from 'zod';
-import { openai } from '@ai-sdk/openai';
-import { generateObject } from 'ai';
 import { log, logError, logWarn } from '@/lib/logger';
-import { getTextModel, getVisionModel } from '@/lib/ai-config';
-import type { FractalNode } from '@/types/fractal';
+import { getTextModel, getVisionModel, getOpenAIKey } from '@/lib/ai-config';
+import { callText, callObject } from '@/lib/ai/llm';
+import { extractTaggedBlock } from '@/lib/ai/protocol';
+import { buildFallbackGraph } from '@/lib/graph/fallback-graph';
+import { safeParseZodJson } from '@/lib/ai/json-extract';
+import type { FractalNode, EdgeNavMeta } from '@/types/fractal';
 import type { Edge } from 'reactflow';
 
 const GenerateGraphInputSchema = z.object({
@@ -77,10 +79,28 @@ const NodeSchema = z.object({
   dataQueries: z.array(DataQuerySchema).optional().describe('数据查询需求列表（排序、过滤、数据源定义）- 仅用于View类型页面'),
 });
 
+// Edge Navigation Metadata Schema（导航元数据）
+const EdgeNavMetaSchema = z.object({
+  trigger: z.enum(['ROLE_ENTRY', 'PERMISSION_ENTRY', 'UI_CLICK', 'SYSTEM_REDIRECT']).describe('触发类型：ROLE_ENTRY（按角色进入）、PERMISSION_ENTRY（按权限进入）、UI_CLICK（点击按钮）、SYSTEM_REDIRECT（系统重定向）'),
+  conditionType: z.enum(['role', 'permission', 'expression', 'none']).describe('条件类型：role（角色）、permission（权限）、expression（表达式）、none（无条件）'),
+  condition: z.object({
+    roles: z.array(z.string()).optional().describe('角色列表（conditionType=role 时必需，如：["admin", "editor"]）'),
+    permissions: z.array(z.string()).optional().describe('权限列表（conditionType=permission 时必需，如：["read:orders", "write:orders"]）'),
+    expr: z.string().optional().describe('表达式（conditionType=expression 时必需，支持 role == "xx" 和 has("perm") 两种模式）'),
+  }).describe('条件配置'),
+  sourceHint: z.object({
+    elementText: z.string().optional().describe('触发元素文本（优先，如按钮文案"提交"、"进入工作台"）'),
+    elementId: z.string().optional().describe('触发元素 ID（可推断时）'),
+    elementSelector: z.string().optional().describe('触发元素选择器（可推断时）'),
+  }).optional().describe('触发来源提示（当 trigger=UI_CLICK 且能从描述中定位按钮/文案时必需）'),
+  priority: z.number().optional().describe('优先级（多分支时选择顺序，数字越大优先级越高，默认 0）'),
+});
+
 const EdgeSchema = z.object({
   source: z.string().describe('源节点 ID'),
   target: z.string().describe('目标节点 ID'),
   label: z.string().optional().describe('边的标签（连接关系描述）'),
+  nav: EdgeNavMetaSchema.optional().describe('导航元数据（动作/跳转逻辑，必须包含）'),
 });
 
 // 定义全局用户旅程 Schema（Epics - 跨多个页面的长流程）
@@ -119,13 +139,20 @@ const NodeSchemaWithTraceability = NodeSchema.extend({
   traceability: TraceabilitySchema.optional().describe('页面与全局架构的可追溯性映射'),
 });
 
-// 定义输入模糊度分析 Schema
-const InputClarityAnalysisSchema = z.object({
+// 定义输入模糊度分析 Schema (for single-call response)
+const ClaritySchema = z.object({
   confidence: z.number().min(0).max(100).describe('输入明确度（0-100），>=60为明确，<60为模糊'),
   isVague: z.boolean().describe('是否模糊（confidence < 60）'),
-  detectedDomain: z.string().optional().describe('检测到的业务领域（如：Enterprise Management、Inventory Management）'),
-  detectedBusinessObject: z.string().optional().describe('检测到的业务对象（如：Paint、Reimbursement、Customer）'),
-  detectedAction: z.string().optional().describe('检测到的核心动作（如：Stocktaking、Approving、Selling）'),
+  domain: z.string().optional().describe('检测到的业务领域（如：Enterprise Management、Inventory Management）'),
+  object: z.string().optional().describe('检测到的业务对象（如：Paint、Reimbursement、Customer）'),
+  action: z.string().optional().describe('检测到的核心动作（如：Stocktaking、Approving、Selling）'),
+});
+
+// 向后兼容：用于 analyzeInputClarity 函数（已废弃，但保留以避免破坏现有代码）
+const InputClarityAnalysisSchema = ClaritySchema.extend({
+  detectedDomain: ClaritySchema.shape.domain,
+  detectedBusinessObject: ClaritySchema.shape.object,
+  detectedAction: ClaritySchema.shape.action,
 });
 
 // 定义澄清请求选项 Schema
@@ -146,7 +173,17 @@ const ClarificationRequestSchema = z.object({
   }),
 });
 
-// 定义图生成结果 Schema
+// 定义单次调用返回 Schema（包含 clarity + graph）
+const SingleCallResultSchema = z.object({
+  clarity: ClaritySchema.describe('输入明确度分析'),
+  graph: z.object({
+    global: GlobalArchitectureSchema.describe('全局业务架构（用户旅程和领域事件）'),
+    nodes: z.array(NodeSchemaWithTraceability).describe('节点列表（包含可追溯性信息）'),
+    edges: z.array(EdgeSchema).describe('边列表（节点之间的连接关系）'),
+  }),
+});
+
+// 定义图生成结果 Schema（保持向后兼容）
 const GraphResultSchema = z.object({
   type: z.literal('graph_generated'),
   global: GlobalArchitectureSchema.describe('全局业务架构（用户旅程和领域事件）'),
@@ -161,6 +198,7 @@ const ConditionalResultSchema = z.discriminatedUnion('type', [
 ]);
 
 // 分析输入模糊度的辅助函数
+// CRITICAL: This function must NEVER throw. Always returns a valid result.
 async function analyzeInputClarity(
   prompt: string,
   textModel: string,
@@ -169,6 +207,8 @@ async function analyzeInputClarity(
   mediaBase64?: string,
   mediaType?: 'image' | 'video'
 ): Promise<z.infer<typeof InputClarityAnalysisSchema>> {
+  const requestId = `clarity-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  
   // 构建包含文件内容的分析内容
   let analysisContent = prompt.trim() || '用户输入为空';
   let hasFileContent = false;
@@ -180,8 +220,6 @@ async function analyzeInputClarity(
   
   if (mediaBase64) {
     const mediaTypeText = mediaType === 'image' ? '图片' : '视频';
-    // 对于图片，在文本中说明有图片，但图片本身会作为视觉输入
-    // 对于视频，只能通过文本说明
     if (mediaType === 'image') {
       analysisContent += `\n\n用户上传了${mediaTypeText}文件（图片内容将作为视觉输入进行分析）。`;
     } else {
@@ -190,7 +228,23 @@ async function analyzeInputClarity(
     hasFileContent = true;
   }
   
-  const clarityAnalysisPrompt = `# Role
+  // 如果有图片，需要使用 vision 模型
+  const useVisionModel = mediaBase64 && mediaType === 'image';
+  const model = useVisionModel 
+    ? getVisionModel(aiConfig)
+    : textModel;
+  
+  log('🔍 [analyzeInputClarity] 开始分析输入模糊度', {
+    requestId,
+    hasText: !!prompt,
+    hasAttachment: !!attachmentContent,
+    hasMedia: !!mediaBase64,
+    mediaType,
+    useVisionModel,
+    model,
+  });
+  
+  const userPrompt = `# Role
 AI Product Consultant & Requirement Analyst.
 
 # Task
@@ -218,78 +272,116 @@ Ask yourself: *Do I know the specific **Business Object** (e.g., Paint, Reimburs
 - Uploaded files (images/documents) contain detailed requirements, flowcharts, or specifications that clarify the business scenario
 
 ## Output Requirements
-- **confidence**: A number between 0-100 representing how specific the input is (considering BOTH text and files)
-- **isVague**: true if confidence < 60, false otherwise
-- **detectedDomain**: Extract the high-level domain if detectable (from text or files)
-- **detectedBusinessObject**: Extract the specific business object if mentioned (from text or files)
-- **detectedAction**: Extract the core action/workflow if mentioned (from text or files)
+You MUST output ONLY one tagged block in this exact format:
+<AI_JSON>
+{
+  "confidence": <integer 0-100>,
+  "isVague": <boolean>,
+  "detectedDomain": "<string or empty>",
+  "detectedBusinessObject": "<string or empty>",
+  "detectedAction": "<string or empty>"
+}
+</AI_JSON>
+
+Rules:
+- Output ONLY one <AI_JSON> block
+- No second block
+- No other JSON outside the block
+- JSON must be valid and complete
+- All required fields must be present
 
 Analyze the following input: "${analysisContent}"`;
 
-  // 如果有图片，需要使用 vision 模型
-  const useVisionModel = mediaBase64 && mediaType === 'image';
-  const model = useVisionModel 
-    ? openai(getVisionModel(aiConfig))
-    : openai(textModel);
-  
-  log('🔍 [analyzeInputClarity] 开始分析输入模糊度', {
-    hasText: !!prompt,
-    hasAttachment: !!attachmentContent,
-    hasMedia: !!mediaBase64,
-    mediaType,
-    useVisionModel,
-    model: useVisionModel ? getVisionModel(aiConfig) : textModel,
+  // Call LLM gateway with callText
+  const result = await callText({
+    model,
+    prompt: userPrompt,
+    timeoutMs: 30000, // 30s timeout for clarity analysis
+    aiConfig,
   });
-  
-  // 构建消息内容
-  const messages: any[] = [];
-  
-  if (useVisionModel && mediaBase64) {
-    // 对于图片，使用多模态消息格式
-    // 处理 base64 格式：可能是 data URL 格式（data:image/...;base64,xxx）或纯 base64
-    let base64Data = mediaBase64;
-    if (mediaBase64.includes(',')) {
-      base64Data = mediaBase64.split(',')[1];
-      log('📝 [analyzeInputClarity] 检测到 data URL 格式，已提取 base64 部分');
-    } else {
-      log('📝 [analyzeInputClarity] 检测到纯 base64 格式');
-    }
+
+  // Handle errors - return fallback instead of throwing
+  if (!result.ok) {
+    logError('❌ [analyzeInputClarity] 分析失败，使用 fallback', {
+      requestId,
+      errorType: result.type,
+      errorMessage: result.message,
+    });
     
-    messages.push({
-      role: 'user' as const,
-      content: [
-        { type: 'text', text: clarityAnalysisPrompt },
-        { 
-          type: 'image', 
-          image: base64Data
-        },
-      ],
-    });
-  } else {
-    // 对于纯文本或视频，使用文本消息
-    messages.push({
-      role: 'user' as const,
-      content: clarityAnalysisPrompt,
-    });
+    // Return fallback clarity - never throw
+    return {
+      confidence: 45,
+      isVague: true,
+      detectedDomain: '',
+      detectedBusinessObject: '',
+      detectedAction: '',
+    };
   }
 
-  const result = await generateObject({
-    model,
-    schema: InputClarityAnalysisSchema,
-    messages,
-    temperature: 0.3,
-  });
+  // Extract tagged block
+  const block = extractTaggedBlock(result.data, 'AI_JSON');
+  if (!block) {
+    logError('❌ [analyzeInputClarity] Tagged block not found, using fallback', {
+      requestId,
+      rawPreview: result.data.substring(0, 200),
+    });
+    return {
+      confidence: 45,
+      isVague: true,
+      detectedDomain: '',
+      detectedBusinessObject: '',
+      detectedAction: '',
+    };
+  }
+
+  // 使用 safeParseZodJson 进行可恢复解析
+  // 确保 block 是 string 类型
+  const blockText = typeof block === 'string' ? block : String(block || '');
+  
+  if (!blockText || blockText.trim().length === 0) {
+    logWarn('⚠️ [analyzeInputClarity] Block is empty, using fallback', {
+      requestId,
+    });
+    return {
+      confidence: 45,
+      isVague: true,
+      detectedDomain: '',
+      detectedBusinessObject: '',
+      detectedAction: '',
+    };
+  }
+  
+  const parseResult = safeParseZodJson(blockText, InputClarityAnalysisSchema);
+  
+  if (!parseResult.ok) {
+    logWarn('⚠️ [analyzeInputClarity] JSON parse failed, using fallback', {
+      requestId,
+      error: parseResult.error,
+      rawPreview: parseResult.raw || blockText.substring(0, 200),
+    });
+    return {
+      confidence: 45,
+      isVague: true,
+      detectedDomain: '',
+      detectedBusinessObject: '',
+      detectedAction: '',
+    };
+  }
+
+  // 解析成功，使用结果
+  const analysisResult = parseResult.data;
 
   log('📊 [analyzeInputClarity] 模糊度分析完成', {
-    confidence: result.object.confidence,
-    isVague: result.object.isVague,
-    detectedDomain: result.object.detectedDomain,
-    detectedBusinessObject: result.object.detectedBusinessObject,
-    detectedAction: result.object.detectedAction,
+    requestId,
+    confidence: analysisResult.confidence,
+    isVague: analysisResult.isVague,
+    detectedDomain: analysisResult.detectedDomain,
+    detectedBusinessObject: analysisResult.detectedBusinessObject,
+    detectedAction: analysisResult.detectedAction,
     hasFileContent,
   });
 
-  return result.object;
+  return analysisResult;
 }
 
 // 生成澄清请求的辅助函数
@@ -336,8 +428,9 @@ Generate appropriate scenarios based on the detected domain.`;
     question: z.string().describe('引导用户提供更多信息的问题'),
   });
 
-  const result = await generateObject({
-    model: openai(textModel),
+  // Use unified LLM gateway
+  const result = await callObject({
+    model: textModel,
     schema: ClarificationGenerationSchema,
     messages: [
       {
@@ -345,107 +438,78 @@ Generate appropriate scenarios based on the detected domain.`;
         content: clarificationPrompt,
       },
     ],
-    temperature: 0.7, // 稍高的温度以生成更多样化的场景
+    actionName: 'generateClarification',
+    mode: 'clarification',
   });
+
+  if (!result.ok) {
+    // Return error union instead of throwing
+    return {
+      ok: false,
+      type: result.type,
+      message: result.message,
+      cooldownSeconds: result.cooldownSeconds,
+    } as any;
+  }
+
+  const clarificationData = result.data as z.infer<typeof ClarificationGenerationSchema>;
 
   return {
     type: 'clarification_needed' as const,
-    data: result.object,
+    data: clarificationData,
   };
 }
 
 export const generateGraph = createServerAction()
   .input(GenerateGraphInputSchema)
   .handler(async ({ input }) => {
-    const startTime = Date.now();
+    const t0 = Date.now();
+    const requestId = `graph-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    let warnings: string[] = [];
+    let fallbackUsed = false;
+    let llmMetrics = { queuedMs: 0, dedupHit: false, totalMs: 0 };
     
-    try {
-      log('🚀 [generateGraph] 开始生成图结构');
-      log('📋 [generateGraph] 输入参数:', {
+    log('🚀 [generateGraph] 开始生成图结构（单次调用）', {
+      requestId,
         promptLength: input.prompt.length,
         promptPreview: input.prompt.substring(0, 100),
         hasMedia: !!input.mediaBase64,
         mediaType: input.mediaType,
-        hasAiConfig: !!input.aiConfig,
-        textModel: input.aiConfig?.textModel,
+      hasAttachment: !!input.attachmentContent,
       });
 
-      // 检查环境变量
-      if (!process.env.OPENAI_API_KEY) {
-        logError('❌ [generateGraph] OPENAI_API_KEY 未配置');
-        throw new Error('OPENAI_API_KEY 未配置');
+      if (!getOpenAIKey()) {
+        logError('❌ [generateGraph] OPENAI_API_KEY 未配置', { requestId });
+        return {
+          ok: false,
+          type: 'validation_error',
+          message: 'OPENAI_API_KEY 未配置',
+        };
       }
 
-      // 获取文本模型（优先使用传入的配置）
-      const textModel = input.aiConfig?.textModel || getTextModel();
-      log(`🤖 [generateGraph] 使用模型: ${textModel}`);
+    // 获取文本模型
+    const textModel = input.aiConfig?.textModel || getTextModel();
 
-      // Step 1: 分析输入模糊度
-      // 现在会同时分析文本提示词和上传的文件内容
-      const shouldAnalyzeClarity = input.prompt.trim().length > 0 || !!input.mediaBase64 || !!input.attachmentContent;
-      const hasMediaOrAttachment = !!input.mediaBase64 || !!input.attachmentContent;
-      
-      // 声明 clarityAnalysis 变量，在作用域外也可访问
-      let clarityAnalysis: z.infer<typeof InputClarityAnalysisSchema> | null = null;
-      
-      if (shouldAnalyzeClarity) {
-        log('🔍 [generateGraph] 开始分析输入模糊度（包含文件内容）...');
-        clarityAnalysis = await analyzeInputClarity(
-          input.prompt.trim(),
-          textModel,
-          input.aiConfig,
-          input.attachmentContent,
-          input.mediaBase64,
-          input.mediaType
-        );
-        
-        log('📊 [generateGraph] 模糊度分析结果:', {
-          confidence: clarityAnalysis.confidence,
-          isVague: clarityAnalysis.isVague,
-          detectedDomain: clarityAnalysis.detectedDomain,
-          detectedBusinessObject: clarityAnalysis.detectedBusinessObject,
-          detectedAction: clarityAnalysis.detectedAction,
-          hasMedia: !!input.mediaBase64,
-          hasAttachment: !!input.attachmentContent,
-        });
+    // 构建用户提示词
+    let userPrompt = input.prompt.trim() || '请生成项目结构';
+    if (input.attachmentContent) {
+      const attachmentInfo = input.attachmentType === 'text' 
+        ? `\n\n附件内容（${input.mimeType || '文本文件'}）：\n${input.attachmentContent}`
+        : `\n\n附件已上传（${input.mimeType || '媒体文件'}），请参考附件内容进行分析。`;
+      userPrompt += attachmentInfo;
+    }
+    if (input.mediaBase64) {
+      userPrompt += `\n\n注意：用户上传了${input.mediaType === 'image' ? '图片' : '视频'}文件，请结合图片/视频内容进行分析。`;
+    }
 
-        // 现在 analyzeInputClarity 已经考虑了文件内容，所以直接使用分析结果
-        // 不再需要额外的调整逻辑，因为文件内容已经在分析时被考虑了
-        // 即使输入不够明确，也继续生成图结构（不再返回澄清请求）
-        if (clarityAnalysis.isVague) {
-          log('⚠️ [generateGraph] 输入过于模糊，但仍继续生成基础图结构', {
-            isVague: clarityAnalysis.isVague,
-            hasMediaOrAttachment,
-            confidence: clarityAnalysis.confidence,
-            note: '即使输入不够明确，也会生成基础结构，让用户可以继续流程',
-          });
-          
-          // 不再返回澄清请求，而是继续生成图结构
-          // 在生成时，会在提示词中说明输入不够明确，要求AI生成一个基础结构
-          // 同时，前端会打开项目画像页面，提示用户补充信息
-          log('📝 [generateGraph] 继续生成图结构，但会在提示词中说明输入不够明确');
-        } else {
-          if (hasMediaOrAttachment) {
-            log('✅ [generateGraph] 输入足够具体，且有附件支持，继续生成图结构');
-          } else {
-            log('✅ [generateGraph] 输入足够具体，继续生成图结构');
-          }
-        }
-      } else {
-        log('⏭️ [generateGraph] 没有文本输入，直接生成图结构');
-      }
-
-      // 构建系统提示词 - 包含Top-Down Architecture策略
-      // 如果输入不够明确，在提示词中添加说明
-      const clarityNote = (clarityAnalysis && clarityAnalysis.isVague)
-        ? `\n\n⚠️ **重要提示**：用户输入不够明确（明确度: ${clarityAnalysis.confidence}%）。请基于检测到的领域"${clarityAnalysis.detectedDomain || '通用业务'}"生成一个基础的项目结构。即使信息不足，也要生成至少1-2个核心页面节点，让用户可以在此基础上继续完善。`
-        : '';
-      
+    // 构建系统提示词 - 单次调用，同时生成 clarity + graph
       const systemPrompt = `# Role
 Product Solution Architect (Domain Driven Design Expert).
 
 # Task
-Analyze the User Input and generate a **Global Business Architecture JSON** using Top-Down Architecture strategy.${clarityNote}
+Analyze the User Input and generate BOTH:
+1. **Clarity Analysis**: Assess input clarity (confidence, isVague, domain, object, action)
+2. **Graph Structure**: Generate Global Business Architecture JSON using Top-Down Architecture strategy.
 
 # 🧠 Processing Strategy: Top-Down Architecture
 
@@ -634,9 +698,49 @@ Return JSON with the following structure:
       }
     }
   ],
-  "edges": [...]
+  "edges": [
+    {
+      "source": "page_id_1",
+      "target": "page_id_2",
+      "label": "连接关系描述（可选）",
+      "nav": {
+        "trigger": "UI_CLICK" | "ROLE_ENTRY" | "PERMISSION_ENTRY" | "SYSTEM_REDIRECT",
+        "conditionType": "none" | "role" | "permission" | "expression",
+        "condition": {
+          "roles": ["admin", "editor"], // conditionType=role 时必需
+          "permissions": ["read:orders"], // conditionType=permission 时必需
+          "expr": "role == 'admin'" // conditionType=expression 时必需（支持 role == "xx" 和 has("perm")）
+        },
+        "sourceHint": {
+          "elementText": "提交" // trigger=UI_CLICK 时优先填写按钮文案
+        },
+        "priority": 1 // 多分支时选择顺序，数字越大优先级越高
+      }
+    }
+  ]
 }
 \`\`\`
+
+**Critical Requirements for Edges (Navigation Metadata)**:
+1. **Every edge MUST include \`nav\` metadata** - This is REQUIRED, not optional
+2. **Trigger Types**:
+   - \`ROLE_ENTRY\`: 首页按角色进入不同工作台（如：管理员进入管理台，编辑进入编辑台）
+   - \`PERMISSION_ENTRY\`: 按数据权限进入不同页面（如：有"查看订单"权限进入订单列表）
+   - \`UI_CLICK\`: 点击按钮进入下一页（如：点击"提交"按钮进入确认页）
+   - \`SYSTEM_REDIRECT\`: 系统自动重定向（如：登录后跳转、超时跳转）
+3. **Condition Types**:
+   - \`none\`: 无条件跳转（默认，用于 UI_CLICK 和 SYSTEM_REDIRECT）
+   - \`role\`: 角色条件（condition.roles 必需，如：["admin", "editor"]）
+   - \`permission\`: 权限条件（condition.permissions 必需，如：["read:orders", "write:orders"]）
+   - \`expression\`: 表达式条件（condition.expr 必需，支持 \`role == "xx"\` 和 \`has("perm")\`）
+4. **Source Hint (for UI_CLICK)**:
+   - When trigger=UI_CLICK, MUST fill \`sourceHint.elementText\` with button text (优先) or elementId/selector
+   - Example: If description says "点击提交按钮", set elementText: "提交"
+5. **Priority**: Set priority for multiple outgoing edges from same source (higher number = higher priority)
+6. **Examples**:
+   - Role-based entry: \`{ trigger: "ROLE_ENTRY", conditionType: "role", condition: { roles: ["admin"] } }\`
+   - Button click: \`{ trigger: "UI_CLICK", conditionType: "none", sourceHint: { elementText: "提交" } }\`
+   - Permission-based: \`{ trigger: "PERMISSION_ENTRY", conditionType: "permission", condition: { permissions: ["read:orders"] } }\`
 
 **Critical Requirements**:
 1. **Global Context First**: Generate \`global\` object BEFORE generating nodes
@@ -644,70 +748,227 @@ Return JSON with the following structure:
 3. **Event Mapping**: 
    - Action pages MUST have \`triggersEvent\` (at least one)
    - View pages SHOULD have \`consumesEvent\` (if they display event results)
-4. **Traceability**: Every node MUST have \`traceability\` object with journey and event mappings`;
+4. **Traceability**: Every node MUST have \`traceability\` object with journey and event mappings
+5. **Edge Navigation**: Every edge MUST have \`nav\` object with trigger, conditionType, and condition
 
-      // 构建用户提示词（包含附件内容）
-      let userPrompt = input.prompt.trim() || '请生成项目结构';
+# Output Format (Single JSON Object)
+Return a single JSON object with this structure:
+\`\`\`json
+{
+  "clarity": {
+    "confidence": 85,
+    "isVague": false,
+    "domain": "Enterprise Management",
+    "object": "Task",
+    "action": "Managing"
+  },
+  "graph": {
+    "global": { ... },
+    "nodes": [ ... ],
+    "edges": [ ... ]
+  }
+}
+\`\`\`
+
+**Critical**: Output ONLY one JSON object. Do not include markdown code blocks.`;
+
+    const t1 = Date.now();
+    log('⏱️ [generateGraph] t1: Prompt ready', {
+      requestId,
+      elapsedMs: t1 - t0,
+    });
+
+    // 单次 LLM 调用 - 通过 callText 和 runQueued
+    const t2 = Date.now();
+    let singleCallResult: z.infer<typeof SingleCallResultSchema> | null = null;
+    let aiCallSuccess = false;
+    let aiError: { type: 'RATE_LIMIT' | 'NETWORK' | 'PROVIDER' | 'PARSE'; message: string; cooldownSeconds?: number } | null = null;
+
+    // 合并系统提示和用户提示
+    const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
+
+    log('⏱️ [generateGraph] t2: Starting single LLM call via callText', {
+      requestId,
+      elapsedMs: t2 - t0,
+    });
+
+    const llmResult = await callText({
+      model: textModel,
+      prompt: fullPrompt,
+      timeoutMs: 60000, // 60s timeout for graph generation
+      aiConfig: input.aiConfig,
+      actionName: 'generateGraph',
+      attachments: input.attachmentContent || input.mediaBase64 || '',
+      mode: 'single-call',
+    });
+
+    llmMetrics = llmResult.metrics;
+
+    if (!llmResult.ok) {
+      // Handle error from callText
+      logError('❌ [generateGraph] LLM call failed', {
+        requestId,
+        errorType: llmResult.type,
+        errorMessage: llmResult.message,
+        llmMetrics,
+      });
+      aiError = {
+        type: llmResult.type,
+        message: llmResult.message,
+        cooldownSeconds: llmResult.type === 'RATE_LIMIT' ? llmResult.cooldownSeconds : undefined,
+      };
+    } else {
+      // Parse JSON from response using safeParseZodJson (可恢复解析)
+      // 确保 llmResult.data 是 string 类型
+      const responseText = typeof llmResult.data === 'string' ? llmResult.data : String(llmResult.data || '');
       
-      // 如果有附件内容，将其添加到提示词中
-      if (input.attachmentContent) {
-        const attachmentInfo = input.attachmentType === 'text' 
-          ? `\n\n附件内容（${input.mimeType || '文本文件'}）：\n${input.attachmentContent}`
-          : `\n\n附件已上传（${input.mimeType || '媒体文件'}），请参考附件内容进行分析。`;
-        userPrompt += attachmentInfo;
-        
-        log('📎 [generateGraph] 已包含附件内容到提示词:', {
-          attachmentType: input.attachmentType,
-          mimeType: input.mimeType,
-          contentLength: input.attachmentContent.length,
-          contentPreview: input.attachmentContent.substring(0, 200),
+      if (!responseText || responseText.trim().length === 0) {
+        logWarn('⚠️ [generateGraph] LLM 返回数据为空，使用降级图', {
+          requestId,
+          llmMetrics,
         });
+        aiError = {
+          type: 'PARSE',
+          message: 'LLM 返回数据为空',
+        };
+      } else {
+        const parseResult = safeParseZodJson(responseText, SingleCallResultSchema);
+        
+        if (parseResult.ok) {
+          singleCallResult = parseResult.data;
+          aiCallSuccess = true;
+          log('✅ [generateGraph] AI 调用成功', {
+            requestId,
+            clarity: singleCallResult.clarity,
+            nodesCount: singleCallResult.graph.nodes.length,
+            edgesCount: singleCallResult.graph.edges.length,
+            llmMetrics,
+          });
+        } else {
+          // 解析失败，记录警告但不崩溃
+          logWarn('⚠️ [generateGraph] JSON 解析失败，使用降级图', {
+            requestId,
+            error: parseResult.error,
+            rawPreview: parseResult.raw || responseText.substring(0, 500),
+            llmMetrics,
+          });
+          aiError = {
+            type: 'PARSE',
+            message: `JSON 解析失败: ${parseResult.error}`,
+          };
+        }
+      }
+    }
+
+    const t2_end = Date.now(); // LLM call end
+    log('⏱️ [generateGraph] t2_end: LLM call completed', {
+      requestId,
+      elapsedMs: t2_end - t2,
+      success: aiCallSuccess,
+      errorType: aiError?.type,
+      llmMetrics,
+    });
+
+    // 如果 AI 调用失败（429/网络错误/解析错误）
+    if (!aiCallSuccess && aiError) {
+      // ✅ Rate Limit 错误：直接返回错误，不使用降级图
+      if (aiError.type === 'RATE_LIMIT') {
+        const t2_end = Date.now();
+        return {
+          type: 'rate_limit',
+          message: aiError.message,
+          cooldownSeconds: aiError.cooldownSeconds,
+        };
       }
       
-      // 如果有媒体文件，在系统提示词中添加说明
-      if (input.mediaBase64) {
-        const mediaInfo = `\n\n注意：用户上传了${input.mediaType === 'image' ? '图片' : '视频'}文件，请结合图片/视频内容进行分析。`;
-        userPrompt += mediaInfo;
-      }
-
-      // 调用 AI 生成图结构
-      const result = await generateObject({
-        model: openai(textModel),
-        schema: GraphResultSchema,
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt,
-          },
-          {
-            role: 'user',
-            content: userPrompt,
-          },
-        ],
-        temperature: 0.3,
+      // 其他错误：使用降级图
+      logWarn('⚠️ [generateGraph] AI 调用失败，使用降级图', {
+        requestId,
+        errorType: aiError.type,
+        errorMessage: aiError.message,
+        llmMetrics,
       });
 
-      log('✅ [generateGraph] AI 生成完成:', {
-        globalJourneysCount: result.object.global.userJourneys.length,
-        globalEventsCount: result.object.global.businessEvents.length,
-        nodesCount: result.object.nodes.length,
-        edgesCount: result.object.edges.length,
-        nodes: result.object.nodes.map(n => ({ 
-          id: n.id, 
-          label: n.label, 
-          type: n.type,
-          pageType: n.pageType,
-          userStoriesCount: n.userStories?.length || 0,
-          eventsCount: n.events?.length || 0,
-          dataQueriesCount: n.dataQueries?.length || 0,
-          hasTraceability: !!n.traceability,
-          implementsJourney: n.traceability?.implementsJourney,
-          triggersEvent: n.traceability?.triggersEvent,
-        })),
+      fallbackUsed = true;
+      const fallbackResult = buildFallbackGraph(input.prompt);
+      
+      const t3_fallback = Date.now();
+      const totalDuration = t3_fallback - t0;
+      log('✅ [generateGraph] 降级图生成完成', {
+        requestId,
+        totalDurationMs: totalDuration,
+        t0,
+        t1,
+        t2,
+        t2_end,
+        t3: t3_fallback,
+        nodesCount: fallbackResult.nodes.length,
+        edgesCount: fallbackResult.edges.length,
+        warnings: fallbackResult.warnings,
+        llmMetrics,
+      });
+
+      // ✅ 返回扁平结构，nodes 和 edges 在顶层
+      return {
+        type: 'graph_generated',
+        global: fallbackResult.global,
+        nodes: fallbackResult.nodes,
+        edges: fallbackResult.edges,
+        warnings: [
+          `AI 调用失败（${aiError.type}），已使用降级图生成`,
+          ...fallbackResult.warnings,
+        ],
+        metrics: {
+          t0,
+          t1,
+          t2,
+          t3: t3_fallback,
+          totalMs: totalDuration,
+          queuedMs: llmMetrics.queuedMs,
+          dedupHit: llmMetrics.dedupHit,
+          fallbackUsed: true,
+        },
+      };
+    }
+
+    // AI 调用成功，验证结果
+    if (!singleCallResult) {
+      logError('❌ [generateGraph] Single call result is null', { requestId });
+      fallbackUsed = true;
+      const fallbackResult = buildFallbackGraph(input.prompt);
+      const t3_null = Date.now();
+      // ✅ 返回扁平结构，nodes 和 edges 在顶层
+      return {
+        type: 'graph_generated',
+        global: fallbackResult.global,
+        nodes: fallbackResult.nodes,
+        edges: fallbackResult.edges,
+        warnings: ['AI 返回结果为空，已使用降级图生成', ...fallbackResult.warnings],
+        metrics: {
+          t0,
+          t1,
+          t2,
+          t3: t3_null,
+          totalMs: t3_null - t0,
+          queuedMs: llmMetrics.queuedMs,
+          dedupHit: llmMetrics.dedupHit,
+          fallbackUsed: true,
+        },
+      };
+    }
+
+    const graphResult = singleCallResult.graph;
+
+    log('✅ [generateGraph] 开始处理 AI 结果', {
+      requestId,
+      nodesCount: graphResult.nodes.length,
+      edgesCount: graphResult.edges.length,
+      globalJourneysCount: graphResult.global.userJourneys.length,
+      globalEventsCount: graphResult.global.businessEvents.length,
       });
 
       // 转换为 FractalNode 格式
-      const nodes: FractalNode[] = result.object.nodes
+    const nodes: FractalNode[] = graphResult.nodes
         .filter(node => node.type === 'page') // 只保留 page 类型
         .map((node, index) => {
           // 验证页面类型和逻辑分类规则
@@ -749,7 +1010,7 @@ Return JSON with the following structure:
           }
           
           // 记录节点数据信息
-          log(`📊 [generateGraph] 处理节点 ${index + 1}/${result.object.nodes.length}: ${node.label}`, {
+          log(`📊 [generateGraph] 处理节点 ${index + 1}/${graphResult.nodes.length}: ${node.label}`, {
             nodeId: node.id,
             pageType,
             hasUserStories: !!node.userStories,
@@ -855,13 +1116,22 @@ Return JSON with the following structure:
         };
       });
 
-      // 转换为 Edge 格式
-      const edges: Edge[] = (result.object.edges || []).map((edge, index) => {
+      // 转换为 Edge 格式，保留 nav 元数据
+      const edges: Edge[] = (graphResult.edges || []).map((edge, index) => {
+        // 为 nav 提供默认值（向后兼容）
+        const defaultNav = {
+          trigger: 'UI_CLICK' as const,
+          conditionType: 'none' as const,
+          condition: {},
+        };
+        const nav = edge.nav || defaultNav;
+        
         const edgeObj = {
         id: `edge-${edge.source}-${edge.target}-${index}`,
         source: edge.source,
         target: edge.target,
         label: edge.label || '',
+        data: { nav },
           type: 'default' as const,
         markerEnd: {
           type: 'arrowclosed' as const,
@@ -1046,7 +1316,10 @@ Return JSON with the following structure:
             const targetNode = nodeMap.get(outEdge.target);
             if (targetNode && pages.some(p => p.id === targetNode.id)) {
               // 目标是一个页面节点，创建新边：宿主页面 -> 目标页面
-              const newEdge: Edge = {
+              // 保留原边的 nav 元数据（如果存在）
+              const preservedNav = (outEdge.data as any)?.nav || undefined;
+              
+              const newEdge = {
                 id: `edge-${hostPage.id}-${targetNode.id}-merged-${Date.now()}`,
                 source: hostPage.id,
                 target: targetNode.id,
@@ -1055,7 +1328,8 @@ Return JSON with the following structure:
                 markerEnd: {
                   type: 'arrowclosed' as const,
                 },
-              };
+                data: preservedNav ? { nav: preservedNav } : undefined,
+              } as Edge;
               edgesToAdd.push(newEdge);
               log(`🔗 [normalizeNodes] 重连: ${hostPage.data.label} -> ${targetNode.data.label}`, {
                 oldEdge: outEdge.id,
@@ -1097,7 +1371,8 @@ Return JSON with the following structure:
       const normalizedNodes = normalized.nodes;
       const normalizedEdges = normalized.edges;
 
-      const duration = Date.now() - startTime;
+    const t3 = Date.now(); // Post-processing end
+    const totalDuration = t3 - t0;
       
       // 统计用户故事、业务事件和数据查询（使用标准化后的节点）
       const totalUserStories = normalizedNodes.reduce((sum, n) => sum + (n.data.artifacts.userStories?.length || 0), 0);
@@ -1107,7 +1382,8 @@ Return JSON with the following structure:
       const viewPages = normalizedNodes.filter(n => n.data.artifacts.dataQueries && n.data.artifacts.dataQueries.length > 0).length;
       
       log('✅ [generateGraph] 图结构生成完成:', {
-        duration: `${duration}ms`,
+      requestId,
+      duration: `${totalDuration}ms`,
         nodesCount: normalizedNodes.length,
         edgesCount: normalizedEdges.length,
         totalUserStories,
@@ -1120,39 +1396,27 @@ Return JSON with the following structure:
         nodesWithUserStories: normalizedNodes.filter(n => n.data.artifacts.userStories && n.data.artifacts.userStories.length > 0).length,
         nodesWithEvents: actionPages,
         nodesWithDataQueries: viewPages,
+      llmMetrics,
+      fallbackUsed,
       });
 
-      const returnValue = {
-        data: {
-          type: 'graph_generated' as const,
-          global: {
-            userJourneys: result.object.global.userJourneys,
-            businessEvents: result.object.global.businessEvents,
-          },
-          nodes: normalizedNodes,
-          edges: normalizedEdges,
-        },
-      };
-
-      log('📤 [generateGraph] 准备返回数据:', {
-        returnValueType: returnValue.data.type,
-        hasGlobal: !!returnValue.data.global,
-        globalJourneysCount: returnValue.data.global.userJourneys.length,
-        globalEventsCount: returnValue.data.global.businessEvents.length,
-        hasNodes: !!returnValue.data.nodes,
-        nodesLength: returnValue.data.nodes.length,
-        hasEdges: !!returnValue.data.edges,
-        edgesLength: returnValue.data.edges.length,
-      });
-
-      return returnValue;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      logError('❌ [generateGraph] 生成失败:', {
-        error,
-        duration: `${duration}ms`,
-        prompt: input.prompt.substring(0, 100),
-      });
-      throw error;
-    }
+    // ✅ 返回扁平结构，nodes 和 edges 在顶层（unwrap AIResult）
+    return {
+      type: 'graph_generated',
+      global: graphResult.global,
+      nodes: normalizedNodes,
+      edges: normalizedEdges,
+      clarity: singleCallResult.clarity,
+      warnings,
+      metrics: {
+        t0,
+        t1,
+        t2,
+        t3,
+        totalMs: totalDuration,
+        queuedMs: llmMetrics.queuedMs,
+        dedupHit: llmMetrics.dedupHit,
+        fallbackUsed,
+      },
+    };
   });

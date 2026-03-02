@@ -78,7 +78,7 @@ export function StyleExtractor({ onClose }: StyleExtractorProps) {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [aiConfig]);
 
   // 处理文件输入
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

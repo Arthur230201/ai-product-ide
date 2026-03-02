@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
 import { Search } from 'lucide-react';
 import { buildTree } from '@/lib/treeUtils';
@@ -34,7 +34,7 @@ export function NodeTree() {
   }, [nodes, edges]);
 
   // 过滤树节点（递归过滤）
-  const filterTree = (treeNodes: TreeNode[]): TreeNode[] => {
+  const filterTree = useCallback((treeNodes: TreeNode[]): TreeNode[] => {
     if (!searchQuery.trim()) {
       return treeNodes;
     }
@@ -56,7 +56,7 @@ export function NodeTree() {
     });
 
     return filtered;
-  };
+  }, [searchQuery]);
 
   const filteredTreeData = useMemo(() => {
     const result = filterTree(treeData);
@@ -66,7 +66,7 @@ export function NodeTree() {
       searchQuery
     });
     return result;
-  }, [treeData, searchQuery]);
+  }, [treeData, searchQuery, filterTree]);
 
   return (
     <div className="bg-zinc-900 border-r border-zinc-800 flex flex-col h-full overflow-hidden">

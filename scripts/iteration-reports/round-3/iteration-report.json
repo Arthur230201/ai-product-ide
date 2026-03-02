@@ -1,0 +1,88 @@
+{
+  "round": 3,
+  "timestamp": "2026-02-05T04:22:14.871Z",
+  "success": true,
+  "targetReached": false,
+  "scores": {
+    "system": 0,
+    "domainExpert": 100,
+    "thirdParty": null,
+    "overall": 50,
+    "build": 0,
+    "lint": 0,
+    "tsc": 0
+  },
+  "problems": [
+    {
+      "problemId": "p-3-0",
+      "source": "system",
+      "type": "build_fail",
+      "severity": "P0",
+      "title": "Build 失败",
+      "description": "见 docs/self-check/raw/build.log",
+      "context": {
+        "round": 3
+      },
+      "expectedBehavior": "多路评估均达标",
+      "actualBehavior": "pnpm run build 未通过",
+      "relatedFixActions": [
+        {
+          "strategy": "fix_build_fail",
+          "metric": "build_fail",
+          "description": "修复 Build 失败"
+        }
+      ]
+    },
+    {
+      "problemId": "p-3-1",
+      "source": "system",
+      "type": "lint_fail",
+      "severity": "P1",
+      "title": "Lint 失败",
+      "description": "见 docs/self-check/raw/lint.log",
+      "context": {
+        "round": 3
+      },
+      "expectedBehavior": "多路评估均达标",
+      "actualBehavior": "pnpm run lint 未通过",
+      "relatedFixActions": [
+        {
+          "strategy": "fix_lint_fail",
+          "metric": "lint_fail",
+          "description": "修复 Lint 失败"
+        }
+      ]
+    },
+    {
+      "problemId": "p-3-2",
+      "source": "system",
+      "type": "tsc_fail",
+      "severity": "P0",
+      "title": "TSC 失败",
+      "description": "见 docs/self-check/raw/tsc.log",
+      "context": {
+        "round": 3
+      },
+      "expectedBehavior": "多路评估均达标",
+      "actualBehavior": "tsc --noEmit 未通过",
+      "relatedFixActions": [
+        {
+          "strategy": "fix_tsc_fail",
+          "metric": "tsc_fail",
+          "description": "修复 TSC 失败"
+        }
+      ]
+    }
+  ],
+  "fixes": [],
+  "verifications": [],
+  "duration": 135,
+  "thirdPartyRan": false,
+  "auditConclusions": {
+    "internal": "**内部专家（系统 + 领域）审计结论**（第 3 轮）\n- 系统得分：0（build）、0（lint）、0（tsc）；领域得分：100\n- 发现问题：[system] Build 失败；[system] Lint 失败；[system] TSC 失败\n- **结论**：不通过（存在未达标项或 P0 问题）\n- **流程**：不交付三方，仅内部优化并进入下一轮",
+    "thirdParty": "**三方（交付物质量）专家审计**（第 3 轮）\n- **未执行**：内部专家不通过，按设计不交付三方审计；仅内部优化后进入下一轮。",
+    "internalPass": false,
+    "thirdPartyPass": false,
+    "thirdPartyDisplay": "未执行（内部未通过，不交付三方）"
+  }
+}

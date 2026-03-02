@@ -1,0 +1,52 @@
+{
+  "testCase": "shopping-app",
+  "timestamp": "2026-02-05T08:02:26.202Z",
+  "skipProduceInteract": true,
+  "thirdParty": {
+    "score": 80,
+    "issues": [
+      {
+        "source": "third-party",
+        "type": "deliverable_stage_marker",
+        "severity": "P1",
+        "title": "交付物缺少 Stage Marker",
+        "message": "发布前需含阶段 Marker",
+        "description": "DELIVERABLE_QUALITY_GATE：Stage 1 含 Marker"
+      }
+    ]
+  },
+  "deliverableUsability": {
+    "score": 15,
+    "scores": {
+      "A": 0,
+      "B": 0,
+      "C": 10,
+      "D": 5,
+      "E": 0
+    },
+    "issues": [
+      {
+        "source": "deliverable-usability",
+        "type": "fake_interaction_ban",
+        "severity": "P0",
+        "title": "假交互禁令",
+        "message": "存在按钮/主操作但点击无反馈、无状态变化",
+        "description": "INTERNAL_AUDIT_STANDARD：CTA 须有反馈或状态变化"
+      },
+      {
+        "source": "deliverable-usability",
+        "type": "fake_state_ban",
+        "severity": "P0",
+        "title": "假状态禁令",
+        "message": "显示计数/状态（如购物车(0)）但无法通过交互改变",
+        "description": "INTERNAL_AUDIT_STANDARD：状态须可被交互更新"
+      }
+    ]
+  },
+  "artifactSummary": {
+    "hasStageMarker": false,
+    "hasScript": false,
+    "hasDataAction": false,
+    "length": 1259
+  }
+}

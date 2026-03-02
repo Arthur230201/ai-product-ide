@@ -1,0 +1,36 @@
+{
+  "projectMeta": {
+    "projectName": "购物应用",
+    "industry": "电商",
+    "targetAudience": "普通购物用户",
+    "description": "登录与商品列表两页，完成从登录到浏览商品的流程。",
+    "version": "1.0.0"
+  },
+  "globalRules": {
+    "performance": "首屏 3 秒内可交互。",
+    "security": "登录态加密传输；敏感输入脱敏。",
+    "compatibility": "支持 Chrome/Safari 最新版；移动端适配。",
+    "errorHandling": "登录失败有明确提示与重试。",
+    "dataTracking": "登录、加购等关键操作可追溯。"
+  },
+  "nodes": [
+    {
+      "id": "login",
+      "label": "登录",
+      "type": "page",
+      "spec": {
+        "title": "登录页",
+        "requirements": "1) UI：居中登录卡片，含品牌/Logo、账号与密码输入框、记住我、登录按钮、忘记密码与注册入口。2) 文案：标题「登录」；placeholder「请输入手机号/邮箱」「请输入密码」；错误态「账号或密码错误，请重试」。3) 非功能：回车提交；加载态；错误信息红色展示。"
+      }
+    },
+    {
+      "id": "product_list",
+      "label": "商品列表",
+      "type": "page",
+      "spec": {
+        "title": "商品列表页",
+        "requirements": "1) UI：顶部导航/搜索；商品网格（图、名、价、加购按钮）；购物车入口与角标。2) 文案：标题「商品列表」；真实感商品名与价格；按钮「加入购物车」；空态「暂无商品」。3) 非功能：6–10 条示例；购物车角标与数量一致。"
+      }
+    }
+  ]
+}

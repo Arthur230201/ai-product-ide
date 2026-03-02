@@ -1,11 +1,18 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvas-store';
 import type { FractalNode } from '@/types/fractal';
 import { LivePreview } from './LivePreview';
 import { SpecViewer } from './SpecViewer';
+import { DemoRouter } from '@/utils/demo-router';
+import { HtmlSandbox } from './HtmlSandbox';
+import { isHTMLContent } from '@/utils/html-rationalizer';
+import { buildInjectorScript } from '@/lib/ui/injector';
+import { toast } from 'sonner';
+import { selectNavigationEdge } from '@/lib/navigation/edge-navigator';
 
 interface PresentationModeProps {
   initialNodeId: string | null;
@@ -33,6 +40,8 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
   const leftPanelRef = useRef<HTMLDivElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const navigationHistoryRef = useRef<string[]>([]); // 导航历史记录
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const demoRouterRef = useRef<DemoRouter | null>(null);
 
   // 如果 initialNodeId 变化或节点列表变化，更新当前节点
   useEffect(() => {
@@ -165,16 +174,23 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
         return;
       }
 
-      // 如果找不到匹配的节点，尝试通过出边跳转（Fallback）
+      // 如果找不到匹配的节点，尝试通过出边跳转（使用导航逻辑）
       if (currentSlideNodeId) {
         const outgoingEdges = edges.filter(
           (edge) => edge.source === currentSlideNodeId
         );
         if (outgoingEdges.length > 0) {
-          // 将当前节点添加到历史记录
-          navigationHistoryRef.current.push(currentSlideNodeId);
-          // 跳转到第一个出边的目标节点
-          setCurrentSlideNodeId(outgoingEdges[0].target);
+          // 使用 edge-navigator 选择正确的边（根据 runtimeContext）
+          // TODO: 从某个地方获取 runtimeContext（如用户设置、URL参数等）
+          // 目前使用 undefined（无条件选择，按 priority 排序）
+          const selectedEdge = selectNavigationEdge(outgoingEdges, undefined);
+          
+          if (selectedEdge) {
+            // 将当前节点添加到历史记录
+            navigationHistoryRef.current.push(currentSlideNodeId);
+            // 跳转到选中的边的目标节点
+            setCurrentSlideNodeId(selectedEdge.target);
+          }
         }
       }
     };
@@ -193,6 +209,67 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
       );
     };
   }, [currentSlideNodeId, nodes, edges, findNodeByTitle, getPrevNode]);
+
+  // Calculate if current code is HTML (before conditional return)
+  const currentNodeCode = currentNode?.data?.artifacts?.view?.code || '';
+  const isHTML = isHTMLContent(currentNodeCode);
+
+  // Initialize Demo Router for HTML content in presentation mode (before conditional return)
+  useEffect(() => {
+    if (!isHTML || !iframeRef.current || !currentNodeCode) {
+      // Disable router if not HTML or iframe not ready
+      if (demoRouterRef.current) {
+        demoRouterRef.current.disable();
+        demoRouterRef.current = null;
+      }
+      return;
+    }
+
+    // Get HTML for node function
+    const getHtmlForNode = (nodeId: string): string | null => {
+      const node = nodes.find(n => n.id === nodeId);
+      if (!node) return null;
+      return node.data.artifacts?.view?.code || null;
+    };
+
+    // Create or recreate Demo Router if needed
+    // Always recreate to ensure fresh config (router is immutable)
+    if (demoRouterRef.current) {
+      demoRouterRef.current.disable();
+    }
+    // Create new router with current config
+    demoRouterRef.current = new DemoRouter({
+      iframe: iframeRef.current,
+      getHtmlForNode,
+      onNavigate: (nodeId) => {
+        // Update current node when navigation occurs
+        setCurrentSlideNodeId(nodeId);
+      },
+      onError: (error) => {
+        // Show user-friendly error notification
+        toast.error('导航失败', {
+          description: error,
+          duration: 3000,
+        });
+      },
+    });
+
+    // Enable router with initial HTML
+    demoRouterRef.current.enable(currentNodeCode, currentSlideNodeId || undefined);
+
+    // Cleanup on unmount
+    return () => {
+      if (demoRouterRef.current) {
+        demoRouterRef.current.disable();
+        demoRouterRef.current = null;
+      }
+    };
+  }, [isHTML, currentSlideNodeId, currentNodeCode, nodes]);
+
+  // Handle iframe ready callback (before conditional return)
+  const handleIframeReady = useCallback(() => {
+    // Router will be initialized in the useEffect above
+  }, []);
 
   // 如果没有当前节点，显示空状态
   if (!currentNode) {
@@ -380,15 +457,71 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
                         <div className="flex-1">
                           {artifacts.view.previewUrl ? (
                             <div className="w-full">
-                              <img
+                              <Image
                                 src={artifacts.view.previewUrl}
                                 alt="UI Preview"
+                                width={800}
+                                height={600}
                                 className="w-full h-auto block"
+                                unoptimized
                                 style={{
                                   display: 'block',
                                   width: '100%',
                                   height: 'auto',
                                   boxSizing: 'border-box',
+                                }}
+                              />
+                            </div>
+                          ) : isHTML ? (
+                            <div className="w-full h-full">
+                              <HtmlSandbox
+                                html={artifacts.view.code}
+                                mode="preview"
+                                injectorScript={buildInjectorScript({})}
+                                heightMode="device"
+                                className="w-full h-full"
+                                onMessage={(msg) => {
+                                  if (msg.type === 'READY') {
+                                    handleIframeReady();
+                                  } else if (msg.type === 'NAV') {
+                                    // Handle navigation from injector
+                                    const navTarget = msg.to;
+                                    if (navTarget) {
+                                      // Try to find node by title or ID
+                                      const targetNode = nodes.find(n => 
+                                        n.data.label === navTarget || 
+                                        n.id === navTarget ||
+                                        n.data.artifacts?.spec?.title === navTarget
+                                      );
+                                      
+                                      if (targetNode) {
+                                        setCurrentSlideNodeId(targetNode.id);
+                                        // Add to navigation history
+                                        if (currentSlideNodeId) {
+                                          navigationHistoryRef.current.push(currentSlideNodeId);
+                                        }
+                                      } else {
+                                        // Try to use DemoRouter if available
+                                        if (demoRouterRef.current) {
+                                          // DemoRouter will handle navigation
+                                          console.log('[PresentationMode] Navigation via DemoRouter:', navTarget);
+                                        } else {
+                                          toast.warning('导航目标未找到', {
+                                            description: `无法找到节点: ${navTarget}`,
+                                            duration: 2000,
+                                          });
+                                        }
+                                      }
+                                    }
+                                  }
+                                }}
+                                ref={(ref) => {
+                                  if (ref && ref.getIframe) {
+                                    const iframe = ref.getIframe();
+                                    if (iframe) {
+                                      (iframeRef as React.MutableRefObject<HTMLIFrameElement | null>).current = iframe;
+                                    }
+                                  }
                                 }}
                               />
                             </div>

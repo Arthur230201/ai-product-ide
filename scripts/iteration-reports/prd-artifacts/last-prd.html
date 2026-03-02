@@ -1,0 +1,878 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>购物应用 - PRD</title>
+    <!-- React Runtime -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({ 
+        startOnLoad: true, 
+        theme: 'neutral', 
+        securityLevel: 'loose',
+        fontFamily: 'Inter, system-ui, sans-serif'
+      });
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.2.0/github-markdown-light.min.css">
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; background: #f8fafc; }
+        .sidebar { 
+            width: 280px; 
+            height: 100vh; 
+            position: fixed; 
+            left: 0; 
+            top: 0; 
+            overflow-y: auto; 
+            background: #0f172a; 
+            color: #94a3b8;
+            scrollbar-width: thin;
+            scrollbar-color: #475569 #0f172a;
+        }
+        /* 确保sidebar中的项目名称显示为白色 */
+        .sidebar h1 {
+            color: #ffffff !important;
+        }
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .sidebar::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+        .main-content { margin-left: 280px; min-height: 100vh; background: #fff; }
+        .device-sandbox { position: relative; width: 100%; min-height: 400px; height: 100%; overflow: hidden; border-radius: 1rem; border: 2px solid #e2e8f0; background: #fff; }
+        .device-sandbox > div { width: 100%; height: 100%; min-height: 100%; box-sizing: border-box; }
+        .prd-ui-viewport { min-height: 100%; box-sizing: border-box; }
+        
+        /* Typography & Tables - 企业级文档标题层级 */
+        /* 使用 !important 确保样式优先级，覆盖 Tailwind 和 markdown-body 的默认样式 */
+        .main-content h1,
+        section h1,
+        h1 { 
+            color: #0f172a !important; 
+            font-weight: 800 !important; 
+            font-size: 2.5rem !important; /* 40px - 章节标题，最大 */
+            line-height: 1.2 !important;
+            margin-top: 3rem !important; 
+            margin-bottom: 1.5rem !important; 
+            padding-bottom: 0.75rem !important;
+            border-bottom: 3px solid #cbd5e1 !important;
+        }
+        .main-content h2,
+        section h2,
+        h2 { 
+            color: #1e293b !important; 
+            font-weight: 700 !important; 
+            font-size: 2rem !important; /* 32px - 页面/模块标题，比 h1 小 */
+            line-height: 1.3 !important;
+            margin-top: 2.5rem !important; 
+            margin-bottom: 1.25rem !important; 
+            padding-bottom: 0.5rem !important;
+            border-bottom: 2px solid #cbd5e1 !important;
+        }
+        .main-content h3,
+        section h3,
+        h3 { 
+            color: #475569 !important; 
+            font-weight: 600 !important; 
+            font-size: 1.5rem !important; /* 24px - 小节标题，比 h2 小 */
+            line-height: 1.4 !important;
+            margin-top: 2rem !important; 
+            margin-bottom: 1rem !important; 
+            padding-bottom: 0.5rem !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+        }
+        .main-content h4,
+        section h4,
+        h4 { 
+            color: #64748b !important; 
+            font-weight: 600 !important; 
+            font-size: 1.25rem !important; /* 20px - 子小节标题，比 h3 小 */
+            line-height: 1.5 !important;
+            margin-top: 1.5rem !important; 
+            margin-bottom: 0.75rem !important; 
+        }
+        
+        /* Logic Block Styling (for business logic, data rules, etc.) */
+        .logic-block {
+            background-color: #f8fafc;
+            border-left: 4px solid #3b82f6;
+            padding: 1rem;
+            border-radius: 0 0.5rem 0.5rem 0;
+            margin-top: 0.5rem;
+        }
+        .logic-block p {
+            margin-bottom: 0.5rem;
+        }
+        .logic-block ul, .logic-block ol {
+            margin-left: 1.5rem;
+            margin-top: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .logic-block li {
+            margin-bottom: 0.25rem;
+        }
+        
+        /* Node Separator */
+        .node-separator {
+            border-top: 1px solid #cbd5e1;
+            margin: 2rem 0;
+        }
+        
+        /* Markdown Tables Override */
+        .markdown-body table { display: table; width: 100%; }
+        .markdown-body th { background-color: #f1f5f9; }
+        
+        /* 确保正文文本不会比标题更突出 */
+        .markdown-body {
+            color: #475569; /* 正文文本颜色，比 h3 更浅 */
+            font-size: 0.9375rem; /* 15px，小于 h4 的 20px */
+            line-height: 1.6;
+        }
+        .markdown-body p {
+            color: #475569 !important; /* 确保段落文本颜色不会比标题深 */
+            font-size: 0.9375rem !important; /* 确保段落字号不会比标题大 */
+            margin-bottom: 1rem;
+        }
+        .markdown-body strong,
+        .markdown-body b {
+            color: #64748b !important; /* 加粗文本颜色，比 h4 更浅 */
+            font-weight: 600 !important;
+            font-size: inherit !important; /* 继承父元素字号，不会比标题大 */
+        }
+        .markdown-body em,
+        .markdown-body i {
+            color: #64748b !important;
+            font-size: inherit !important;
+        }
+        .markdown-body ul,
+        .markdown-body ol {
+            color: #475569 !important;
+            font-size: 0.9375rem !important;
+        }
+        .markdown-body li {
+            color: #475569 !important;
+            font-size: 0.9375rem !important;
+        }
+        
+        /* 确保 markdown-body 内的标题使用我们的样式 */
+        .markdown-body h1 {
+            color: #0f172a !important;
+            font-weight: 800 !important;
+            font-size: 2.5rem !important;
+            line-height: 1.2 !important;
+            margin-top: 3rem !important;
+            margin-bottom: 1.5rem !important;
+            padding-bottom: 0.75rem !important;
+            border-bottom: 3px solid #cbd5e1 !important;
+        }
+        .markdown-body h2 {
+            color: #1e293b !important;
+            font-weight: 700 !important;
+            font-size: 2rem !important;
+            line-height: 1.3 !important;
+            margin-top: 2.5rem !important;
+            margin-bottom: 1.25rem !important;
+            padding-bottom: 0.5rem !important;
+            border-bottom: 2px solid #cbd5e1 !important;
+        }
+        .markdown-body h3 {
+            color: #475569 !important;
+            font-weight: 600 !important;
+            font-size: 1.5rem !important;
+            line-height: 1.4 !important;
+            margin-top: 2rem !important;
+            margin-bottom: 1rem !important;
+            padding-bottom: 0.5rem !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+        }
+        .markdown-body h4 {
+            color: #64748b !important;
+            font-weight: 600 !important;
+            font-size: 1.25rem !important;
+            line-height: 1.5 !important;
+            margin-top: 1.5rem !important;
+            margin-bottom: 0.75rem !important;
+        }
+
+        /* Split View Sticky UI */
+        .sticky-ui { 
+            position: sticky; 
+            top: 2rem; 
+            align-self: flex-start;
+            max-height: calc(100vh - 4rem);
+            overflow-y: auto;
+        }
+        .phone-mockup { 
+            border: 12px solid #1e293b; 
+            border-radius: 32px; 
+            overflow: hidden; 
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04); 
+            background: #fff;
+            max-width: 100%;
+            margin: 0 auto;
+        }
+        .phone-mockup img {
+            width: 100%;
+            height: auto;
+            display: block;
+            transition: transform 0.2s ease;
+        }
+        .phone-mockup img:hover {
+            transform: scale(1.02);
+        }
+        
+        /* PRD Table Styling */
+        .markdown-body table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+        }
+        .markdown-body table th {
+            background-color: #f1f5f9;
+            color: #1e293b;
+            font-weight: 600;
+            padding: 0.75rem;
+            text-align: left;
+            border: 1px solid #e2e8f0;
+        }
+        .markdown-body table td {
+            padding: 0.75rem;
+            border: 1px solid #e2e8f0;
+            color: #334155;
+        }
+        .markdown-body table tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+        .markdown-body table tr:hover {
+            background-color: #f1f5f9;
+        }
+
+        /* Lightbox */
+        #lightbox { 
+            display: none; 
+            position: fixed; 
+            inset: 0; 
+            background: rgba(0,0,0,0.95); 
+            z-index: 9999; 
+            justify-content: center; 
+            align-items: center; 
+            cursor: pointer;
+        }
+        #lightbox img { 
+            max-width: 95%; 
+            max-height: 95%; 
+            object-fit: contain; 
+            border-radius: 8px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        }
+        #lightbox::before {
+            content: '点击关闭或按 ESC 键';
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        /* Print Optimization */
+        @media print {
+            .sidebar { display: none; }
+            .main-content { margin-left: 0; width: 100%; }
+            .sticky-ui { position: static; }
+            .page-break { page-break-before: always; }
+        }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar">
+        <div class="p-6 border-b border-slate-800">
+            <h1 class="text-white text-lg font-bold leading-tight">购物应用</h1>
+            <div class="text-xs mt-2 text-slate-500">版本: 1.0.0</div>
+        </div>
+        <nav class="p-4 space-y-1 text-sm">
+            <a href="#version-control" class="block px-4 py-2 hover:bg-slate-800 rounded text-white font-medium">0. 版本记录</a>
+            <a href="#ch1" class="block px-4 py-2 hover:bg-slate-800 rounded">1. 项目综述</a>
+            <a href="#ch2" class="block px-4 py-2 hover:bg-slate-800 rounded">2. 全局规范</a>
+            <a href="#ch3" class="block px-4 py-2 hover:bg-slate-800 rounded">3. 系统架构</a>
+            <a href="#ch4" class="block px-4 py-2 hover:bg-slate-800 rounded">4. 业务流程</a>
+            <a href="#ch5" class="block px-4 py-2 hover:bg-slate-800 rounded">5. 功能详述</a>
+            
+                    <div class="space-y-0.5">
+                        <a href="#node-0" class="block px-4 py-1.5 hover:bg-slate-800 rounded truncate pl-6 text-xs font-medium text-slate-300 transition-colors">5.1 登录页</a>
+                        <a href="#node-0-section-1" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.1.1 功能需求说明</a>
+                        
+                    </div>
+                
+                    <div class="space-y-0.5">
+                        <a href="#node-1" class="block px-4 py-1.5 hover:bg-slate-800 rounded truncate pl-6 text-xs font-medium text-slate-300 transition-colors">5.2 商品列表页</a>
+                        <a href="#node-1-section-1" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.2.1 功能需求说明</a>
+                        
+                    </div>
+                
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <div class="max-w-5xl mx-auto p-12">
+            
+            <section id="version-control" class="mb-16">
+                <div class="bg-slate-50 rounded-xl border p-6">
+                    <h2 style="margin-top:0; border:none; padding-bottom:0;">📝 文档版本记录</h2>
+                    <table class="w-full text-sm text-left mt-4 border-collapse bg-white">
+                        <thead class="bg-slate-100 text-slate-700">
+                            <tr>
+                                <th class="p-3 border">版本号</th>
+                                <th class="p-3 border">修订日期</th>
+                                <th class="p-3 border">修改人</th>
+                                <th class="p-3 border">修订说明</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="p-3 border font-mono text-blue-600">1.0.0</td>
+                                <td class="p-3 border">2026年2月5日</td>
+                                <td class="p-3 border font-medium">Project Owner</td>
+                                <td class="p-3 border text-gray-600">初始版本生成 (Auto-generated)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <hr class="my-12 border-slate-200" />
+
+            <section id="ch1" class="mb-20 scroll-mt-10">
+                <h1>第 1 章：项目综述</h1>
+                
+                <h3>1.1 项目背景</h3>
+                <div class="bg-white p-4 text-gray-700 leading-relaxed">
+                    登录与商品列表两页，完成从登录到浏览商品的流程。
+                </div>
+
+                <h3>1.2 目标用户</h3>
+                <div class="bg-blue-50 text-blue-800 p-4 rounded-lg border border-blue-100">
+                    <strong>👥 核心用户群体：</strong> 普通购物用户
+                </div>
+            </section>
+
+            <section id="ch2" class="mb-20 scroll-mt-10">
+                <h1>第 2 章：全局规范</h1>
+                
+                <h3>2.1 全局交互/数据规则</h3>
+                <div class="markdown-body text-sm">
+                    <h3>性能要求</h3>
+<p>首屏 3 秒内可交互。</p>
+<h3>安全要求</h3>
+<p>登录态加密传输；敏感输入脱敏。</p>
+<h3>兼容性要求</h3>
+<p>支持 Chrome/Safari 最新版；移动端适配。</p>
+<h3>错误处理</h3>
+<p>登录失败有明确提示与重试。</p>
+<h3>数据追踪</h3>
+<p>登录、加购等关键操作可追溯。</p>
+
+                </div>
+
+                <div class="mt-8"></div>
+                <h3>2.2 全局数据字典</h3>
+                <div class="markdown-body text-sm bg-slate-50 p-4 rounded border">
+                    <table>
+<thead>
+<tr>
+<th>字段名</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>（暂无数据字典）</td>
+<td>-</td>
+<td>-</td>
+</tr>
+</tbody></table>
+
+                </div>
+            </section>
+
+            <section id="ch3" class="mb-20 scroll-mt-10">
+                <h1>第 3 章：系统架构</h1>
+                
+                <h3>3.1 架构拓扑图</h3>
+                <p class="text-gray-400 italic">暂无架构拓扑图</p>
+
+                <h3>3.2 交互拓扑图</h3>
+                <p class="text-gray-400 italic">暂无交互拓扑图</p>
+            </section>
+
+            <section id="ch4" class="mb-20 scroll-mt-10">
+                <h1>第 4 章：业务流程</h1>
+                
+                <h3>4.1 核心业务泳道图</h3>
+                <div class="overflow-x-auto border rounded-xl p-6 bg-white shadow-sm">
+                    <div class="mermaid flex justify-center min-w-[800px]">
+                        graph TD; A[暂无泳道图]
+                    </div>
+                </div>
+            </section>
+
+            <section id="ch5" class="mb-32 scroll-mt-10">
+                <h1>第 5 章：功能详述</h1>
+                <p class="text-gray-500 mb-8">本章节包含各个页面的 UI 原型图及详细的功能需求说明。</p>
+
+                
+                <div id="node-0" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20">
+                    <!-- Page Title (H2) -->
+                    <h2>5.1 登录页</h2>
+                    
+                    <div class="grid grid-cols-12 gap-8 items-start">
+                        <!-- Left Column: UI Preview (Sticky) -->
+                        <div class="col-span-4">
+                            <div class="sticky-ui">
+                                <h3>5.1.2 界面示意</h3>
+                                
+                                <!-- React 交互式 UI 容器 -->
+                                <div class="phone-mockup bg-white" style="min-height: 400px;">
+                                    <div id="root-login" style="width: 100%; min-height: 400px;"></div>
+                                </div>
+                                <p class="text-center text-xs text-slate-500 mt-3 font-mono">图 5.1.2 交互式 UI 原型</p>
+                                
+                            </div>
+                        </div>
+
+                        <!-- Right Column: Requirement Sections -->
+                        <div class="col-span-8">
+                            <div class="markdown-body text-sm bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                                <div class="p-6">
+                                    
+                            <div id="node-0-section--1" class="mb-6 scroll-mt-20">
+                                <h3>5.1.1 功能需求说明</h3>
+                                <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                                    <ol>
+<li>UI：居中登录卡片，含品牌/Logo、账号与密码输入框、记住我、登录按钮、忘记密码与注册入口。2) 文案：标题「登录」；placeholder「请输入手机号/邮箱」「请输入密码」；错误态「账号或密码错误，请重试」。3) 非功能：回车提交；加载态；错误信息红色展示。</li>
+</ol>
+
+                                </div>
+                            </div>
+                          
+                                    
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="node-separator my-8 border-slate-300" />
+                </div>
+                
+                <div id="node-1" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20">
+                    <!-- Page Title (H2) -->
+                    <h2>5.2 商品列表页</h2>
+                    
+                    <div class="grid grid-cols-12 gap-8 items-start">
+                        <!-- Left Column: UI Preview (Sticky) -->
+                        <div class="col-span-4">
+                            <div class="sticky-ui">
+                                <h3>5.2.2 界面示意</h3>
+                                
+                                <!-- React 交互式 UI 容器 -->
+                                <div class="phone-mockup bg-white" style="min-height: 400px;">
+                                    <div id="root-product_list" style="width: 100%; min-height: 400px;"></div>
+                                </div>
+                                <p class="text-center text-xs text-slate-500 mt-3 font-mono">图 5.2.2 交互式 UI 原型</p>
+                                
+                            </div>
+                        </div>
+
+                        <!-- Right Column: Requirement Sections -->
+                        <div class="col-span-8">
+                            <div class="markdown-body text-sm bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                                <div class="p-6">
+                                    
+                            <div id="node-1-section--1" class="mb-6 scroll-mt-20">
+                                <h3>5.2.1 功能需求说明</h3>
+                                <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                                    <ol>
+<li>UI：顶部导航/搜索；商品网格（图、名、价、加购按钮）；购物车入口与角标。2) 文案：标题「商品列表」；真实感商品名与价格；按钮「加入购物车」；空态「暂无商品」。3) 非功能：6–10 条示例；购物车角标与数量一致。</li>
+</ol>
+
+                                </div>
+                            </div>
+                          
+                                    
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr class="node-separator my-8 border-slate-300" />
+                </div>
+                
+                
+                
+            </section>
+
+        </div>
+    </main>
+
+    <div id="lightbox" onclick="this.style.display='none'">
+        <img src="" alt="Full Screen Image" />
+    </div>
+
+    <script>
+        // Lightbox Logic
+        function openLightbox(src) {
+            if(!src) return;
+            const lb = document.getElementById('lightbox');
+            const img = lb.querySelector('img');
+            if (img) {
+                img.src = src;
+            lb.style.display = 'flex';
+        }
+        }
+
+        // Close lightbox on click outside image
+        document.getElementById('lightbox')?.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.style.display = 'none';
+            }
+        });
+
+        // Close lightbox on Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                const lb = document.getElementById('lightbox');
+                if (lb) lb.style.display = 'none';
+            }
+        });
+
+        // Sidebar Smooth Scroll
+        document.querySelectorAll('nav a').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href');
+                const target = document.querySelector(targetId);
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                });
+                }
+            });
+        });
+
+        // Highlight active section in sidebar on scroll
+        const sections = document.querySelectorAll('section[id]');
+        const navLinks = document.querySelectorAll('nav a[href^="#"]');
+        
+        function updateActiveNav() {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.getBoundingClientRect().top;
+                if (sectionTop <= 100) {
+                    current = section.getAttribute('id') || '';
+                }
+            });
+            
+            navLinks.forEach(link => {
+                link.classList.remove('bg-slate-800', 'text-white');
+                link.classList.add('text-slate-400');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('bg-slate-800', 'text-white');
+                    link.classList.remove('text-slate-400');
+                }
+            });
+        }
+        
+        window.addEventListener('scroll', updateActiveNav);
+        updateActiveNav(); // Initial call
+
+        // ============================================================================
+        // React Component Mounting Logic
+        // ============================================================================
+        
+        // Wait for React and ReactDOM to be loaded
+        function waitForReact(callback, maxRetries = 20, delay = 200) {
+          const hasReact = typeof window.React !== 'undefined';
+          const hasReactDOM = typeof window.ReactDOM !== 'undefined';
+          const hasBabel = typeof window.Babel !== 'undefined';
+          
+          console.log('🔍 [waitForReact] Checking dependencies:', {
+            React: hasReact,
+            ReactDOM: hasReactDOM,
+            Babel: hasBabel,
+            retriesLeft: maxRetries
+          });
+          
+          if (hasReact && hasReactDOM && hasBabel) {
+            console.log('✅ [waitForReact] All dependencies loaded, calling callback');
+            callback();
+          } else if (maxRetries > 0) {
+            setTimeout(() => waitForReact(callback, maxRetries - 1, delay), delay);
+          } else {
+            console.error('❌ [waitForReact] React/ReactDOM/Babel failed to load after timeout');
+            console.error('💡 [waitForReact] Final status:', {
+              React: hasReact,
+              ReactDOM: hasReactDOM,
+              Babel: hasBabel
+            });
+          }
+        }
+
+        // Mount React components
+        function mountComponents() {
+          console.log('🔧 [mountComponents] Starting component mounting...');
+          
+          const nodesWithCode = [{"nodeId":"login","uiCode":"<style>:root {\n            --color-primary: #4A90E2;\n            --color-secondary: #F5F5F5;\n            --color-error: #D0021B;\n            --color-text: #333;\n            --color-placeholder: #888;\n            --color-bg: #FAFAFA;\n            --spacing-xs: 8px;\n            --spacing-sm: 16px;\n            --spacing-md: 24px;\n            --spacing-lg: 32px;\n            --font-size-md: 16px;\n            --font-size-lg: 20px;\n            --border-radius: 8px;\n            --max-width-form: 360px;\n        }\n\n        body {\n            font-family: Arial, sans-serif;\n            font-size: var(--font-size-md);\n            line-height: 1.5;\n            margin: 0;\n            padding: 0;\n            background-color: var(--color-bg);\n            display: flex;\n            justify-content: center;\n            align-items: center;\n            min-height: 100vh;\n        }\n\n        header {\n            display: none;\n        }\n\n        main {\n            width: 100%;\n            max-width: var(--max-width-form);\n            background: #fff;\n            padding: var(--spacing-lg);\n            border-radius: var(--border-radius);\n            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);\n        }\n\n        h1 {\n            text-align: center;\n            font-size: var(--font-size-lg);\n            color: var(--color-text);\n            margin-bottom: var(--spacing-md);\n        }\n\n        .brand-logo {\n            display: block;\n            margin: 0 auto var(--spacing-md);\n            width: 64px;\n            height: 64px;\n            background: var(--color-primary);\n            border-radius: 50%;\n        }\n\n        form {\n            display: grid;\n            gap: var(--spacing-sm);\n        }\n\n        input {\n            width: 100%;\n            padding: var(--spacing-sm);\n            font-size: var(--font-size-md);\n            border: 1px solid #ccc;\n            border-radius: var(--border-radius);\n            color: var(--color-text);\n        }\n\n        input::placeholder {\n            color: var(--color-placeholder);\n        }\n\n        input:focus {\n            border-color: var(--color-primary);\n            outline: none;\n        }\n\n        .error-message {\n            display: none;\n            color: var(--color-error);\n            font-size: var(--font-size-md);\n            margin-top: -var(--spacing-xs);\n        }\n\n        .checkbox-group {\n            display: flex;\n            align-items: center;\n        }\n\n        .checkbox-group input {\n            width: auto;\n            margin-right: var(--spacing-xs);\n        }\n\n        .primary-button {\n            background: var(--color-primary);\n            color: #fff;\n            padding: var(--spacing-sm);\n            font-size: var(--font-size-md);\n            border: none;\n            border-radius: var(--border-radius);\n            cursor: pointer;\n        }\n\n        .primary-button:disabled {\n            opacity: 0.6;\n            cursor: not-allowed;\n        }\n\n        .form-links {\n            display: flex;\n            justify-content: space-between;\n            margin-top: var(--spacing-sm);\n        }\n\n        .form-links a {\n            color: var(--color-primary);\n            text-decoration: none;\n            font-size: var(--font-size-md);\n        }\n\n        .form-links a:hover {\n            text-decoration: underline;\n        }\n\n        footer {\n            text-align: center;\n            margin-top: var(--spacing-lg);\n            font-size: var(--font-size-md);\n            color: var(--color-placeholder);\n        }\n\n        @media (max-width: 768px) {\n            main {\n                margin: var(--spacing-sm);\n                padding: var(--spacing-md);\n            }\n        }</style>\n<header data-component-id=\"header\"></header>\n    <main data-component-id=\"main\">\n        <div>\n            <div class=\"brand-logo\"></div>\n            <h1>登录</h1>\n            <form data-component-id=\"login-form\">\n                <input type=\"text\" name=\"username\" placeholder=\"请输入手机号/邮箱\" required>\n                <input type=\"password\" name=\"password\" placeholder=\"请输入密码\" required>\n                <div class=\"error-message\">账号或密码错误，请重试</div>\n                <div class=\"checkbox-group\">\n                    <input type=\"checkbox\" id=\"remember-me\" name=\"remember\">\n                    <label for=\"remember-me\">记住我</label>\n                </div>\n                <button type=\"button\" class=\"primary-button\">登录</button>\n                <div class=\"form-links\">\n                    <a href=\"#\">忘记密码</a>\n                    <a href=\"#\">注册</a>\n                </div>\n            </form>\n        </div>\n    </main>\n    <footer data-component-id=\"footer\">\n        &copy; 2023 示例公司\n    </footer>","title":"登录页","isHtml":true},{"nodeId":"product_list","uiCode":"<style>:root {\n            --primary-color: #4CAF50;\n            --secondary-color: #f1f1f1;\n            --text-color: #333;\n            --badge-color: #e91e63;\n            --spacing-small: 8px;\n            --spacing-medium: 16px;\n            --spacing-large: 24px;\n        }\n\n        body {\n            font-family: Arial, sans-serif;\n            margin: 0;\n            padding: 0;\n            color: var(--text-color);\n        }\n\n        header[data-component-id=\"header\"] {\n            background-color: var(--primary-color);\n            color: white;\n            display: flex;\n            justify-content: space-between;\n            align-items: center;\n            padding: var(--spacing-medium);\n        }\n\n        nav[data-component-id=\"nav\"] {\n            display: flex;\n            gap: var(--spacing-small);\n        }\n\n        nav a {\n            color: white;\n            text-decoration: none;\n            padding: var(--spacing-small);\n        }\n\n        .search-input {\n            padding: var(--spacing-small);\n            border-radius: var(--spacing-small);\n            border: none;\n        }\n\n        main[data-component-id=\"main\"] {\n            padding: var(--spacing-large);\n            background-color: var(--secondary-color);\n        }\n\n        .product-grid {\n            display: grid;\n            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n            gap: var(--spacing-medium);\n        }\n\n        .product-card {\n            background-color: white;\n            padding: var(--spacing-medium);\n            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);\n            border-radius: var(--spacing-small);\n            text-align: center;\n        }\n\n        .product-image {\n            width: 100px;\n            height: 100px;\n            background-color: var(--primary-color);\n            color: white;\n            margin-bottom: var(--spacing-small);\n            display: flex;\n            justify-content: center;\n            align-items: center;\n            border-radius: var(--spacing-small);\n        }\n\n        .product-name {\n            font-size: 16px;\n            margin-bottom: var(--spacing-small);\n        }\n\n        .product-price {\n            font-size: 14px;\n            color: var(--badge-color);\n            margin-bottom: var(--spacing-medium);\n        }\n\n        .product-button {\n            background-color: var(--primary-color);\n            color: white;\n            border: none;\n            padding: var(--spacing-small);\n            border-radius: var(--spacing-small);\n            cursor: pointer;\n        }\n\n        .cart-badge {\n            background-color: var(--badge-color);\n            color: white;\n            border-radius: 50%;\n            padding: var(--spacing-small);\n            display: inline-block;\n        }\n\n        footer[data-component-id=\"footer\"] {\n            background-color: var(--primary-color);\n            color: white;\n            text-align: center;\n            padding: var(--spacing-medium);\n        }\n\n        @media (max-width: 768px) {\n            .product-grid {\n                grid-template-columns: 1fr;\n            }\n\n            header, footer {\n                text-align: center;\n            }\n        }</style>\n<header data-component-id=\"header\">\n        <div>\n            <strong>商品列表</strong>\n        </div>\n        <nav data-component-id=\"nav\">\n            <a href=\"#\">主页</a>\n            <a href=\"#\">关于</a>\n            <input type=\"text\" class=\"search-input\" placeholder=\"搜索商品\">\n            <div class=\"cart-badge\">0</div>\n        </nav>\n    </header>\n\n    <main data-component-id=\"main\">\n        <section class=\"product-grid\">\n            <article class=\"product-card\">\n                <div class=\"product-image\">图片</div>\n                <div class=\"product-name\">商品一</div>\n                <div class=\"product-price\">¥10.00</div>\n                <button class=\"product-button\">加入购物车</button>\n            </article>\n            <article class=\"product-card\">\n                <div class=\"product-image\">图片</div>\n                <div class=\"product-name\">商品二</div>\n                <div class=\"product-price\">¥20.00</div>\n                <button class=\"product-button\">加入购物车</button>\n            </article>\n            <article class=\"product-card\">\n                <div class=\"product-image\">图片</div>\n                <div class=\"product-name\">商品三</div>\n                <div class=\"product-price\">¥30.00</div>\n                <button class=\"product-button\">加入购物车</button>\n            </article>\n            <article class=\"product-card\">\n                <div class=\"product-image\">图片</div>\n                <div class=\"product-name\">商品四</div>\n                <div class=\"product-price\">¥40.00</div>\n                <button class=\"product-button\">加入购物车</button>\n            </article>\n            <article class=\"product-card\">\n                <div class=\"product-image\">图片</div>\n                <div class=\"product-name\">商品五</div>\n                <div class=\"product-price\">¥50.00</div>\n                <button class=\"product-button\">加入购物车</button>\n            </article>\n            <article class=\"product-card\">\n                <div class=\"product-image\">图片</div>\n                <div class=\"product-name\">商品六</div>\n                <div class=\"product-price\">¥60.00</div>\n                <button class=\"product-button\">加入购物车</button>\n            </article>\n        </section>\n    </main>\n\n    <footer data-component-id=\"footer\">\n        &copy; 2023 商品商店。保留所有权利。\n    </footer>","title":"商品列表页","isHtml":true}];
+
+          console.log('📊 [mountComponents] Found ' + nodesWithCode.length + ' nodes with UI code');
+          
+          if (nodesWithCode.length === 0) {
+            console.warn('⚠️ [mountComponents] No nodes with UI code found');
+            return;
+          }
+
+          // Log available containers
+          const allContainers = document.querySelectorAll('[id^="root-"]');
+          console.log('🔍 [mountComponents] Available containers:', Array.from(allContainers).map(el => el.id));
+
+          nodesWithCode.forEach((nodeData, index) => {
+            const containerId = 'root-' + nodeData.nodeId;
+            const container = document.getElementById(containerId);
+            
+            console.log('🎯 [mountComponents] Processing node:', nodeData.title, 'Container ID:', containerId);
+            
+            if (!container) {
+              console.warn('⚠️ Container ' + containerId + ' not found for node: ' + nodeData.title);
+              console.warn('💡 Available containers:', Array.from(document.querySelectorAll('[id^="root-"]')).map(el => el.id));
+              return;
+            }
+            
+            if (!nodeData.uiCode || nodeData.uiCode.trim().length === 0) {
+              console.warn('⚠️ Node ' + nodeData.title + ' has empty UI code');
+              container.innerHTML = '<div style="padding: 20px; color: #9ca3af; text-align: center;">暂无 UI 代码</div>';
+              return;
+            }
+
+            try {
+              if (nodeData.isHtml) {
+                var htmlContent = nodeData.uiCode.trim();
+                htmlContent = htmlContent.replace(/<style([^>]*)>([\s\S]*?)<\/style>/gi, function(_, attrs, inner) {
+                  var r = inner.replace(/\b(html\s*,\s*)?body\b/g, '.prd-ui-viewport');
+                  return '<style' + attrs + '>' + r + '</style>';
+                });
+                var styleEnd = htmlContent.indexOf('</style>');
+                if (styleEnd !== -1) {
+                  var after = htmlContent.slice(styleEnd + 8).trim();
+                  htmlContent = htmlContent.slice(0, styleEnd + 8) + '<div class="prd-ui-viewport">' + after + '</div>';
+                }
+                container.innerHTML = '';
+                container.className = 'device-sandbox';
+                var innerDiv = document.createElement('div');
+                innerDiv.className = 'prd-ui-sandbox-inner';
+                innerDiv.style.cssText = 'width:100%;height:100%;min-height:100%;box-sizing:border-box;';
+                innerDiv.innerHTML = htmlContent;
+                container.appendChild(innerDiv);
+                return;
+              }
+
+              console.log('🔄 [mountComponents] Transforming code for:', nodeData.title);
+              
+              // Transform component code: ensure it's a valid React component
+              let componentCode = nodeData.uiCode;
+              
+              console.log('📝 [mountComponents] Original code length:', componentCode.length);
+              
+              // Step 1: Remove TypeScript type definitions and annotations (Babel can't handle TS)
+              // Remove type definitions using a more robust approach that handles multi-line and nested braces
+              // First, remove simple single-line type definitions: type X = Y;
+              componentCode = componentCode.replace(/^s*types+w+s*=s*[^;{]+;?s*$/gm, '');
+              
+              // Then, remove multi-line type definitions: type X = { ... } (handles nested braces)
+              // This regex matches: type NAME = { ... } where ... can contain nested braces
+              let typeRegex = /^s*types+w+s*=s*{/gm;
+              let match;
+              while ((match = typeRegex.exec(componentCode)) !== null) {
+                let start = match.index;
+                let braceCount = 0;
+                let i = match.index + match[0].length - 1;
+                let foundEnd = false;
+                
+                while (i < componentCode.length) {
+                  if (componentCode[i] === '{') braceCount++;
+                  if (componentCode[i] === '}') {
+                    braceCount--;
+                    if (braceCount === 0) {
+                      // Found the end of the type definition
+                      let end = i + 1;
+                      // Also remove trailing semicolon if present
+                      if (componentCode[end] === ';') end++;
+                      // Remove the entire type definition
+                      componentCode = componentCode.substring(0, start) + componentCode.substring(end);
+                      foundEnd = true;
+                      break;
+                    }
+                  }
+                  i++;
+                }
+                
+                if (!foundEnd) {
+                  // If we didn't find the end, just remove from start to end of line
+                  let lineEnd = componentCode.indexOf('
+', start);
+                  if (lineEnd === -1) lineEnd = componentCode.length;
+                  componentCode = componentCode.substring(0, start) + componentCode.substring(lineEnd);
+                }
+                
+                // Reset regex lastIndex to avoid infinite loop
+                typeRegex.lastIndex = start;
+              }
+              
+              // Remove interface definitions: interface X { ... }
+              componentCode = componentCode.replace(/^s*interfaces+w+[^{]*{[^}]*}s*;?s*$/gm, '');
+              // Remove type annotations from variables: const x: Type = ...
+              componentCode = componentCode.replace(/:s*[A-Z][a-zA-Z0-9<>[]|&s,]*(s*=s*)/g, '$1');
+              // Remove type annotations from function parameters: (x: Type) => ...
+              componentCode = componentCode.replace(/(([^)]*))/g, function(match, params) {
+                return '(' + params.replace(/:s*[A-Z][a-zA-Z0-9<>[]|&s,]*/g, '').replace(/,s*,/g, ',').replace(/^,s*|,s*$/g, '') + ')';
+              });
+              // Remove generic type parameters: <T> or <T extends ...>
+              componentCode = componentCode.replace(/<[A-Z][a-zA-Z0-9<>[]|&s,=.]*>/g, '');
+              // Remove 'as' type assertions: x as Type
+              componentCode = componentCode.replace(/s+ass+[A-Z][a-zA-Z0-9<>[]|&s,]*/g, '');
+              // Remove import type statements: import type { ... } from ...
+              componentCode = componentCode.replace(/imports+types+[^;]+;?s*/g, '');
+              
+              // Step 2: Remove Markdown code blocks if present
+              const backtick = String.fromCharCode(96);
+              componentCode = componentCode.replace(new RegExp(backtick + backtick + backtick + 'tsx|' + backtick + backtick + backtick + 'jsx|' + backtick + backtick + backtick + 'javascript|' + backtick + backtick + backtick + 'typescript|' + backtick + backtick + backtick, 'g'), '').trim();
+              
+              // Step 3: Remove export statements
+              componentCode = componentCode.replace(/^exports+.*?;?s*$/gm, '');
+              componentCode = componentCode.replace(/exports+defaults+/g, '');
+              
+              // Step 4: Remove import statements (we'll handle dependencies separately if needed)
+              componentCode = componentCode.replace(/^imports+.*?froms+['"].*?['"];?s*$/gm, '');
+              
+              // Step 5: Replace function App with const App_[safeId] = () => {
+              const safeId = nodeData.nodeId.replace(/[^a-zA-Z0-9]/g, '_');
+              const componentName = 'App_' + safeId;
+              
+              // Handle different component definition patterns
+              componentCode = componentCode.replace(
+                /(?:exports+(?:defaults+)?)?(?:asyncs+)?(?:functions+App|consts+Apps*=s*(.*?)s*=>|exports+defaults+functions+App)s*(?:())?s*{/g,
+                'const ' + componentName + ' = () => {'
+              );
+
+              console.log('🔧 [mountComponents] Component name:', componentName);
+              console.log('📝 [mountComponents] Cleaned code length:', componentCode.length);
+              
+              // Wrap in Babel transform
+              if (!window.Babel) {
+                throw new Error('Babel is not loaded');
+              }
+              
+              console.log('⚙️ [mountComponents] Transforming with Babel...');
+              const transformedCode = window.Babel.transform(componentCode, {
+                presets: ['react'],
+                plugins: []
+              }).code;
+              
+              console.log('✅ [mountComponents] Babel transformation successful');
+              console.log('📝 [mountComponents] Transformed code length:', transformedCode.length);
+
+              // Create component function
+              console.log('🏭 [mountComponents] Creating component function...');
+              const componentFn = new Function('React', 'ReactDOM', 
+                transformedCode + '\nreturn ' + componentName + ';'
+              );
+
+              console.log('🎨 [mountComponents] Executing component function...');
+              const Component = componentFn(window.React, window.ReactDOM);
+              
+              if (!Component) {
+                throw new Error('Component function returned undefined');
+              }
+              
+              console.log('✅ [mountComponents] Component created successfully');
+              
+              // Clear container and mount
+              container.innerHTML = '';
+              console.log('🎯 [mountComponents] Mounting component to container:', containerId);
+              
+              const root = window.ReactDOM.createRoot(container);
+              root.render(window.React.createElement(Component));
+              
+              console.log('✅ [mountComponents] Successfully mounted component for ' + nodeData.title + ' in ' + containerId);
+            } catch (error) {
+              console.error('❌ Failed to mount component for ' + nodeData.title + ':', error);
+              container.innerHTML = '<div style="padding: 20px; color: #ef4444; text-align: center;">' +
+                '<p>⚠️ UI 组件加载失败</p>' +
+                '<p style="font-size: 12px; margin-top: 8px;">' + (error.message || '未知错误') + '</p>' +
+              '</div>';
+            }
+          });
+        }
+
+        // Initialize React components after page load
+        console.log('🚀 [init] Starting React component initialization...');
+        
+        // Also try on DOMContentLoaded
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', function() {
+            console.log('📄 [init] DOMContentLoaded fired');
+            waitForReact(() => {
+              mountComponents();
+              setTimeout(mountComponents, 500);
+              setTimeout(mountComponents, 1500);
+              setTimeout(mountComponents, 3000);
+            });
+          });
+        }
+        
+        // And on window load
+        window.addEventListener('load', function() {
+          console.log('🌐 [init] Window load fired');
+          waitForReact(() => {
+            mountComponents();
+            setTimeout(mountComponents, 500);
+            setTimeout(mountComponents, 1500);
+            setTimeout(mountComponents, 3000);
+          });
+        });
+        
+        // Also try immediately (in case scripts are already loaded)
+        waitForReact(() => {
+          console.log('⚡ [init] Immediate mount attempt');
+          mountComponents();
+          
+          // Retry after delays (in case Babel compilation takes time)
+          setTimeout(() => {
+            console.log('🔄 [init] Retry mount (500ms)');
+            mountComponents();
+          }, 500);
+          setTimeout(() => {
+            console.log('🔄 [init] Retry mount (1500ms)');
+            mountComponents();
+          }, 1500);
+          setTimeout(() => {
+            console.log('🔄 [init] Retry mount (3000ms)');
+            mountComponents();
+          }, 3000);
+        });
+    </script>
+</body>
+</html>
+  

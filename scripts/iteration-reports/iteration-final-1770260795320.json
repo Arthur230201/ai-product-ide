@@ -1,0 +1,43 @@
+{
+  "totalRounds": 6,
+  "targetReached": false,
+  "finalScores": {
+    "system": 0,
+    "domainExpert": 100,
+    "thirdParty": 100,
+    "overall": 67,
+    "build": 0,
+    "lint": 0,
+    "tsc": 0
+  },
+  "totalProblems": 15,
+  "totalFixes": 0,
+  "rounds": [
+    {
+      "round": 1,
+      "success": true,
+      "targetReached": false
+    },
+    {
+      "round": 2,
+      "success": true,
+      "targetReached": false
+    },
+    {
+      "round": 3,
+      "success": true,
+      "targetReached": false
+    },
+    {
+      "round": 4,
+      "success": true,
+      "targetReached": false
+    },
+    {
+      "round": 5,
+      "success": true,
+      "targetReached": false
+    }
+  ],
+  "timestamp": "2026-02-05T03:06:35.320Z"
+}

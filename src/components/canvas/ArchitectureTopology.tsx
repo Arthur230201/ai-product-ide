@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+import Image from 'next/image';
 import { Upload, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { log } from '@/lib/logger';
@@ -143,10 +144,13 @@ export function ArchitectureTopology() {
 
           {/* 图片预览 */}
           <div className="bg-zinc-950 rounded-lg p-4 border border-zinc-800 overflow-auto">
-            <img
+            <Image
               src={imageUrl}
               alt="架构拓扑图"
+              width={800}
+              height={600}
               className="max-w-full h-auto rounded"
+              unoptimized
             />
           </div>
         </div>

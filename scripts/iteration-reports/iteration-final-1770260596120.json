@@ -1,0 +1,15 @@
+{
+  "totalRounds": 1,
+  "targetReached": false,
+  "finalScores": {},
+  "totalProblems": 0,
+  "totalFixes": 0,
+  "rounds": [
+    {
+      "round": 1,
+      "success": false,
+      "targetReached": false
+    }
+  ],
+  "timestamp": "2026-02-05T03:03:16.120Z"
+}

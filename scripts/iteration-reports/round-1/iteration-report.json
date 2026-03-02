@@ -1,0 +1,69 @@
+{
+  "round": 1,
+  "timestamp": "2026-02-05T07:28:45.699Z",
+  "success": true,
+  "targetReached": false,
+  "scores": {
+    "system": 100,
+    "domainExpert": 100,
+    "thirdParty": null,
+    "overall": 20,
+    "build": 100,
+    "lint": 100,
+    "tsc": 100,
+    "deliverableUsability": 20
+  },
+  "problems": [
+    {
+      "problemId": "p-1-0",
+      "source": "deliverable-usability",
+      "type": "fake_interaction_ban",
+      "severity": "P0",
+      "title": "假交互禁令",
+      "description": "INTERNAL_AUDIT_STANDARD：CTA 须有反馈或状态变化",
+      "context": {
+        "round": 1
+      },
+      "expectedBehavior": "多路评估均达标",
+      "actualBehavior": "存在按钮/主操作但点击无反馈、无状态变化",
+      "relatedFixActions": [
+        {
+          "strategy": "fix_interact_or_behavior",
+          "metric": "fake_interaction_ban",
+          "description": "假交互禁令"
+        }
+      ]
+    },
+    {
+      "problemId": "p-1-1",
+      "source": "deliverable-usability",
+      "type": "fake_state_ban",
+      "severity": "P0",
+      "title": "假状态禁令",
+      "description": "INTERNAL_AUDIT_STANDARD：状态须可被交互更新",
+      "context": {
+        "round": 1
+      },
+      "expectedBehavior": "多路评估均达标",
+      "actualBehavior": "显示计数/状态（如购物车(0)）但无法通过交互改变",
+      "relatedFixActions": [
+        {
+          "strategy": "fix_interact_or_behavior",
+          "metric": "fake_state_ban",
+          "description": "假状态禁令"
+        }
+      ]
+    }
+  ],
+  "fixes": [],
+  "verifications": [],
+  "duration": 37355,
+  "thirdPartyRan": false,
+  "auditConclusions": {
+    "internal": "**内部专家（系统 + 领域）审计结论**（第 1 轮）\n- 系统得分：100（build）、100（lint）、100（tsc）；领域得分：100\n- 发现问题：无\n- **结论**：通过（分数与无 P0 满足要求）\n- **流程**：已交付三方专家审计",
+    "thirdParty": "**三方（交付物质量）专家审计**（第 1 轮）\n- **未执行**：内部专家不通过，按设计不交付三方审计；仅内部优化后进入下一轮。",
+    "internalPass": true,
+    "thirdPartyPass": false,
+    "thirdPartyDisplay": "未执行（内部未通过，不交付三方）"
+  }
+}

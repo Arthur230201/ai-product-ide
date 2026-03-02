@@ -63,7 +63,7 @@ export function AIConfigButton() {
                   id="visionModel"
                   type="text"
                   className="w-full bg-zinc-800/50 border border-zinc-700 rounded-md px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
-                  placeholder="例如：gpt-5-2025-08-07, gpt-4o"
+                  placeholder="例如：gpt-5.2-2025-12-11, gpt-4o"
                   value={aiConfig.visionModel}
                   onChange={(e) => updateAIConfig({ visionModel: e.target.value })}
                 />
@@ -80,7 +80,7 @@ export function AIConfigButton() {
                   id="textModel"
                   type="text"
                   className="w-full bg-zinc-800/50 border border-zinc-700 rounded-md px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-blue-500/50"
-                  placeholder="例如：gpt-5-2025-08-07, gpt-4o"
+                  placeholder="例如：gpt-5.2-2025-12-11, gpt-4o"
                   value={aiConfig.textModel}
                   onChange={(e) => updateAIConfig({ textModel: e.target.value })}
                 />
@@ -94,7 +94,7 @@ export function AIConfigButton() {
                 <p className="text-xs text-blue-300 font-medium mb-1.5">💡 提示</p>
                 <ul className="text-xs text-blue-200/80 space-y-0.5 list-disc list-inside">
                   <li>模型名称必须与 OpenAI API 支持的模型名称一致</li>
-                  <li>视觉模型需要支持图像输入（如 gpt-4o, gpt-5-2025-08-07）</li>
+                  <li>视觉模型需要支持图像输入（如 gpt-4o, gpt-5.2-2025-12-11）</li>
                   <li>配置会保存在本地，刷新页面后仍然有效</li>
                 </ul>
               </div>

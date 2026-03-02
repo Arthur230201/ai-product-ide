@@ -1,0 +1,74 @@
+---
+description: Recursive audit system with deep thinking, surgical fixes, automated patterns, and continuous learning
+globs: ["**/*.{js,jsx,ts,tsx,py,java,c,cpp,go,rs,rb,php,swift,kt,scala,cs,vb,sql,sh,bash}", "**/Dockerfile", "**/.{gitignore,dockerignore,env,env.*}", "**/Makefile", "**/package.json", "**/requirements.txt", "**/Cargo.toml", "**/go.mod", "**/pom.xml", "**/build.gradle", "**/*.{yml,yaml,json,xml,html,css,scss}", "**/*.{md,txt,rst}"]
+alwaysApply: true
+priority: 100
+---
+
+# Recursive Audit System
+
+## Core Philosophy
+
+Think deeply, fix surgically, learn continuously.
+
+- Question EVERYTHING through explicit thinking.
+- Fix issues surgically with zero redundancy.
+- Learn patterns from every fix for future automation.
+- Maintain brutal honesty while being actionable.
+
+## Mandatory Thinking Protocol
+
+Before ANY action:
+1. What am I seeing and why does it matter?
+2. Is this the root cause or just a symptom?
+3. Have I seen this pattern before?
+4. What's the minimal surgical fix?
+5. Can this be automated next time?
+6. What should the team learn from this?
+
+## Recursive Audit Pipeline
+
+### Phase 1: Intelligent Discovery
+- For each file/module: What is this code trying to accomplish? What patterns am I detecting?
+- Execute: static analysis (ESLint, TSC), security scanning (npm audit), complexity analysis.
+- Classify findings by: Severity (P0–P4), Confidence, Fix pattern, Impact radius.
+
+### Phase 2: Deep Recursive Analysis
+- For each finding: Why does this exist? What allowed it? Is this part of a larger pattern?
+- If pattern exists in knowledge base: verify and check confidence (>0.8 for auto-fix).
+- Else: trace root cause, analyze call chains, design minimal fix.
+
+### Phase 3: Surgical Intervention
+- For each verified issue: minimal change, no breakage, extract reusable pattern.
+- Fix IN-PLACE (no duplicate files); remove rather than comment; simplify rather than complicate.
+
+### Phase 4: Verification & Learning
+- Verify: original issue resolved, no regressions, tests cover the fix.
+- Learn: extract fix pattern, update knowledge base, generate prevention rule.
+
+## Priority Classification
+
+- **P0 CRITICAL**: Security vulnerabilities, data corruption, production crashes. Fix immediately. Auto-fix threshold 0.95.
+- **P1 HIGH**: Logic errors, performance >100ms, broken error handling. Fix this session. Auto-fix 0.9.
+- **P2 MEDIUM**: Duplication >20 lines, complexity >10, missing tests. Fix this sprint. Auto-fix 0.85.
+- **P3 LOW**: Style, minor perf, docs. Backlog. Auto-fix 0.8.
+- **P4 COSMETIC**: Formatting, import order. Always auto-fix.
+
+## Known Anti-Patterns (Examples)
+
+- **sql_injection**: Parameterized queries only.
+- **hardcoded_secrets**: Move to environment variables.
+- **n_plus_one_query**: Eager loading / batch queries.
+- **god_function**: Extract smaller functions (complexity >10, loc >50).
+- **duplicate_code**: Extract shared function.
+
+## Usage
+
+- Deep audit: `audit deep "Analyze authentication system"`
+- Quick scan: `audit quick --autofix P2,P3,P4`
+- Security: `audit security --paranoid`
+- Report: `audit report --brutal-honesty`
+
+After each session: update knowledge base with new patterns, refined detection rules, prevention techniques.
+
+**Remember**: Perfect is the enemy of good, but good is the enemy of garbage. Pursue excellence through brutal honesty, surgical precision, and continuous learning.

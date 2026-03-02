@@ -1,0 +1,80 @@
+{
+  "round": 5,
+  "timestamp": "2026-02-05T03:06:59.772Z",
+  "success": true,
+  "targetReached": false,
+  "scores": {
+    "system": 0,
+    "domainExpert": 100,
+    "thirdParty": 100,
+    "overall": 67,
+    "build": 0,
+    "lint": 0,
+    "tsc": 0
+  },
+  "problems": [
+    {
+      "problemId": "p-5-0",
+      "source": "system",
+      "type": "build_fail",
+      "severity": "P0",
+      "title": "Build 失败",
+      "description": "见 docs/self-check/raw/build.log",
+      "context": {
+        "round": 5
+      },
+      "expectedBehavior": "多路评估均达标",
+      "actualBehavior": "pnpm run build 未通过",
+      "relatedFixActions": [
+        {
+          "strategy": "fix_build_fail",
+          "metric": "build_fail",
+          "description": "修复 Build 失败"
+        }
+      ]
+    },
+    {
+      "problemId": "p-5-1",
+      "source": "system",
+      "type": "lint_fail",
+      "severity": "P1",
+      "title": "Lint 失败",
+      "description": "见 docs/self-check/raw/lint.log",
+      "context": {
+        "round": 5
+      },
+      "expectedBehavior": "多路评估均达标",
+      "actualBehavior": "pnpm run lint 未通过",
+      "relatedFixActions": [
+        {
+          "strategy": "fix_lint_fail",
+          "metric": "lint_fail",
+          "description": "修复 Lint 失败"
+        }
+      ]
+    },
+    {
+      "problemId": "p-5-2",
+      "source": "system",
+      "type": "tsc_fail",
+      "severity": "P0",
+      "title": "TSC 失败",
+      "description": "见 docs/self-check/raw/tsc.log",
+      "context": {
+        "round": 5
+      },
+      "expectedBehavior": "多路评估均达标",
+      "actualBehavior": "tsc --noEmit 未通过",
+      "relatedFixActions": [
+        {
+          "strategy": "fix_tsc_fail",
+          "metric": "tsc_fail",
+          "description": "修复 TSC 失败"
+        }
+      ]
+    }
+  ],
+  "fixes": [],
+  "verifications": [],
+  "duration": 124
+}

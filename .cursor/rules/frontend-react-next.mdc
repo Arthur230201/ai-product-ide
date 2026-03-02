@@ -1,0 +1,63 @@
+---
+name: frontend-react-next
+description: React, Next.js App Router, TypeScript, Shadcn/Radix, Tailwind — component and styling conventions
+globs: ["**/*.tsx", "**/*.jsx", "**/components/**", "**/app/**"]
+alwaysApply: false
+---
+
+# Frontend: React + Next.js + TypeScript
+
+Apply when working on UI components, pages, or app router. Stack: TypeScript, Next.js App Router, React, Shadcn UI, Radix UI, Tailwind (Aria).
+
+## Key Principles
+
+- Write concise, technical responses with accurate TypeScript examples.
+- Use functional, declarative programming. Avoid classes.
+- Prefer iteration and modularization over duplication.
+- Use descriptive variable names with auxiliary verbs (e.g. `isLoading`, `hasError`).
+- Use lowercase with dashes for directories (e.g. `components/auth-wizard`).
+- Favor named exports for components.
+- Use Receive an Object, Return an Object (RORO) pattern.
+
+## JavaScript/TypeScript
+
+- Use `function` keyword for pure functions. Omit semicolons if project style agrees.
+- Use TypeScript for all code. Prefer interfaces over types. Avoid enums; use maps.
+- File structure: Exported component, subcomponents, helpers, static content, types.
+- Avoid unnecessary curly braces in single-line conditionals; use early returns.
+
+## Error Handling and Validation
+
+- Handle errors and edge cases at the beginning of functions.
+- Use early returns for error conditions; keep the happy path last.
+- Use guard clauses for preconditions and invalid states.
+- Implement proper error logging and user-friendly error messages.
+- Consider custom error types or error factories for consistency.
+
+## React / Next.js
+
+- Use functional components and TypeScript interfaces.
+- Use declarative JSX.
+- Use `function`, not `const`, for component declarations.
+- Use Shadcn UI, Radix, and Tailwind Aria for components and styling.
+- Implement responsive design with Tailwind CSS; mobile-first.
+- Place static content and interfaces at the end of the file.
+- Minimize `'use client'`, `useEffect`, and `setState`; favor React Server Components (RSC).
+- Use Zod for form validation.
+- Wrap client components in Suspense with fallback.
+- Use dynamic loading for non-critical components.
+- Optimize images: WebP, size/width/height, lazy loading.
+- Model expected errors as return values in Server Actions; use `useActionState` to surface them. Use error boundaries (`error.tsx`, `global-error.tsx`) for unexpected errors.
+- Use `useActionState` with react-hook-form for form validation.
+- Server actions: use next-safe-action (or equivalent), Zod input schemas, type-safe `ActionResponse`; consistent error/success responses.
+
+## Conventions
+
+1. Rely on Next.js App Router for state and navigation.
+2. Prioritize Web Vitals (LCP, CLS, FID).
+3. Minimize `'use client'`:
+   - Prefer Server Components and SSR.
+   - Use `'use client'` only for Web API access in small components.
+   - Avoid `'use client'` for data fetching or global state.
+
+Refer to: Next.js docs (Data Fetching, Rendering, Routing), TypeScript handbook, Tailwind CSS docs, React docs.

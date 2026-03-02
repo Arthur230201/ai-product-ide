@@ -296,7 +296,7 @@ export function ProjectToolbar() {
         <button
           type="button"
           onClick={handleNewProject}
-          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
+          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors duration-150 focus-ring"
           title="新建项目"
           aria-label="新建项目"
         >
@@ -307,7 +307,7 @@ export function ProjectToolbar() {
         <button
           type="button"
           onClick={handleSaveProject}
-          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
+          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors duration-150 focus-ring"
           title="保存项目"
           aria-label="保存项目"
         >
@@ -318,7 +318,7 @@ export function ProjectToolbar() {
         <button
           type="button"
           onClick={handleOpenProject}
-          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
+          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors duration-150 focus-ring"
           title="打开项目"
           aria-label="打开项目"
         >
@@ -342,7 +342,7 @@ export function ProjectToolbar() {
         <button
           type="button"
           onClick={handleAddNode}
-          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
+          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors duration-150 focus-ring"
           title="添加节点"
           aria-label="添加节点"
         >
@@ -356,7 +356,7 @@ export function ProjectToolbar() {
         <button
           type="button"
           onClick={() => setIsBlueprintOpen(true)}
-          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
+          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors duration-150 focus-ring"
           title="项目蓝图"
           aria-label="项目蓝图"
         >
@@ -371,9 +371,10 @@ export function ProjectToolbar() {
           <button
             type="button"
             onClick={() => setIsExportMenuOpen(!isExportMenuOpen)}
-            className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors flex items-center gap-1"
+            className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors duration-150 focus-ring flex items-center gap-1"
             title="导出 PRD 文档"
             aria-label="导出 PRD 文档"
+            aria-expanded={isExportMenuOpen}
           >
             <Download className="w-4 h-4" />
             <ChevronDown className="w-3 h-3" />
@@ -383,25 +384,25 @@ export function ProjectToolbar() {
               <button
                 type="button"
                 onClick={handleExportToHtml}
-                className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white flex items-center gap-2 transition-colors first:rounded-t-lg"
+                className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white flex items-center gap-2 transition-colors duration-150 focus-ring first:rounded-t-lg"
               >
-                <Globe className="w-4 h-4" />
+                <Globe className="w-4 h-4 shrink-0" />
                 <span>导出 HTML</span>
               </button>
               <button
                 type="button"
                 onClick={handleExportToWord}
-                className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white flex items-center gap-2 transition-colors"
+                className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white flex items-center gap-2 transition-colors duration-150 focus-ring"
               >
-                <FileText className="w-4 h-4" />
+                <FileText className="w-4 h-4 shrink-0" />
                 <span>导出 Word</span>
               </button>
               <button
                 type="button"
                 onClick={handleExportToMarkdown}
-                className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white flex items-center gap-2 transition-colors last:rounded-b-lg"
+                className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white flex items-center gap-2 transition-colors duration-150 focus-ring last:rounded-b-lg"
               >
-                <FileCode className="w-4 h-4" />
+                <FileCode className="w-4 h-4 shrink-0" />
                 <span>导出 Markdown</span>
               </button>
             </div>

@@ -2,10 +2,9 @@
 
 import { createServerAction } from 'zsa';
 import { z } from 'zod';
-import { openai } from '@ai-sdk/openai';
-import { generateObject } from 'ai';
 import { log, logError } from '@/lib/logger';
-import { getVisionModel } from '@/lib/ai-config';
+import { getVisionModel, ensureOpenAIKey } from '@/lib/ai-config';
+import { callObject } from '@/lib/ai/llm';
 import type { FractalNode } from '@/types/fractal';
 // 注意：parse-topology 不返回 Edge 类型，只返回拓扑图数据，所以不需要导入 reactflow
 
@@ -73,12 +72,7 @@ export const parseTopology = createServerAction()
     log('='.repeat(80));
 
     try {
-      // 检查环境变量
-      if (!process.env.OPENAI_API_KEY) {
-        logError('❌ [parseTopology] OPENAI_API_KEY 未配置');
-        throw new Error('OPENAI_API_KEY 未配置。请在 .env.local 文件中添加 OPENAI_API_KEY=your_api_key');
-      }
-
+      ensureOpenAIKey();
       // 处理 base64 数据
       let base64Data = input.imageBase64;
       if (base64Data.includes(',')) {
@@ -99,9 +93,9 @@ export const parseTopology = createServerAction()
       // 构建用户提示词
       const userPrompt = input.prompt?.trim() || '请分析这张拓扑图，识别所有节点和它们之间的连接关系。';
 
-      // 使用 generateObject 强制返回结构化 JSON
-      const result = await generateObject({
-        model: openai(visionModel),
+      // 使用统一 LLM 网关调用 generateObject
+      const result = await callObject({
+        model: visionModel,
         schema: TopologyResultSchema,
         messages: [
           {
@@ -157,17 +151,25 @@ export const parseTopology = createServerAction()
             ],
           },
         ],
-        temperature: 0.3, // 较低温度以确保输出稳定
+        actionName: 'parseTopology',
+        mode: 'vision',
+        aiConfig: input.aiConfig,
       });
 
+      if (!result.ok) {
+        // Return error union instead of throwing
+        throw new Error(`拓扑图解析失败: ${result.message}`); // Server Action still throws for now
+      }
+
+      const topologyData = result.data;
       const duration = Date.now() - startTime;
       log(`✅ [parseTopology] 拓扑图解析成功，耗时: ${duration}ms`);
-      log(`📊 [parseTopology] 解析结果: ${result.object.nodes.length} 个节点, ${result.object.edges.length} 条连接`);
+      log(`📊 [parseTopology] 解析结果: ${topologyData.nodes.length} 个节点, ${topologyData.edges.length} 条连接`);
 
       return {
-        nodes: result.object.nodes,
-        edges: result.object.edges,
-        description: result.object.description,
+        nodes: topologyData.nodes,
+        edges: topologyData.edges,
+        description: topologyData.description,
       };
     } catch (error) {
       const duration = Date.now() - startTime;
