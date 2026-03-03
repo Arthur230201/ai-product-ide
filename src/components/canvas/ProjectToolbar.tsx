@@ -6,6 +6,7 @@ import { useCanvasStore } from '@/store/canvas-store';
 import { ProjectBlueprint } from './ProjectBlueprint';
 import { toast } from 'sonner';
 import { exportToFullPrdHtml, exportToWord } from '@/utils/prdGenerator';
+import { captureNodePreviews } from '@/utils/capture-node-preview';
 
 export function ProjectToolbar() {
   const { clearCanvas, exportProject, loadProject, addBlankNode, isDetailPanelOpen, nodes, edges, projectMeta, globalRules } = useCanvasStore();
@@ -161,14 +162,21 @@ export function ProjectToolbar() {
 
   const handleExportToHtml = async () => {
     setIsExportMenuOpen(false);
+    const toastId = toast.loading('正在准备导出…', { description: '为各页面生成预览图' });
     try {
-      // 使用 exportToFullPrdHtml 而不是 exportToHtml
+      const nodePreviewInputs = nodes
+        .filter((n) => n.data?.artifacts?.view?.code?.trim())
+        .map((n) => ({ id: n.id, html: (n.data!.artifacts!.view as { code?: string }).code! }));
+      const nodePreviewUrls = nodePreviewInputs.length > 0
+        ? await captureNodePreviews(nodePreviewInputs, { timeoutPerNode: 10000, concurrency: 1 })
+        : undefined;
+      toast.dismiss(toastId);
       await exportToFullPrdHtml({
         projectMeta,
         globalRules,
         nodes,
         edges,
-        // 这些是可选的，如果项目中有可以从 store 获取
+        nodePreviewUrls,
         architectureImage: undefined,
         topologyImage: undefined,
         swimlaneChart: undefined,
@@ -176,6 +184,7 @@ export function ProjectToolbar() {
       });
       toast.success('Full PRD HTML 导出成功！');
     } catch (error) {
+      toast.dismiss(toastId);
       console.error('Export to Full PRD HTML error:', error);
       toast.error('导出 Full PRD HTML 失败', {
         description: error instanceof Error ? error.message : '未知错误',

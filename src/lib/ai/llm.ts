@@ -64,7 +64,7 @@ function extractCooldownSeconds(error: unknown): number {
   if (error && typeof error === 'object') {
     if ('response' in error && error.response && typeof error.response === 'object') {
       const headers = 'headers' in error.response ? error.response.headers : null;
-      if (headers && typeof headers === 'object' && 'get' in headers) {
+      if (headers != null && typeof headers === 'object' && typeof (headers as { get?: unknown }).get === 'function') {
         const retryAfter = (headers as { get: (name: string) => string | null }).get('retry-after');
         if (retryAfter) {
           const seconds = parseInt(retryAfter, 10);
@@ -158,7 +158,7 @@ export async function callText(params: {
     model,
     prompt,
     messages,
-    timeoutMs = 180000, // Default 180s (3 minutes) timeout
+    timeoutMs = 360000, // Default 360s (6 minutes) timeout
     maxOutputTokens,
     temperature,
     aiConfig,
@@ -460,7 +460,7 @@ export async function callObject<T extends z.ZodTypeAny>(params: {
     schema,
     messages,
     prompt,
-    timeoutMs = 180000, // Default 180s (3 minutes) timeout
+    timeoutMs = 360000, // Default 360s (6 minutes) timeout
     aiConfig,
     actionName = 'callObject',
     attachments = '',

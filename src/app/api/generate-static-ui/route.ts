@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { generateStaticUIFromText } from '@/app/actions/ui-pipeline-new';
 
+const STYLE_PRESETS = ['apple', 'material', 'neutral', 'custom'] as const;
+const VIEWPORT_PRESETS = ['mobile', 'desktop'] as const;
+
 /**
  * POST /api/generate-static-ui
- * Body: { prompt?: string, nodeLabel: string }
+ * Body: { prompt?: string, nodeLabel: string, stylePreset?: string, viewportPreset?: 'mobile'|'desktop' }
  * Returns: { ok, type, html?, stage?, message? }
  */
 export async function POST(request: Request) {
@@ -14,10 +17,18 @@ export async function POST(request: Request) {
     if (!nodeLabel) {
       return NextResponse.json({ ok: false, type: 'VALIDATION', message: 'nodeLabel 必填' }, { status: 400 });
     }
+    const stylePreset = typeof body?.stylePreset === 'string' && STYLE_PRESETS.includes(body.stylePreset as (typeof STYLE_PRESETS)[number])
+      ? (body.stylePreset as (typeof STYLE_PRESETS)[number])
+      : 'apple';
+    const viewportPreset = typeof body?.viewportPreset === 'string' && VIEWPORT_PRESETS.includes(body.viewportPreset as (typeof VIEWPORT_PRESETS)[number])
+      ? (body.viewportPreset as (typeof VIEWPORT_PRESETS)[number])
+      : 'mobile';
     const inputPrompt = String(prompt || `请为"${nodeLabel}"页面生成静态 HTML 界面。`);
     const raw = await generateStaticUIFromText({
       prompt: inputPrompt,
       nodeLabel,
+      stylePreset,
+      viewportPreset,
     });
     // zsa 可能返回 [data, null] 或 [null, error] 或直接返回 data
     const isTuple = Array.isArray(raw) && raw.length === 2;

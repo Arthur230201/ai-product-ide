@@ -902,13 +902,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                         <div class="col-span-4">
                             <div class="sticky-ui">
                                 <h3>${nodeNum}.${sectionIdx++} 界面示意</h3>
-                                ${node.uiCode ? `
-                                <!-- React 交互式 UI 容器 -->
-                                <div class="phone-mockup bg-white" style="min-height: 400px;">
-                                    <div id="root-${node.nodeId || `node-${nodeIdx}`}" style="width: 100%; min-height: 400px;"></div>
-                                </div>
-                                <p class="text-center text-xs text-slate-500 mt-3 font-mono">图 ${nodeNum}.${sectionIdx - 1} 交互式 UI 原型</p>
-                                ` : hasUIPreview ? `
+                                ${hasUIPreview ? `
                                 <div class="phone-mockup bg-white">
                                     <img 
                                         src="${uiPreview}" 
@@ -1326,12 +1320,14 @@ export const exportToFullPrdHtml = async (options: {
   globalRules: GlobalRules;
   nodes: FractalNode[];
   edges?: Edge[];
+  /** 导出前为节点生成的预览图（nodeId -> dataUrl），优先于节点已有 previewUrl，保证导出 HTML 中 UI 可见 */
+  nodePreviewUrls?: Record<string, string>;
   architectureImage?: string; // Base64 架构拓扑图
   topologyImage?: string; // Base64 或 Mermaid 交互拓扑图
   swimlaneChart?: string; // Mermaid 业务泳道图
   dataDictionary?: string; // Markdown 数据字典
 }) => {
-  const { projectMeta, globalRules, nodes, edges = [], architectureImage, topologyImage, swimlaneChart, dataDictionary } = options;
+  const { projectMeta, globalRules, nodes, edges = [], nodePreviewUrls, architectureImage, topologyImage, swimlaneChart, dataDictionary } = options;
 
   // 构建全局规则 Markdown（使用三级标题）
   const globalRulesMarkdown = `
@@ -1372,9 +1368,8 @@ ${globalRules.dataTracking || '（待补充）'}
       const bodyContent = extractBodyContent(rawHtml);
       uiCode = styles ? `${styles}\n${bodyContent}` : bodyContent;
     }
-    const uiPreview = view?.previewUrl || (uiCode ?
-      'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==' :
-      'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==');
+    const placeholderSvg = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==';
+    const uiPreview = nodePreviewUrls?.[node.id] ?? view?.previewUrl ?? placeholderSvg;
     
     // 构建需求章节数组
     const sections: RequirementSection[] = [];

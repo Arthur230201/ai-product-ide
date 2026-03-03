@@ -5,19 +5,25 @@ import { LivePreview } from './LivePreview';
 import { useCanvasStore } from '@/store/canvas-store';
 import { useMemo } from 'react';
 
+type ViewportPreset = 'mobile' | 'desktop';
+
 interface MobileDevicePreviewProps {
   imageUrl?: string;
   zoom?: number;
   width?: number;
   height?: number;
+  /** 视口类型：桌面时不渲染手机外框 */
+  viewportPreset?: ViewportPreset;
 }
 
 export function MobileDevicePreview({ 
   imageUrl, 
   zoom = 1, 
   width = 375, 
-  height = 812 
+  height = 812,
+  viewportPreset = 'mobile',
 }: MobileDevicePreviewProps) {
+  const isDeviceFrame = viewportPreset === 'mobile';
   const selectedNodeId = useCanvasStore((state) => state.selectedNodeId);
   const nodes = useCanvasStore((state) => state.nodes);
   
@@ -41,17 +47,19 @@ export function MobileDevicePreview({
         transformOrigin: 'top center',
       }}
     >
-      {/* 外层包装：手机外框 - 仅用于视觉框架（边框、圆角、阴影），不填充背景色 */}
+      {/* 移动端：手机外框；桌面：简单圆角卡片，无手机边框 */}
       <div 
-        className="relative w-full h-full border-[12px] border-gray-900 rounded-[45px] shadow-2xl overflow-hidden"
+        className={`relative w-full h-full overflow-hidden flex flex-col bg-white ${
+          isDeviceFrame
+            ? 'border-[12px] border-gray-900 rounded-[45px]'
+            : 'rounded-xl'
+        }`}
         style={{
-          // 只保留边框，不填充背景色，减少底部黑色区域
-          backgroundColor: 'transparent',
+          backgroundColor: isDeviceFrame ? 'transparent' : '#ffffff',
         }}
       >
-        {/* 中层：内屏包装器 - 完全贴合边框，无缝隙 */}
         <div 
-          className="w-full h-full rounded-[32px] overflow-hidden relative flex flex-col bg-white"
+          className={`w-full h-full overflow-hidden relative flex flex-col bg-white ${isDeviceFrame ? 'rounded-[32px]' : 'rounded-lg'}`}
           style={{
             margin: 0,
             width: '100%',
@@ -59,25 +67,13 @@ export function MobileDevicePreview({
             backgroundColor: '#ffffff',
           }}
         >
-        {/* 内层容器：完全干净，不应用任何视觉修饰符 */}
-          <div 
-            className="w-full h-full overflow-hidden relative"
-            style={{
-              // CRITICAL: 内层容器必须没有以下任何视觉修饰符，确保渐变、阴影、背景色以完整强度渲染
-              opacity: undefined,
-              filter: undefined,
-              backdropFilter: undefined,
-              transform: undefined,
-              backgroundColor: undefined,
-              background: undefined,
-            }}
-          >
           {code ? (
-              <div className="w-full h-full overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-zinc-300 scrollbar-track-transparent">
-              <div className="w-full min-h-full max-w-full break-words">
-                <LivePreview code={code} zoom={1} />
+              <>
+              <style dangerouslySetInnerHTML={{ __html: `.preview-inner-scroll::-webkit-scrollbar { display: none; }` }} />
+              <div className="preview-inner-scroll w-full h-full overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                <LivePreview code={code} zoom={1} viewportPreset={viewportPreset} />
               </div>
-            </div>
+            </>
           ) : imageUrl ? (
             <Image 
               src={imageUrl} 
@@ -99,7 +95,6 @@ export function MobileDevicePreview({
               <p className="text-xs mt-1 opacity-60">生成 UI 代码后将显示在这里</p>
             </div>
           )}
-          </div>
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, Minimize2 } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvas-store';
 import type { FractalNode } from '@/types/fractal';
 import { LivePreview } from './LivePreview';
@@ -12,6 +12,7 @@ import { HtmlSandbox } from './HtmlSandbox';
 import { isHTMLContent } from '@/utils/html-rationalizer';
 import { buildInjectorScript } from '@/lib/ui/injector';
 import { toast } from 'sonner';
+import { clsx } from 'clsx';
 import { selectNavigationEdge } from '@/lib/navigation/edge-navigator';
 
 interface PresentationModeProps {
@@ -20,7 +21,8 @@ interface PresentationModeProps {
 }
 
 export function PresentationMode({ initialNodeId, onClose }: PresentationModeProps) {
-  const { nodes, edges } = useCanvasStore();
+  const { nodes, edges, viewportPreset } = useCanvasStore();
+  const [isFullscreen, setIsFullscreen] = useState(false);
   
   // 计算初始节点：优先使用 initialNodeId，如果为 null 或无效则使用第一个节点
   const computeInitialNodeId = useMemo((): string | null => {
@@ -300,8 +302,15 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
       style={{ zIndex: 10000 }}
       data-presentation-mode="true"
     >
-      {/* 退出按钮 - 右上角 */}
-      <div className="absolute top-4 right-4 z-[10001]">
+      {/* 退出 / 全屏 按钮 - 右上角 */}
+      <div className="absolute top-4 right-4 z-[10001] flex items-center gap-2">
+        <button
+          onClick={() => setIsFullscreen((v) => !v)}
+          className="px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-md text-sm font-medium transition-all shadow-lg"
+          title={isFullscreen ? '退出全屏' : '全屏预览'}
+        >
+          {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+        </button>
         <button
           onClick={onClose}
           className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-all shadow-lg hover:shadow-xl active:scale-95"
@@ -311,12 +320,12 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
         </button>
       </div>
 
-      {/* Main Content - Two Columns (1:2 比例) */}
-      <div className="flex-1 grid grid-cols-[1fr_2fr] overflow-hidden h-full">
-        {/* Left Column - Mobile Preview (33.3%) - Professional Device Simulator */}
+      {/* Main Content - 全屏时只显示预览区且占满，否则预览与说明各占 1/2 */}
+      <div className={clsx('flex-1 overflow-hidden h-full flex', isFullscreen ? '' : 'grid grid-cols-[1fr_1fr]')}>
+        {/* Left Column - Preview (全屏时占满，否则 1/2) */}
         <div 
           ref={leftPanelRef}
-          className="border-r border-gray-200 bg-gray-100 flex flex-col overflow-hidden relative"
+          className={clsx('border-r border-gray-200 bg-gray-100 flex flex-col overflow-hidden relative', isFullscreen && 'flex-1 min-w-0')}
           style={{ 
             height: '100%',
             maxHeight: '100%',
@@ -377,7 +386,11 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
               paddingRight: '20px',
             }}
           >
-            {/* 设备模拟器容器 - iPhone 标准尺寸 375x812 - 应用缩放 */}
+            {/* 设备模拟器容器 - 尺寸随 viewportPreset 变化 */}
+            {(() => {
+              const presetSize = viewportPreset === 'mobile' ? { w: 375, h: 812 } : { w: 1280, h: 800 };
+              const isPhone = viewportPreset === 'mobile';
+              return (
             <div 
               ref={previewContainerRef}
               className="flex items-start justify-center"
@@ -386,48 +399,42 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
                 transformOrigin: 'top center',
                 width: '100%',
                 height: 'auto',
-                marginTop: '8px', // 确保设备框架上沿在导航栏下方
+                marginTop: '8px',
               }}
             >
-              {/* iPhone 风格设备框架 - 标准尺寸 375x812 (iPhone X/11/12/13/14/15) */}
               <div 
                 className="relative flex-shrink-0"
-                style={{
-                  width: '375px',
-                  height: '812px',
-                }}
+                style={{ width: presetSize.w, height: presetSize.h }}
               >
-                {/* 设备边框 - iPhone 风格 */}
+                {/* 移动端用手机框，桌面用简单圆角框 */}
                 <div 
-                  className="relative border-[12px] border-gray-900 rounded-[45px] shadow-2xl overflow-hidden bg-gray-900"
+                  className={clsx(
+                    'relative shadow-2xl overflow-hidden',
+                    isPhone ? 'border-[12px] border-gray-900 rounded-[45px] bg-gray-900' : 'border-2 border-gray-300 rounded-xl bg-white'
+                  )}
                   style={{
                     width: '100%',
                     height: '100%',
-                    boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)',
+                    boxShadow: isPhone ? '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)' : '0 4px 6px -1px rgba(0,0,0,0.1)',
                   }}
                 >
-                  {/* 内屏包装器 - 防止圆角裁剪，强制移动视口约束 */}
                   <div 
-                    className="bg-white w-full h-full rounded-[32px] overflow-hidden relative flex flex-col"
-                    style={{
-                      margin: '3px', // 12px border - 9px inner margin = 3px visible bezel
-                      width: 'calc(100% - 6px)',
-                      height: 'calc(100% - 6px)',
-                    }}
+                    className={clsx('bg-white w-full h-full overflow-hidden relative flex flex-col', isPhone && 'rounded-[32px]')}
+                    style={isPhone ? { margin: '3px', width: 'calc(100% - 6px)', height: 'calc(100% - 6px)' } : undefined}
                   >
-                    {/* Status Bar Spacer - 可见的状态栏区域 */}
+                    {isPhone && (
                     <div className="h-12 w-full bg-white shrink-0 flex items-center justify-center text-[10px] text-gray-400 font-mono">
                       iOS 17
                     </div>
-                    
-                    {/* Content Area - 修复右侧裁剪问题，添加左右padding防止内容被圆角遮挡 */}
+                    )}
+                    {/* Content Area */}
                     <div 
                       className="flex-1 w-full relative overflow-y-auto overflow-x-hidden bg-gray-50"
                       style={{ 
                         minHeight: 0,
-                        paddingLeft: '6px', // 左侧padding防止内容被遮挡
-                        paddingRight: '6px', // 右侧padding防止内容被遮挡
-                        paddingBottom: '20px', // 底部padding，确保内容不被底部按钮遮挡
+                        paddingLeft: isPhone ? 6 : 12,
+                        paddingRight: isPhone ? 6 : 12,
+                        paddingBottom: 20,
                       }}
                     >
                       <style>{`
@@ -537,6 +544,8 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
                 </div>
               </div>
             </div>
+          );
+            })()}
           </div>
           
           {/* 导航按钮 - 绝对定位在左侧列的下沿上方一点点 */}
@@ -583,7 +592,8 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
           
         </div>
 
-        {/* Right Column - Content Panel (66.6%) - 使用与编辑模式相同的渲染方式 */}
+        {/* Right Column - 全屏时隐藏 */}
+        {!isFullscreen && (
         <div className="overflow-hidden bg-zinc-900 border-l border-gray-200 flex flex-col h-full">
           <div className="flex-1 overflow-y-auto min-h-0 bg-zinc-900 p-6">
             {/* 使用 SpecViewer 组件，与编辑模式一致 */}
@@ -638,6 +648,7 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
             })()}
           </div>
         </div>
+        )}
       </div>
 
     </div>

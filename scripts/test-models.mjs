@@ -55,30 +55,40 @@ if (!API_KEY) {
   process.exit(1);
 }
 
+// 重点关注：优先测试（用户指定）
+const PRIORITY_MODELS = [
+  'gemini-3.1-pro-preview',
+  'gpt-5.3',
+  'gpt-5.3-chat',
+  'gpt-5.3-2026',
+];
+
 // 推荐模型列表（来自 reelxai 教程）
 const RECOMMENDED_MODELS = [
+  'gemini-3.1-pro-preview',
   'gemini-3-flash-preview',
-  'gpt-5.2-2025-12-11',
   'gemini-3-pro-preview',
+  'gpt-5.3',
+  'gpt-5.3-chat',
+  'gpt-5.2-2025-12-11',
+  'gpt-5.1-chat-2025-11-13',
+  'gpt-5.1-2025-11-13',
+  'gpt-5-chat-latest',
+  'gpt-5-2025-08-07',
+  'gpt-5-mini-2025-08-07',
+  'gpt-5-nano-2025-08-07',
   'gemini-2.5-pro',
   'gemini-2.5-pro-thinking-128',
   'gemini-2.5-flash',
   'gemini-2.5-flash-nothinking',
   'gemini-2.5-flash-lite-preview-06-17',
-  'gpt-5.1-2025-11-13',
-  'gpt-5.1-chat-2025-11-13',
-  'gpt-5-chat-latest',
-  'gpt-5-2025-08-07',
-  'gpt-5-mini-2025-08-07',
-  'gpt-5-nano-2025-08-07',
   'gpt-4o',
   'gpt-4.1',
   'o3',
+  'claude-sonnet-4-6',
   'claude-haiku-4-5-20251001',
-  'claude-haiku-4-5-20251001-thinking',
   'claude-sonnet-4-5-20250929',
   'claude-sonnet-4-20250514',
-  'claude-sonnet-4-20250514-thinking',
   'claude-3-7-sonnet-20250219',
   'deepseek-r1-250528',
   'deepseek-v3-1-250821',
@@ -86,6 +96,9 @@ const RECOMMENDED_MODELS = [
   'grok-4',
   'grok-4.1',
 ];
+
+// 去重且优先模型在前
+const ALL_MODELS = [...new Set([...PRIORITY_MODELS, ...RECOMMENDED_MODELS])];
 
 const colors = { reset: '\x1b[0m', red: '\x1b[31m', green: '\x1b[32m', yellow: '\x1b[33m', cyan: '\x1b[36m' };
 
@@ -128,11 +141,13 @@ async function testModel(modelId) {
 async function main() {
   console.log(`\n${colors.cyan}🔬 模型兼容性测试${colors.reset}`);
   console.log(`   Base URL: ${BASE_URL}`);
-  console.log(`   测试 ${RECOMMENDED_MODELS.length} 个模型...\n`);
+  console.log(`   共测试 ${ALL_MODELS.length} 个模型（含重点关注: gemini-3.1-pro、gpt-5.3）\n`);
 
   const results = { ok: [], fail: [] };
-  for (const model of RECOMMENDED_MODELS) {
-    process.stdout.write(`   ${model.padEnd(40)} `);
+  for (const model of ALL_MODELS) {
+    const isPriority = PRIORITY_MODELS.includes(model);
+    const label = isPriority ? `${colors.yellow}[重点]${colors.reset} ` : '';
+    process.stdout.write(`   ${label}${model.padEnd(42)} `);
     const r = await testModel(model);
     if (r.ok) {
       console.log(`${colors.green}✅ OK${colors.reset}`);
@@ -143,12 +158,22 @@ async function main() {
     }
   }
 
+  const priorityOk = results.ok.filter((m) => PRIORITY_MODELS.includes(m));
+  const priorityFail = results.fail.filter((f) => PRIORITY_MODELS.includes(f.model));
+
   console.log(`\n${colors.cyan}📊 结果汇总${colors.reset}`);
   console.log(`   ✅ 可用: ${results.ok.length} 个`);
+  if (priorityOk.length > 0) {
+    console.log(`   ${colors.yellow}重点关注模型 - 可用:${colors.reset}`);
+    priorityOk.forEach((m) => console.log(`     - ${m}`));
+  }
+  if (priorityFail.length > 0) {
+    console.log(`   ${colors.yellow}重点关注模型 - 不可用:${colors.reset}`);
+    priorityFail.forEach((f) => console.log(`     - ${f.model}: ${f.error}`));
+  }
   if (results.ok.length > 0) {
-    console.log(`   ${colors.green}推荐用于 UI 生成的模型:${colors.reset}`);
-    results.ok.slice(0, 10).forEach((m) => console.log(`     - ${m}`));
-    if (results.ok.length > 10) console.log(`     ... 共 ${results.ok.length} 个`);
+    console.log(`   ${colors.green}全部可用模型:${colors.reset}`);
+    results.ok.forEach((m) => console.log(`     - ${m}`));
   }
   if (results.fail.length > 0) {
     console.log(`   ❌ 不可用: ${results.fail.length} 个`);

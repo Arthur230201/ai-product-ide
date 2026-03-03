@@ -8,6 +8,7 @@ import { callText, callObject } from '@/lib/ai/llm';
 import { extractTaggedBlock } from '@/lib/ai/protocol';
 import { buildFallbackGraph } from '@/lib/graph/fallback-graph';
 import { safeParseZodJson } from '@/lib/ai/json-extract';
+import { processIntentForCreate } from '@/lib/prompts/intent-processor';
 import type { FractalNode, EdgeNavMeta } from '@/types/fractal';
 import type { Edge } from 'reactflow';
 
@@ -490,8 +491,10 @@ export const generateGraph = createServerAction()
     // 获取文本模型
     const textModel = input.aiConfig?.textModel || getTextModel();
 
-    // 构建用户提示词
-    let userPrompt = input.prompt.trim() || '请生成项目结构';
+    // 意图加工：用户输入 → 增强后的用户 prompt（含领域范围说明）
+    const rawPrompt = input.prompt.trim() || '请生成项目结构';
+    const { enrichedUserPrompt } = processIntentForCreate(rawPrompt);
+    let userPrompt = enrichedUserPrompt;
     if (input.attachmentContent) {
       const attachmentInfo = input.attachmentType === 'text' 
         ? `\n\n附件内容（${input.mimeType || '文本文件'}）：\n${input.attachmentContent}`
@@ -510,6 +513,12 @@ Product Solution Architect (Domain Driven Design Expert).
 Analyze the User Input and generate BOTH:
 1. **Clarity Analysis**: Assess input clarity (confidence, isVague, domain, object, action)
 2. **Graph Structure**: Generate Global Business Architecture JSON using Top-Down Architecture strategy.
+
+# 📐 Scope Rule (CRITICAL)
+- **页面数量与类型由你根据用户描述与业务完整性自行推断**，不要依赖固定数字或模板。
+- 根据用户意图推断：需要多少节点、每个节点代表什么页面/功能、节点间如何连接；可能是 3 页、8 页或更多，以**业务完整、逻辑自洽**为准。
+- 若用户描述较简略，基于对领域与目标的理解推断完整页面集合，并为每个节点填写足够的 description、userStories，便于后续生成 UI。
+- **禁止**替用户做业务决策时使用固定列表（如「必须包含首页+列表+设置」）；只输出你推断出的、与用户意图一致的节点集合。
 
 # 🧠 Processing Strategy: Top-Down Architecture
 
@@ -1051,9 +1060,16 @@ Return a single JSON object with this structure:
               },
               spec: {
                 title: node.label,
-                  requirements: node.description 
-                    ? [`页面描述：${node.description}`]
-                    : [],
+                requirements: (() => {
+                  const reqs: string[] = [];
+                  if (node.description) reqs.push(`页面描述：${node.description}`);
+                  if (node.userStories?.length) {
+                    const u = node.userStories[0];
+                    reqs.push(`作为${u.role}，${u.activity}，以便${u.value}`);
+                  }
+                  if (reqs.length === 0) reqs.push(`页面：${node.label}`);
+                  return reqs;
+                })(),
               },
               impl: {
                 apiEndpoints: [],

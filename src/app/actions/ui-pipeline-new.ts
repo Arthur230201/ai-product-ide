@@ -3,7 +3,7 @@
 import { createServerAction } from 'zsa';
 import { z } from 'zod';
 import { log, logError } from '@/lib/logger';
-import { getTextModel, getOpenAIKey } from '@/lib/ai-config';
+import { getOpenAIKey, getModelForTier, getTextModel } from '@/lib/ai-config';
 import { callText } from '@/lib/ai/llm';
 import type { AIResult } from '@/lib/ai/llm';
 import type { UIPipelineResponse } from './ui-pipeline-response';
@@ -33,11 +33,30 @@ const getOutputFooter = (stage: 'STATIC' | 'BEAUTIFY' | 'INTERACT') => {
 - Append this marker at the end: ${marker}`;
 };
 
+/** 风格预设：默认苹果风格，用户未指定时使用（仅 pipeline 内部使用，避免 use server 导出非函数） */
+const STYLE_PRESETS = ['apple', 'material', 'neutral', 'custom'] as const;
+
+/** 苹果风格 Prompt 片段（Stage 1/2 注入，见 HIGH_QUALITY_UI_APPLE_STYLE_STITCH_PLAN.md） */
+const APPLE_STYLE_FRAGMENT = `
+## 默认视觉风格：Apple HIG（用户未指定时必须遵守）
+
+- **整体气质**：干净、留白充足、层次分明；避免拥挤与高饱和色块堆砌。
+- **字体**：使用系统无衬线栈（如 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif）；层级清晰：大标题 1.25–1.5rem/粗体，正文 0.9375–1rem，辅助 0.8125–0.875rem/常规；行高 1.4–1.5。
+- **圆角与阴影**：卡片/按钮圆角 8–12px（如 0.5rem–0.75rem）；阴影轻量（如 0 1px 3px rgba(0,0,0,0.08)），避免大块重阴影。
+- **色彩**：背景以白/浅灰为主（#fff, #f5f5f7）；主文字深灰/黑（#1d1d1f, #424245）；强调色克制（如系统蓝 #0071e3 或品牌主色单点使用）。
+- **间距**：8px 基准网格；区块间距 16–24px；内容区 padding 不少于 16px。
+- **组件**：按钮主色单一、hover 略深；列表/卡片对齐网格、分割线细而淡。
+`.trim();
+
 // ==================== Stage 1: 静态 HTML 生成 ====================
+
+const VIEWPORT_PRESETS = ['mobile', 'desktop'] as const;
 
 const GenerateStaticUIInputSchema = z.object({
   prompt: z.string().optional().default('').describe('页面描述'),
   nodeLabel: z.string().optional().describe('节点标签'),
+  stylePreset: z.enum(STYLE_PRESETS).optional().default('apple').describe('视觉风格预设，默认苹果'),
+  viewportPreset: z.enum(VIEWPORT_PRESETS).optional().default('mobile').describe('目标视口：mobile/tablet/desktop，决定生成布局宽度与结构'),
   aiConfig: z.object({
     textModel: z.string().optional(),
   }).optional(),
@@ -60,9 +79,10 @@ export const generateStaticUIFromText = createServerAction()
         };
       }
 
-      const textModel = getTextModel(input.aiConfig);
-      
-      const systemPrompt = `You are a product UI designer and senior frontend engineer.
+      // Stitch 分轨：Stage 1 用 draft 模型，TTFT 优先，适合多页连续生成
+      const textModel = getModelForTier('draft', 'text', input.aiConfig);
+
+      let systemPrompt = `You are a product UI designer and senior frontend engineer.
 
 TASK:
 Create a single-file, runnable STATIC HTML first draft based on the user request.
@@ -92,7 +112,7 @@ HARD CONSTRAINTS:
    - If you include lists/grids (products/cards/rows), include ONLY 6–10 sample items.
    - Avoid large repeated content.
 8) Responsive strategy:
-   - Desktop-first layout with a simple mobile adaptation using @media (max-width: 768px).
+   - Follow the TARGET VIEWPORT below; do not default to mobile when user requested desktop.
 9) Semantic HTML:
    - Use header/nav/main/section/footer and meaningful headings.
 
@@ -101,18 +121,36 @@ QUALITY TARGET:
 - Keep total output reasonably compact (< ~40KB if possible, ~800 lines max).
 - All text content must be in Chinese (中文).`;
 
-      const userPrompt = input.prompt.trim() || `请为"${input.nodeLabel || '页面'}"生成静态 HTML 页面。
+      if (input.stylePreset === 'apple') {
+        systemPrompt += `\n\n${APPLE_STYLE_FRAGMENT}`;
+      }
+
+      const viewportInstruction =
+        input.viewportPreset === 'desktop'
+          ? `\n\n## TARGET VIEWPORT: DESKTOP (PC)\n- Generate a **desktop/PC layout**: multi-column where appropriate, max-width ~1280px or 100%, optional sidebar, larger typography and spacing. Use \`max-width: 1280px\` or similar for main content. Do NOT use a single narrow column or mobile-first layout.\n- Body/main should look like a desktop page (e.g. side nav, wide content area), not a 375px mobile screen.`
+          : `\n\n## TARGET VIEWPORT: MOBILE\n- Generate a **mobile layout**: single column, width ~375px, touch targets, \`max-width: 100%\` with mobile-first styles.`;
+      systemPrompt += viewportInstruction;
+
+      const viewportLabel = input.viewportPreset === 'desktop' ? '桌面(PC)' : '移动端';
+      const viewportFirstLine =
+        input.viewportPreset === 'desktop'
+          ? '【重要】目标设备：桌面(PC)。必须生成桌面端布局：宽屏（max-width 1280px）、多列或侧边栏+主内容区、大字号；禁止单列 375px 移动端布局。\n\n'
+          : '';
+      const userPrompt =
+        viewportFirstLine +
+        (input.prompt.trim() || `请为"${input.nodeLabel || '页面'}"生成静态 HTML 页面。
 
 要求：
 1. 根据描述设计合理的 UI 布局
-2. 使用现代化的设计风格
-3. 确保代码可以直接在浏览器中打开查看
-4. 所有文本内容使用中文`;
+2. **目标设备**：当前为「${viewportLabel}」，请按该视口生成对应布局（桌面=宽屏多列，移动=单列窄屏）
+3. 使用现代化的设计风格
+4. 确保代码可以直接在浏览器中打开查看
+5. 所有文本内容使用中文`);
 
       const result = await callText({
         model: textModel,
         prompt: `${systemPrompt}\n\n[USER REQUEST]\n${userPrompt}${getOutputFooter(stage)}`,
-        timeoutMs: 360000, // 360s (6 minutes) - UI 生成耗时较长
+        timeoutMs: 600000, // 10 min - 代理/远程模型首 token 与长输出较慢，避免静态生成超时
         maxOutputTokens: 8000, // Limit output size
         aiConfig: input.aiConfig,
         actionName: 'generateStaticUI',
@@ -229,6 +267,7 @@ ${STAGE_MARKER_STATIC}
 const BeautifyUIInputSchema = z.object({
   html: z.string().describe('当前 HTML 代码'),
   prompt: z.string().optional().describe('美化要求（可选）'),
+  stylePreset: z.enum(STYLE_PRESETS).optional().default('apple').describe('视觉风格预设，默认苹果'),
   aiConfig: z.object({
     textModel: z.string().optional(),
   }).optional(),
@@ -251,9 +290,10 @@ export const beautifyUI = createServerAction()
         };
       }
 
-      const textModel = getTextModel(input.aiConfig);
-      
-      const systemPrompt = `You are a senior UI visual designer and CSS expert.
+      // Stitch 分轨：Stage 2 用 quality 模型，保证美化效果
+      const textModel = getModelForTier('quality', 'text', input.aiConfig);
+
+      let systemPrompt = `You are a senior UI visual designer and CSS expert.
 
 TASK:
 Beautify the provided HTML to look more production-ready.
@@ -282,6 +322,10 @@ CSS CONCISENESS:
 - Prefer variables and reusable selectors.
 - Avoid long repetitive per-element styles.`;
 
+      if (input.stylePreset === 'apple') {
+        systemPrompt += `\n\n${APPLE_STYLE_FRAGMENT}`;
+      }
+
       const userPrompt = input.prompt 
         ? `美化要求：${input.prompt}\n\n[CURRENT HTML]\n${input.html}`
         : `[CURRENT HTML]\n${input.html}`;
@@ -289,7 +333,7 @@ CSS CONCISENESS:
       const result = await callText({
         model: textModel,
         prompt: `${systemPrompt}\n\n${userPrompt}${getOutputFooter(stage)}`,
-        timeoutMs: 60000, // 60s timeout
+        timeoutMs: 180000, // 3 min - 美化阶段输入含整页 HTML，代理下易超时
         maxOutputTokens: 12000, // Limit output size
         aiConfig: input.aiConfig,
         actionName: 'beautifyUI',
@@ -388,8 +432,9 @@ export const addInteractions = createServerAction()
         };
       }
 
-      const textModel = getTextModel(input.aiConfig);
-      
+      // Stitch 分轨：Stage 3 用 quality 模型，保证交互逻辑质量
+      const textModel = getModelForTier('quality', 'text', input.aiConfig);
+
       const systemPrompt = `You are a senior frontend engineer.
 
 TASK:
@@ -448,7 +493,7 @@ STYLE CHANGES:
       const result = await callText({
         model: textModel,
         prompt: `${systemPrompt}\n\n${userPrompt}${getOutputFooter(stage)}`,
-        timeoutMs: 120000, // 2 min（添加交互阶段）
+        timeoutMs: 180000, // 3 min - 交互阶段输入含整页 HTML，代理下预留余量
         maxOutputTokens: 10000, // Limit output size
         aiConfig: input.aiConfig,
         actionName: 'addInteractions',

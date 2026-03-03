@@ -291,3 +291,18 @@ export function buildTextGenerationPrompt(options: {
   return parts.filter(p => p.trim()).join('\n\n');
 }
 
+// 意图加工与领域提示词（用户输入 → 加工后再传 LLM）
+export {
+  processIntentForCreate,
+  processIntentForGenerateUI,
+  type CreateModeResult,
+  type GenerateUIModeResult,
+} from './intent-processor';
+export {
+  detectDomain,
+  getDomainById,
+  getDomainUISystemSuffix,
+  type DomainModule,
+  type DomainId,
+} from './domains';
+export { DESIGN_PHILOSOPHY_PRINCIPLES } from './design-philosophy';

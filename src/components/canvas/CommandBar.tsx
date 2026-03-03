@@ -33,17 +33,16 @@ function getNodePageDescription(node: { data: { label?: string; artifacts?: { sp
 
   const parts: string[] = [];
   if (title) parts.push(`页面：${title}`);
-
+  if (spec?.requirements?.length) {
+    parts.push(spec.requirements.join('。'));
+  }
   if (userStories?.length) {
-    userStories.forEach((us, i) => {
-      const line = `作为${us.role}，${us.activity}，以便${us.value}`;
-      parts.push(line);
+    userStories.forEach((us) => {
+      parts.push(`作为${us.role}，${us.activity}，以便${us.value}`);
       if (us.acceptanceCriteria?.length) {
         parts.push(`验收标准：${us.acceptanceCriteria.join('；')}`);
       }
     });
-  } else if (spec?.requirements?.length) {
-    parts.push(`需求：${spec.requirements.join('；')}`);
   }
 
   return parts.length ? parts.join('。') : '';
@@ -54,17 +53,10 @@ function getDefaultUIPrompt(nodeLabel: string): string {
   return `请为「${nodeLabel}」页面生成完整、可用的 React 组件，界面内容与页面名称匹配，包含现代化 UI 与完整交互。`;
 }
 
-/** 判断用户输入是否仅为「生成UI」类触发语（无具体页面描述）。此类情况必须用节点名+节点描述作 prompt，避免生成成首页/概览。 */
-function isUIGenerationTriggerOnly(text: string): boolean {
-  const t = text.trim().replace(/\s+/g, ' ').toLowerCase();
-  const triggers = [
-    '生成ui', '生成 ui', '生成本页', '生成本页面', '生成页面', '生成页面ui',
-    '生成页面 ui', '生成本页ui', '生成本页 ui', '生成 本页', '生成 本页面',
-  ];
-  return triggers.includes(t) || (t.length <= 20 && /^(生成|生成本页|生成页面)\s*(ui)?\s*$/.test(t));
-}
+type ViewportPreset = 'mobile' | 'desktop';
 
-export function CommandBar() {
+export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<ViewportPreset | null> }) {
+  const { viewportSubmitRef } = props;
   const [prompt, setPrompt] = useState('');
   const [attachment, setAttachment] = useState<FileAttachment | null>(null);
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
@@ -91,8 +83,8 @@ export function CommandBar() {
   // 输入框聚焦状态 - 必须在所有其他 hooks 之前定义
   const [isFocused, setIsFocused] = useState(false);
 
-  /** Stitch 双模型分轨：draft=快速预览，quality=高质量，仅编辑模式生效 */
-  const [uiGenerationTier, setUIGenerationTier] = useState<'draft' | 'quality'>('quality');
+  /** UI 生成统一使用 quality 模型，不再暴露档位选项 */
+  const uiGenerationTier = 'quality' as const;
 
   // 自动调整textarea高度的函数
   const adjustTextareaHeight = useCallback(() => {
@@ -2190,10 +2182,15 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                 isNull: executeUIText === null,
               });
               
+              const viewportPresetForCall = (viewportSubmitRef?.current ?? useCanvasStore.getState().viewportPreset ?? 'mobile') as ViewportPreset;
+              log('📐 [CommandBar] 当前视口(HTML参考路径):', viewportPresetForCall);
+              const viewportLabelForCall = viewportPresetForCall === 'desktop' ? '桌面' : '移动';
+              toast.info(`正在按【${viewportLabelForCall}】视口生成…`, { duration: 3000, id: 'viewport-send' });
               // CRITICAL: 在调用前输出日志，确认客户端代码正在执行
               console.log('📤 [CommandBar] 准备调用 executeUIText，参数:', {
                 promptLength: htmlReferencePrompt.length,
                 nodeLabel: targetNodeLabel,
+                viewportPreset: viewportPresetForCall,
                 hasProjectMeta: !!useCanvasStore.getState().projectMeta,
                 hasThemeConfig: !!currentTheme,
                 hasAiConfig: !!aiConfig,
@@ -2208,6 +2205,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                 nodeLabel: targetNodeLabel,
                 projectMeta: useCanvasStore.getState().projectMeta,
                 themeConfig: undefined,
+                viewportPreset: viewportPresetForCall,
                 tier: uiGenerationTier,
                 aiConfig: aiConfig,
               });
@@ -2289,8 +2287,10 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
               
               setLoadingStep('✅ UI代码生成完成');
               setProgress(100);
+              const vUsed = (htmlData as { viewportUsed?: 'mobile' | 'tablet' | 'desktop' })?.viewportUsed;
+              const vLabel = vUsed === 'desktop' ? '桌面' : vUsed === 'mobile' ? '移动' : '';
               toast.success('UI代码生成成功', {
-                description: `已基于HTML文件为"${targetNodeLabel}"生成UI代码`,
+                description: `已基于HTML文件为"${targetNodeLabel}"生成UI代码${vLabel ? `（服务端已按${vLabel}视口）` : ''}`,
                 duration: 3000,
               });
               
@@ -2370,9 +2370,9 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
       }
 
       // ========== 检查用户意图：是否要求生成UI ==========
-      // 如果用户提示词中包含"生成UI"、"生成本页面"等关键词，且没有图片，则使用 generateUIFromText
+      // 如果用户提示词中包含"生成UI"、"生成本页面"、"管理系统"、"PC端"等关键词，且没有图片，则使用 generateUIFromText
       const userPromptLower = prompt.trim().toLowerCase();
-      const isRequestingUI = userPromptLower.includes('生成ui') || 
+      const isRequestingUI = userPromptLower.includes('生成ui') ||
                             userPromptLower.includes('生成 ui') ||
                             userPromptLower.includes('生成本页面') ||
                             userPromptLower.includes('生成页面') ||
@@ -2381,7 +2381,13 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                             userPromptLower.includes('生成界面') ||
                             userPromptLower.includes('为我生成') ||
                             userPromptLower.includes('生成页面ui') ||
-                            userPromptLower.includes('生成页面 ui');
+                            userPromptLower.includes('生成页面 ui') ||
+                            userPromptLower.includes('生成一个') ||
+                            userPromptLower.includes('管理系统') ||
+                            userPromptLower.includes('pc端') ||
+                            userPromptLower.includes('桌面端') ||
+                            userPromptLower.includes('后台') ||
+                            userPromptLower.includes('后台管理');
       
       // 详细记录检测结果
       log('🔍 [CommandBar] UI生成意图检测:', {
@@ -2400,6 +2406,11 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
           userPromptLower.includes('生成这个页面') ? '生成这个页面' : null,
           userPromptLower.includes('生成界面') ? '生成界面' : null,
           userPromptLower.includes('为我生成') ? '为我生成' : null,
+          userPromptLower.includes('生成一个') ? '生成一个' : null,
+          userPromptLower.includes('管理系统') ? '管理系统' : null,
+          userPromptLower.includes('pc端') ? 'pc端' : null,
+          userPromptLower.includes('桌面端') ? '桌面端' : null,
+          userPromptLower.includes('后台') ? '后台' : null,
         ].filter(Boolean),
       });
       
@@ -2435,26 +2446,16 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
           // 🚨 保存目标节点ID和标签（防止用户在生成过程中切换节点）
           const targetNodeId = selectedNode.id;
           const targetNodeLabel = selectedNode.data.label || selectedNode.id;
-          const baseDesc = getNodePageDescription(selectedNode);
-          // 仅触发语（如「生成UI」「生成本页面」）或无输入时：强制用节点名+描述，避免生成成首页/概览
-          const isTriggerOnly = !prompt.trim() || isUIGenerationTriggerOnly(prompt.trim());
-          const effectivePrompt = isTriggerOnly
-            ? (baseDesc
-                ? `请生成【${targetNodeLabel}】页的 UI。页面名称即页面类型，必须与之一致。本页说明：${baseDesc}`
-                : getDefaultUIPrompt(targetNodeLabel))
-            : prompt.trim();
-          
-          // 🚨 添加调用前日志
+          const rawUserPrompt = prompt.trim();
+          const pageDescription = getNodePageDescription(selectedNode);
           log('🚀 [CommandBar] 准备调用 executeUIText (文本模式)...');
           log('📋 [CommandBar] executeUIText 调用参数 (文本模式):', {
-            promptLength: effectivePrompt.length,
-            hasUserPrompt: !!prompt.trim(),
-            isTriggerOnly,
-            usedNodeDescription: isTriggerOnly && !!getNodePageDescription(selectedNode),
             nodeLabel: targetNodeLabel,
-            targetNodeId: targetNodeId,
+            promptLength: rawUserPrompt.length,
+            pageDescriptionLength: pageDescription?.length ?? 0,
+            hasUserPrompt: !!rawUserPrompt,
+            targetNodeId,
             hasProjectMeta: !!useCanvasStore.getState().projectMeta,
-            hasThemeConfig: !!currentTheme,
             hasAIConfig: !!aiConfig,
             timestamp: new Date().toISOString(),
           });
@@ -2472,12 +2473,19 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
           }
           
           console.log('✅ [CommandBar] executeUIText 函数验证通过 (文本模式)，开始调用...');
-          
+
+          const viewportPresetForCall = (viewportSubmitRef?.current ?? useCanvasStore.getState().viewportPreset ?? 'mobile') as ViewportPreset;
+          log('📐 [CommandBar] 当前视口(文本模式):', viewportPresetForCall);
+          const viewportLabel = viewportPresetForCall === 'desktop' ? '桌面' : '移动';
+          toast.info(`正在按【${viewportLabel}】视口生成…`, { duration: 3000, id: 'viewport-send' });
+
           const uiResultRaw = await executeUIText({
-            prompt: effectivePrompt,
+            prompt: rawUserPrompt,
             nodeLabel: targetNodeLabel,
+            pageDescription: pageDescription || undefined,
             projectMeta: useCanvasStore.getState().projectMeta,
             themeConfig: undefined,
+            viewportPreset: viewportPresetForCall,
             tier: uiGenerationTier,
             aiConfig: aiConfig,
           });
@@ -2619,8 +2627,10 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
             log('✅ [CommandBar] UI代码生成成功');
             setLoadingStep('✅ UI代码生成完成');
             setProgress(100);
+            const vUsed = 'viewportUsed' in response ? (response as { viewportUsed?: 'mobile' | 'tablet' | 'desktop' }).viewportUsed : undefined;
+            const vLabel = vUsed === 'desktop' ? '桌面' : vUsed === 'mobile' ? '移动' : '';
             toast.success('UI代码生成成功', {
-              description: `已为"${selectedNode.data.label}"生成UI代码`,
+              description: `已为"${selectedNode.data.label}"生成UI代码${vLabel ? `（服务端已按${vLabel}视口）` : ''}`,
               duration: 3000,
             });
             
@@ -3066,35 +3076,11 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
         </div>
       )}
 
-      {/* 编辑模式提示 + 生成档位开关（Stitch 双模型分轨） */}
+      {/* 编辑模式提示：当前编辑的节点 */}
       {isEditMode && selectedNode && (
-        <div className="mb-2 flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-4">
+        <div className="mb-2 flex justify-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-400">
             <span>编辑中：{selectedNode.data.label}</span>
-          </div>
-          <div className="inline-flex p-0.5 bg-zinc-800 border border-zinc-700 rounded-lg" role="group" aria-label="UI 生成档位">
-            <button
-              type="button"
-              onClick={() => setUIGenerationTier('draft')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                uiGenerationTier === 'draft'
-                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
-                  : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
-              }`}
-            >
-              快速预览
-            </button>
-            <button
-              type="button"
-              onClick={() => setUIGenerationTier('quality')}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                uiGenerationTier === 'quality'
-                  ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40'
-                  : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
-              }`}
-            >
-              高质量
-            </button>
           </div>
         </div>
       )}
@@ -3257,6 +3243,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
 
             {/* 输入框 */}
             <textarea
+              data-testid="command-input"
               ref={textareaRef}
               value={prompt}
               onChange={(e) => {
@@ -3294,6 +3281,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
             {/* 发送按钮 - 统一视觉语言 */}
             <button
               type="submit"
+              data-testid="command-send"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               disabled={!hasContent || isLoading}

@@ -32,6 +32,8 @@ type BlueprintTabType = 'profile' | 'business' | 'interaction' | 'data' | 'topol
 interface CanvasStore extends CanvasState {
   // Detail Panel State
   isDetailPanelOpen: boolean;
+  /** 预览视口预设：移动端 / 桌面，用于编辑与演示 */
+  viewportPreset: 'mobile' | 'desktop';
   // Project Blueprint State
   isBlueprintOpen: boolean;
   blueprintInitialTab?: BlueprintTabType;
@@ -72,6 +74,7 @@ interface CanvasStore extends CanvasState {
   // Project Blueprint Management
   openBlueprint: (initialTab?: BlueprintTabType, initialData?: Partial<ProjectMeta>) => void;
   closeBlueprint: () => void;
+  setViewportPreset: (preset: 'mobile' | 'desktop') => void;
 }
 
 /**
@@ -146,11 +149,12 @@ export const useCanvasStore = create<CanvasStore>()(
           nodes: [createMockNode()],
           edges: [],
           selectedNodeId: null,
-          isDetailPanelOpen: false,
-          isBlueprintOpen: false,
-          blueprintInitialTab: undefined,
-          blueprintInitialData: undefined,
-          addNode: () => {},
+        isDetailPanelOpen: false,
+        viewportPreset: 'mobile',
+        isBlueprintOpen: false,
+        blueprintInitialTab: undefined,
+        blueprintInitialData: undefined,
+        addNode: () => {},
           addNodes: () => {},
           addEdges: () => {},
           updateNodeData: () => {},
@@ -176,6 +180,7 @@ export const useCanvasStore = create<CanvasStore>()(
           updateAIConfig: () => {},
           openBlueprint: () => {},
           closeBlueprint: () => {},
+          setViewportPreset: () => {},
           currentTheme: defaultTheme,
           projectMeta: {
             projectName: '未命名项目',
@@ -291,6 +296,7 @@ export const useCanvasStore = create<CanvasStore>()(
         edges: [],
         selectedNodeId: null,
         isDetailPanelOpen: false,
+        viewportPreset: 'mobile',
         isBlueprintOpen: false,
         blueprintInitialTab: undefined,
         blueprintInitialData: undefined,
@@ -1068,7 +1074,8 @@ export const useCanvasStore = create<CanvasStore>()(
       // 如果没有父边（是根节点），调用 addChildNode 逻辑
       if (!parentEdge) {
         // 根节点没有同级，调用 addChildNode 添加子节点
-        const { addChildNode } = get();
+        const storeState = get?.();
+        const addChildNode = storeState?.addChildNode;
         if (addChildNode) {
           addChildNode();
         }
@@ -1171,12 +1178,12 @@ export const useCanvasStore = create<CanvasStore>()(
   },
 
   exportProject: () => {
-    if (!get) {
-      console.error('get function is not available in exportProject');
-      return { nodes: [], edges: [] };
-    }
     try {
-      const state = get();
+      const state = get?.();
+      if (state == null) {
+        console.warn('Canvas store getState not available in exportProject');
+        return { nodes: [], edges: [] };
+      }
       return {
         nodes: state?.nodes || [],
         edges: state?.edges || [],
@@ -1238,23 +1245,30 @@ export const useCanvasStore = create<CanvasStore>()(
       blueprintInitialData: undefined,
     });
   },
+
+  setViewportPreset: (preset: 'mobile' | 'desktop') => {
+    set({ viewportPreset: preset });
+  },
       }
     },
     {
       name: 'fractal-canvas-storage',
       // 确保所有数据都是可序列化的
-      partialize: (state) => ({
+      partialize: (state: CanvasStore) => ({
         nodes: state.nodes,
         edges: state.edges,
         projectMeta: state.projectMeta,
         globalRules: state.globalRules,
         aiConfig: state.aiConfig,
+        viewportPreset: state.viewportPreset,
         // 不持久化 selectedNodeId，每次刷新时重置
       }) as any,
       // 跳过 SSR 时的 hydration
       skipHydration: true, // 手动控制 hydration，避免阻塞
       // 添加存储检查，防止在服务器端或 localStorage 不可用时出错
-      storage: typeof window !== 'undefined' ? {
+      // 必须始终提供 storage 对象，否则 persist 会调用 undefined.get/getItem 报错
+      storage: (typeof window !== 'undefined' && window.localStorage)
+        ? {
         getItem: (name: string) => {
           try {
             if (typeof window === 'undefined' || !window.localStorage) return null;
@@ -1325,7 +1339,12 @@ export const useCanvasStore = create<CanvasStore>()(
             console.warn('Failed to remove item from localStorage:', error);
           }
         },
-      } as any : undefined,
+      } as any
+        : {
+            getItem: () => null,
+            setItem: () => {},
+            removeItem: () => {},
+          },
       // 添加版本控制，如果数据结构改变，清除旧数据
       version: 1,
       migrate: (persistedState: any, version: number) => {
@@ -1359,8 +1378,14 @@ export const useCanvasStore = create<CanvasStore>()(
           if (persistedState.currentTheme === undefined) {
             persistedState.currentTheme = defaultTheme;
           }
+          if (persistedState.viewportPreset === 'tablet') {
+            persistedState.viewportPreset = 'desktop';
+          }
+          if (persistedState.viewportPreset === undefined || !['mobile', 'desktop'].includes(persistedState.viewportPreset)) {
+            persistedState.viewportPreset = 'mobile';
+          }
         }
-        
+
         return persistedState;
       } catch (error) {
         console.error('Migration error, using defaults:', error);

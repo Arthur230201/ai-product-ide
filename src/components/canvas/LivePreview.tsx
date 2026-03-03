@@ -1,29 +1,69 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { transform } from 'sucrase';
 import * as LucideIcons from 'lucide-react';
 import * as Recharts from 'recharts';
+import * as PreviewUI from '@/components/preview-ui';
 import { UniversalHtmlRenderer } from './UniversalHtmlRenderer';
 import { HtmlSandboxRenderer } from './HtmlSandboxRenderer';
 import { HtmlSandbox } from './HtmlSandbox';
 import { isHTMLContent } from '@/utils/html-rationalizer';
 import { buildInjectorScript } from '@/lib/ui/injector';
-import { preview, ensureString } from '@/lib/safe/preview';
+import { preview } from '@/lib/safe/preview';
+import { PreviewFrame } from './PreviewFrame';
 
-// 安全的动态组件渲染器
+export type ViewportPreset = 'mobile' | 'desktop';
+
+/** 捕获生成组件在渲染阶段的错误（如 cn/Stars 未定义），避免白屏 */
+class PreviewErrorBoundary extends React.Component<
+  { children: React.ReactNode; onError: (err: Error) => void },
+  { hasError: boolean; error: Error | null }
+> {
+  state = { hasError: false, error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error) {
+    this.props.onError(error);
+  }
+
+  render() {
+    if (this.state.hasError && this.state.error) {
+      return (
+        <div
+          className="p-4 bg-red-950/20 border border-red-900/50 rounded-lg text-red-300 text-sm font-mono min-h-[120px] flex flex-col justify-center"
+          role="alert"
+        >
+          <div className="font-semibold text-red-400 mb-1">渲染错误</div>
+          <div className="break-all">{this.state.error.message}</div>
+          <div className="mt-2 text-xs text-red-400/80">若此处信息不足，请打开浏览器控制台查看完整报错。</div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// 安全的动态组件渲染器。viewportPreset 由父级传入，决定预览画布尺寸逻辑，不随代码内容反推
 export const LivePreview = ({ 
   code, 
   zoom = 1,
-  isPresentationMode = false
+  isPresentationMode = false,
+  viewportPreset = 'mobile',
 }: { 
   code: string; 
   zoom?: number;
   isPresentationMode?: boolean;
+  /** 当前用户选择的视口，桌面时不再用 375px 包裹，与 NodeDetailPanel 一致 */
+  viewportPreset?: ViewportPreset;
 }) => {
   // ========== 所有 Hooks 必须在组件顶层，在任何条件返回之前 ==========
   // 1. 所有 useState hooks
   const [renderedElement, setRenderedElement] = useState<React.ReactElement | null>(null);
   const [compilationError, setCompilationError] = useState<Error | null>(null);
   const [babelLoaded, setBabelLoaded] = useState(false);
+  const previewScrollRef = useRef<HTMLDivElement>(null);
 
   // 动态加载 Material Icons CDN
   useEffect(() => {
@@ -51,11 +91,13 @@ export const LivePreview = ({
     };
   }, []);
 
-  // 0. 检测是否为 HTML 代码
+  // 0. 检测是否为 HTML 代码（生成管线产出均为 React，此处仅对「粘贴/导入」的 HTML 做分支）
   const isHTMLCode = useMemo(() => {
     if (!code || code.trim().length === 0) return false;
     
     const trimmed = code.trim();
+    // 明确为 React 组件格式时，绝不走 HTML 分支，避免白屏
+    if (/export\s+default\s+function\s+(Page|App|\w+)\s*\(/.test(trimmed)) return false;
     
     // Check for HTML-specific patterns
     const htmlPatterns = [
@@ -103,7 +145,9 @@ export const LivePreview = ({
     return code.includes('function BlankPage') || code.includes('export default function BlankPage');
   }, [code]);
 
-  const isMobile = useMemo(() => {
+  // 仅当 viewportPreset 为 mobile 时采用「代码像移动端」的 375 设备框；桌面以用户选择为准
+  const useMobileFrame = useMemo(() => {
+    if (viewportPreset === 'desktop') return false;
     if (!code) return false;
     return code.includes('w-[375px]') || 
            code.includes('h-[812px]') || 
@@ -111,7 +155,8 @@ export const LivePreview = ({
            code.includes('NavBar') ||
            code.includes('TabBar') ||
            code.includes('金刚区');
-  }, [code]);
+  }, [code, viewportPreset]);
+  const isMobile = useMobileFrame;
 
   // 3. 所有 useEffect hooks
   // 1. 清理和编译代码
@@ -129,10 +174,15 @@ export const LivePreview = ({
       return;
     }
 
-    // Code processing started
+    // React 路径：先清空旧结果，避免展示旧内容或旧错误
+    setRenderedElement(null);
+    setCompilationError(null);
 
-    try {
-      // 步骤 1: 移除 Markdown 标记
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      try {
+        // 步骤 1: 移除 Markdown 标记
       let cleaned = code.replace(/```tsx|```jsx|```javascript|```typescript|```/g, '').trim();
 
       // 步骤 2: 处理 export default
@@ -195,8 +245,9 @@ export const LivePreview = ({
       const iconReplacements: Array<{ from: string; to: string }> = [];
       
       usedIconNames.forEach(iconName => {
-        // 检查图标是否存在（可能以函数或对象形式存在）
-        const iconExists = iconName in LucideIcons && 
+        // Icon 为 lucide 基类，需 iconNode，生成代码不得直接使用；其他检查是否存在
+        const isReserved = iconName === 'Icon';
+        const iconExists = !isReserved && iconName in LucideIcons && 
           (typeof (LucideIcons as any)[iconName] === 'function' || typeof (LucideIcons as any)[iconName] === 'object');
         
         if (!iconExists) {
@@ -244,16 +295,16 @@ export const LivePreview = ({
             // Lucide 图标可能是 function 或 object（React 组件）
             (typeof (LucideIcons as any)[key] === 'function' || typeof (LucideIcons as any)[key] === 'object') &&
             // 排除一些内部使用的函数
-            !['createLucideIcon', 'IconNode', 'lucide'].includes(key)
+            !['createLucideIcon', 'IconNode', 'lucide', 'Icon'].includes(key)
           );
           if (iconNames && Array.isArray(iconNames) && iconNames.length > 0) {
-            // 过滤出有效的 JavaScript 标识符
+            // 与 PreviewUI 同名的必须用组件，不能被 Lucide 图标覆盖（否则 NavBar/ListItem 等会变成 SVG）
+            const previewUIKeys = new Set(Object.keys(PreviewUI || {}));
             const validIconNames = iconNames.filter(name => {
-              // 必须是有效的 JavaScript 标识符
+              if (previewUIKeys.has(name)) return false;
               const isValid = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name);
-              // 确保图标确实存在于 LucideIcons 中（可能是 function 或 object）
               const exists = name in LucideIcons && (
-                typeof (LucideIcons as any)[name] === 'function' || 
+                typeof (LucideIcons as any)[name] === 'function' ||
                 typeof (LucideIcons as any)[name] === 'object'
               );
               return isValid && exists;
@@ -371,6 +422,7 @@ export const LivePreview = ({
           'React',
           'LucideIcons',
           'Recharts',
+          'PreviewUI',
           `
           // 确保依赖项可用
           if (typeof React === 'undefined' || !React) {
@@ -384,6 +436,7 @@ export const LivePreview = ({
           var _React = React;
           var _LucideIcons = LucideIcons;
           var _Recharts = Recharts || {};
+          var _PreviewUI = typeof PreviewUI !== 'undefined' ? PreviewUI : {};
           
           // 使用立即执行函数确保所有变量在使用前都已初始化
           return (function() {
@@ -391,6 +444,36 @@ export const LivePreview = ({
             var React = _React;
             var LucideIcons = _LucideIcons;
             var Recharts = _Recharts;
+            var Button = _PreviewUI.Button;
+            var Card = _PreviewUI.Card;
+            var CardHeader = _PreviewUI.CardHeader;
+            var CardTitle = _PreviewUI.CardTitle;
+            var CardContent = _PreviewUI.CardContent;
+            var CardFooter = _PreviewUI.CardFooter;
+            var Input = _PreviewUI.Input;
+            var Label = _PreviewUI.Label;
+            var Badge = _PreviewUI.Badge;
+            var Avatar = _PreviewUI.Avatar;
+            var Separator = _PreviewUI.Separator;
+            var Textarea = _PreviewUI.Textarea;
+            var Switch = _PreviewUI.Switch;
+            var Alert = _PreviewUI.Alert;
+            var Skeleton = _PreviewUI.Skeleton;
+            var TabsList = _PreviewUI.TabsList;
+            var TabsTrigger = _PreviewUI.TabsTrigger;
+            var TabsContent = _PreviewUI.TabsContent;
+            var NavBar = _PreviewUI.NavBar;
+            var BottomNav = _PreviewUI.BottomNav;
+            var BottomNavItem = _PreviewUI.BottomNavItem;
+            var AppBar = _PreviewUI.AppBar;
+            var Sidebar = _PreviewUI.Sidebar;
+            var SidebarItem = _PreviewUI.SidebarItem;
+            var Progress = _PreviewUI.Progress;
+            var StatCard = _PreviewUI.StatCard;
+            var ListItem = _PreviewUI.ListItem;
+            var EmptyState = _PreviewUI.EmptyState;
+            var PageHeader = _PreviewUI.PageHeader;
+            var cn = typeof _PreviewUI.cn === 'function' ? _PreviewUI.cn : function() { return Array.prototype.slice.call(arguments).filter(Boolean).join(' '); };
             
             // 全局保护：确保数组方法在 undefined 上不会报错
             // 为所有常用的数组方法添加安全检查
@@ -471,8 +554,42 @@ export const LivePreview = ({
               }
             }
             
-            // 初始化所有图标变量和其他声明
+            // 初始化所有图标变量和其他声明（已排除与 PreviewUI 同名的图标，避免覆盖）
             ${allDeclarations}
+            
+            // 再次绑定全部 PreviewUI 组件，确保不被 Lucide 同名图标覆盖（主内容区空白根因）
+            if (_PreviewUI && typeof _PreviewUI === 'object') {
+              if (_PreviewUI.Button != null) Button = _PreviewUI.Button;
+              if (_PreviewUI.Card != null) Card = _PreviewUI.Card;
+              if (_PreviewUI.CardHeader != null) CardHeader = _PreviewUI.CardHeader;
+              if (_PreviewUI.CardTitle != null) CardTitle = _PreviewUI.CardTitle;
+              if (_PreviewUI.CardContent != null) CardContent = _PreviewUI.CardContent;
+              if (_PreviewUI.CardFooter != null) CardFooter = _PreviewUI.CardFooter;
+              if (_PreviewUI.Input != null) Input = _PreviewUI.Input;
+              if (_PreviewUI.Label != null) Label = _PreviewUI.Label;
+              if (_PreviewUI.Badge != null) Badge = _PreviewUI.Badge;
+              if (_PreviewUI.Avatar != null) Avatar = _PreviewUI.Avatar;
+              if (_PreviewUI.Separator != null) Separator = _PreviewUI.Separator;
+              if (_PreviewUI.Textarea != null) Textarea = _PreviewUI.Textarea;
+              if (_PreviewUI.Switch != null) Switch = _PreviewUI.Switch;
+              if (_PreviewUI.Alert != null) Alert = _PreviewUI.Alert;
+              if (_PreviewUI.Skeleton != null) Skeleton = _PreviewUI.Skeleton;
+              if (_PreviewUI.TabsList != null) TabsList = _PreviewUI.TabsList;
+              if (_PreviewUI.TabsTrigger != null) TabsTrigger = _PreviewUI.TabsTrigger;
+              if (_PreviewUI.TabsContent != null) TabsContent = _PreviewUI.TabsContent;
+              if (_PreviewUI.NavBar != null) NavBar = _PreviewUI.NavBar;
+              if (_PreviewUI.BottomNav != null) BottomNav = _PreviewUI.BottomNav;
+              if (_PreviewUI.BottomNavItem != null) BottomNavItem = _PreviewUI.BottomNavItem;
+              if (_PreviewUI.AppBar != null) AppBar = _PreviewUI.AppBar;
+              if (_PreviewUI.Sidebar != null) Sidebar = _PreviewUI.Sidebar;
+              if (_PreviewUI.SidebarItem != null) SidebarItem = _PreviewUI.SidebarItem;
+              if (_PreviewUI.Progress != null) Progress = _PreviewUI.Progress;
+              if (_PreviewUI.StatCard != null) StatCard = _PreviewUI.StatCard;
+              if (_PreviewUI.ListItem != null) ListItem = _PreviewUI.ListItem;
+              if (_PreviewUI.EmptyState != null) EmptyState = _PreviewUI.EmptyState;
+              if (_PreviewUI.PageHeader != null) PageHeader = _PreviewUI.PageHeader;
+              if (typeof _PreviewUI.cn === 'function') cn = _PreviewUI.cn;
+            }
             
             // 执行编译后的代码（此时所有变量都已初始化并可用）
           ${compiledCode}
@@ -496,7 +613,7 @@ export const LivePreview = ({
       try {
         // 使用直接调用而不是 .call()，避免可能的 this 绑定问题
         // 传入完整的 LucideIcons 对象，所有图标都已通过解构声明可用
-        Component = ComponentFactory(React, LucideIcons || {}, Recharts || {});
+        Component = ComponentFactory(React, LucideIcons || {}, Recharts || {}, PreviewUI || {});
       } catch (execError) {
         console.error('❌ [LivePreview] Function execution error:', execError);
         // 提供更详细的错误信息，包括代码片段
@@ -517,19 +634,32 @@ export const LivePreview = ({
       // 渲染组件
       try {
         const element = React.createElement(Component);
-        setRenderedElement(element);
-        setCompilationError(null);
+        if (!cancelled) {
+          setRenderedElement(element);
+          setCompilationError(null);
+        }
       } catch (renderError) {
         console.error('❌ [LivePreview] React.createElement error:', renderError);
         throw new Error(`渲染错误: ${renderError instanceof Error ? renderError.message : String(renderError)}`);
       }
     } catch (err) {
-      console.error('❌ [LivePreview] Compilation/Execution error:', err);
-      console.error('❌ [LivePreview] Code that failed:', code ? preview(code, 200) : 'N/A');
-      setCompilationError(err instanceof Error ? err : new Error(String(err)));
-      setRenderedElement(null);
+      if (!cancelled) {
+        console.error('❌ [LivePreview] Compilation/Execution error:', err);
+        console.error('❌ [LivePreview] Code that failed:', code ? preview(code, 200) : 'N/A');
+        setCompilationError(err instanceof Error ? err : new Error(String(err)));
+        setRenderedElement(null);
+      }
     }
+    });
+    return () => { cancelled = true; };
   }, [code, isHTMLCode]);
+
+  // 内容更新时滚动到顶部，避免只看到底部 footer
+  useEffect(() => {
+    if (renderedElement && previewScrollRef.current) {
+      previewScrollRef.current.scrollTop = 0;
+    }
+  }, [renderedElement, code]);
 
   // 1.5. 如果是 HTML，使用 UniversalHtmlRenderer (需要确保 Babel 已加载)
   useEffect(() => {
@@ -560,6 +690,31 @@ export const LivePreview = ({
     }
   }, [isHTMLCode]);
   
+  // 调试条：开发环境或 window.__SHOW_LIVE_PREVIEW_DEBUG__ 时显示，便于排查白屏
+  const showDebug =
+    (typeof window !== 'undefined' && (window as unknown as { __SHOW_LIVE_PREVIEW_DEBUG__?: boolean }).__SHOW_LIVE_PREVIEW_DEBUG__) ||
+    process.env.NODE_ENV === 'development';
+  const debugBranch = isHTMLCode
+    ? 'html'
+    : compilationError
+      ? 'error'
+      : !code || code === '// PLACEHOLDER' || !renderedElement
+        ? 'loading'
+        : 'preview';
+  const debugStrip = showDebug ? (
+    <div
+      className="absolute top-0 left-0 right-0 z-[9999] bg-amber-500 text-black px-2 py-1 text-xs font-mono flex items-center gap-3"
+      style={{ minHeight: 28 }}
+    >
+      <span>[LivePreview]</span>
+      <span>branch={debugBranch}</span>
+      <span>codeLen={code?.length ?? 0}</span>
+      <span>hasEl={String(!!renderedElement)}</span>
+      <span>err={compilationError ? compilationError.message.slice(0, 40) : '-'}</span>
+      <span>isHTML={String(isHTMLCode)}</span>
+    </div>
+  ) : null;
+
   // HTML-First Architecture: Render HTML as-is in sandbox, no React conversion
   if (isHTMLCode) {
     // Use HtmlSandbox for HTML-first architecture
@@ -569,42 +724,48 @@ export const LivePreview = ({
     const injectorScript = buildInjectorScript({});
     
     return (
-      <HtmlSandbox
-        html={code}
-        mode="preview"
-        injectorScript={injectorScript}
-        heightMode={isMobile ? 'device' : 'auto'}
-        className="w-full h-full"
-        onMessage={(msg) => {
-          // Handle navigation events from iframe
-          if (msg.type === 'NAV') {
-            console.log('[LivePreview] Navigation event:', msg.to);
-            // Navigation is handled by PresentationMode or parent component
-          }
-        }}
-      />
+      <div className="relative w-full h-full">
+        {debugStrip}
+        <HtmlSandbox
+          html={code}
+          mode="preview"
+          injectorScript={injectorScript}
+          heightMode={isMobile ? 'device' : 'auto'}
+          className="w-full h-full"
+          onMessage={(msg) => {
+            // Handle navigation events from iframe
+            if (msg.type === 'NAV') {
+              console.log('[LivePreview] Navigation event:', msg.to);
+              // Navigation is handled by PresentationMode or parent component
+            }
+          }}
+        />
+      </div>
     );
   }
 
-  // 3. 错误处理
+  // 3. 错误处理（保证最小高度，避免在预览区内「看不见」）
   if (compilationError) {
     return (
-      <div className="p-4 bg-red-950/20 border border-red-900/50 rounded-lg max-h-96 overflow-auto">
-        <div className="flex items-start gap-3">
-          <div className="text-red-400 text-lg">⚠️</div>
-          <div className="flex-1">
-            <div className="text-red-400 font-semibold text-sm mb-2">编译/执行错误</div>
-            <div className="text-red-300 text-xs font-mono mb-3">{compilationError.message}</div>
-            {compilationError.stack && (
-              <details className="mt-2">
-                <summary className="cursor-pointer text-red-400 text-xs hover:text-red-300 transition-colors">
-                  查看详细堆栈跟踪
-                </summary>
-                <pre className="mt-2 text-xs text-red-400/80 whitespace-pre-wrap font-mono bg-red-950/30 p-2 rounded border border-red-900/30">
-                  {compilationError.stack}
-                </pre>
-              </details>
-            )}
+      <div className="relative w-full min-h-[140px]">
+        {debugStrip}
+        <div className="p-4 bg-red-950/20 border border-red-900/50 rounded-lg min-h-[140px] max-h-96 overflow-auto">
+          <div className="flex items-start gap-3">
+            <div className="text-red-400 text-lg">⚠️</div>
+            <div className="flex-1">
+              <div className="text-red-400 font-semibold text-sm mb-2">编译/执行错误</div>
+              <div className="text-red-300 text-xs font-mono mb-3">{compilationError.message}</div>
+              {compilationError.stack && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-red-400 text-xs hover:text-red-300 transition-colors">
+                    查看详细堆栈跟踪
+                  </summary>
+                  <pre className="mt-2 text-xs text-red-400/80 whitespace-pre-wrap font-mono bg-red-950/30 p-2 rounded border border-red-900/30">
+                    {compilationError.stack}
+                  </pre>
+                </details>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -614,138 +775,53 @@ export const LivePreview = ({
   // 4. 等待状态
   if (!code || code === "// PLACEHOLDER" || !renderedElement) {
     return (
-      <div className="text-zinc-500 text-sm flex flex-col justify-center items-center h-full gap-3">
-        <div className="w-8 h-8 border-2 border-zinc-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-xs">正在编译 UI 代码...</p>
+      <div className="relative w-full h-full min-h-[200px]">
+        {debugStrip}
+        <div className="text-zinc-500 text-sm flex flex-col justify-center items-center h-full gap-3 min-h-[200px]">
+          <div className="w-8 h-8 border-2 border-zinc-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-xs">正在编译 UI 代码...</p>
+        </div>
       </div>
     );
   }
 
-  // 5. 渲染内容
-  // 重构预览布局结构：
-  // - 外层包装：仅用于预览背景和框架（灰色背景、内边距、缩放变换等）
-  // - 内层容器：完全干净的UI内容容器，不应用任何视觉修饰符
-  //   内层容器必须没有：opacity, filter, backdrop-filter, transform, overlay, background-color
-  
+  // 5. 渲染内容（重写）：薄壳 + PreviewFrame 单一容器，由专家商议结论执行
+  const PREVIEW_MIN_HEIGHT = viewportPreset === 'desktop' ? 800 : 812;
+  const content = (
+    <PreviewFrame ref={previewScrollRef} minHeight={PREVIEW_MIN_HEIGHT}>
+      <PreviewErrorBoundary key={code} onError={setCompilationError}>
+        {renderedElement}
+      </PreviewErrorBoundary>
+    </PreviewFrame>
+  );
+
   if (isPresentationMode) {
-    // 演示模式：设备框架由外部提供
-    // 外层包装：仅用于缩放变换（如果需要）和布局约束
-    // 内层容器：完全干净，不应用任何视觉修饰符（opacity, filter, backdrop-filter, transform, overlay, background-color）
     return (
-      <div 
-        className={`${isMobile && zoom !== 1 ? 'w-[375px] h-[812px]' : 'w-full h-full'} overflow-hidden relative`}
-        style={{
-          // 外层包装：仅用于缩放变换（预览框架功能）
-          transform: zoom !== 1 ? `scale(${zoom})` : undefined,
-          transformOrigin: zoom !== 1 ? 'top center' : undefined,
-          transition: zoom !== 1 ? 'transform 0.2s ease' : undefined,
-          maxWidth: isMobile && zoom !== 1 ? '375px' : '100%',
-          maxHeight: isMobile && zoom !== 1 ? '812px' : '100%',
-          width: isMobile && zoom !== 1 ? '375px' : '100%',
-          height: isMobile && zoom !== 1 ? '812px' : '100%',
-          boxSizing: 'border-box',
-        } as React.CSSProperties}
+      <div
+        className={isMobile && zoom !== 1 ? 'w-[375px] h-[812px]' : 'w-full h-full'}
+        style={{ overflow: 'hidden', transform: zoom !== 1 ? `scale(${zoom})` : undefined, transformOrigin: 'top center' }}
       >
-        {/* 内层容器：完全干净，只保留必要的布局属性，不应用任何视觉修饰符 */}
-        {/* 为固定底部栏预留底部间距（通常为 80-100px） */}
-        <div 
-          className={`${isMobile && zoom !== 1 ? 'w-[375px] h-[812px]' : 'w-full h-full'} overflow-x-hidden`}
-          style={{
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-            boxSizing: 'border-box',
-            width: '100%',
-            maxWidth: '100%',
-            // 只在非空白页面时为固定底部导航栏预留底部间距
-            paddingBottom: isBlankPage ? '0px' : '100px',
-            // CRITICAL: 内层容器必须没有以下任何视觉修饰符，确保渐变、阴影、背景色以完整强度渲染
-            opacity: undefined,
-            filter: undefined,
-            backdropFilter: undefined,
-            transform: undefined,
-            backgroundColor: undefined,
-            background: undefined,
-          } as React.CSSProperties}
-        >
-          {/* 隐藏滚动条的样式 */}
-          <style dangerouslySetInnerHTML={{
-            __html: `
-              /* 隐藏滚动条 */
-              div::-webkit-scrollbar {
-                display: none;
-              }
-            `
-          }} />
-          {/* 直接渲染组件，确保原始HTML的所有视觉效果（渐变、阴影、背景色）能够以完整强度正确渲染 */}
-          {/* 恢复原始HTML的滚动和固定行为：fixed bottom 元素将相对于视口定位 */}
-          {renderedElement}
-        </div>
+        {showDebug && debugStrip}
+        {content}
       </div>
     );
   }
 
-  // 正常模式：三层结构
-  // 最外层：预览背景（灰色背景、内边距）- 仅用于视觉框架，body-level 滚动容器
-  // 中层：设备容器框架（圆角、阴影、缩放变换）- 仅用于预览框架
-  // 内层：完全干净的UI内容容器，不应用任何视觉修饰符
+  const deviceWidth = viewportPreset === 'desktop' ? '100%' : 375;
   return (
-    <div 
-      className="flex justify-center py-8 bg-gray-100"
+    <div
+      className="rounded-xl overflow-hidden bg-white shrink-0"
       style={{
-        // Body-level 滚动容器：主内容在这里滚动
-        overflowY: 'auto',
-        overflowX: 'hidden',
-        height: '100vh',
-        scrollbarWidth: 'none',
-        msOverflowStyle: 'none',
-      } as React.CSSProperties}
+        width: deviceWidth,
+        height: '100%',
+        minHeight: PREVIEW_MIN_HEIGHT,
+        maxWidth: viewportPreset === 'desktop' ? '100%' : 375,
+        transform: zoom !== 1 ? `scale(${zoom})` : undefined,
+        transformOrigin: 'top center',
+      }}
     >
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          /* 隐藏滚动条 */
-          div::-webkit-scrollbar {
-            display: none;
-          }
-        `
-      }} />
-      {/* 中层：设备容器框架（圆角、阴影、缩放变换），仅用于预览框架，不应用背景色影响内容 */}
-      <div 
-        className="w-[375px] min-h-[812px] rounded-[36px] overflow-hidden shadow-2xl device-container"
-        style={{
-          // 中层：仅用于缩放变换（预览框架功能），不滚动
-          transform: zoom !== 1 ? `scale(${zoom})` : undefined,
-          transformOrigin: zoom !== 1 ? 'top center' : undefined,
-          transition: zoom !== 1 ? 'transform 0.2s ease' : undefined,
-          // 不设置背景色，让原始HTML的背景色、渐变能够完整显示
-          backgroundColor: undefined,
-          // 不在这里滚动，滚动在 body-level 容器
-          overflow: 'visible',
-        } as React.CSSProperties}
-      >
-        {/* 内层容器：完全干净，只保留必要的布局属性，不应用任何视觉修饰符 */}
-        {/* 为固定底部栏预留底部间距（通常为 80-100px） */}
-        <div 
-          className="w-full min-h-full overflow-x-hidden"
-          style={{
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-            boxSizing: 'border-box',
-            // 为固定底部导航栏预留底部间距，确保内容不被遮挡
-            paddingBottom: '100px',
-            // CRITICAL: 内层容器必须没有以下任何视觉修饰符，确保渐变、阴影、背景色以完整强度渲染
-            opacity: undefined,
-            filter: undefined,
-            backdropFilter: undefined,
-            transform: undefined,
-            backgroundColor: undefined,
-            background: undefined,
-          } as React.CSSProperties}
-        >
-          {/* 直接渲染组件，确保原始HTML的所有视觉效果（渐变、阴影、背景色）能够以完整强度正确渲染 */}
-          {/* 恢复原始HTML的滚动和固定行为：fixed bottom 元素将相对于视口定位 */}
-          {renderedElement}
-        </div>
-      </div>
+      {showDebug && debugStrip}
+      {content}
     </div>
   );
 };

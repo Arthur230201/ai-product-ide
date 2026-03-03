@@ -116,9 +116,9 @@ function getCustomFetch() {
         if (timeoutId) clearTimeout(timeoutId);
         const elapsed = Date.now() - startTime;
         
-        // Extract Retry-After header for llm.ts to use
-        const retryAfter = response.headers.get('retry-after') || 
-                          response.headers.get('Retry-After');
+        // Extract Retry-After header for llm.ts to use (guard: headers 可能为 null)
+        const retryAfter = response?.headers?.get?.('retry-after') ||
+                          response?.headers?.get?.('Retry-After');
         let cooldownSeconds = 10; // Default
         if (retryAfter) {
           const parsed = parseInt(retryAfter, 10);

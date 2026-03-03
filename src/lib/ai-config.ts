@@ -27,10 +27,10 @@ export function ensureOpenAIKey(): string {
   return key;
 }
 
-// 默认模型配置（与 reelxai.com 兼容性测试通过的模型）
+// 默认模型配置：UI 生成等质量任务使用 GPT-5.2
 export const DEFAULT_AI_CONFIG = {
-  visionModel: 'gpt-4o',
-  textModel: 'gpt-4o',
+  visionModel: 'gpt-5.2',
+  textModel: 'gpt-5.2',
 } as const;
 
 /** Stitch 方案：快速草稿用轻量模型，降低 TTFT，默认与 quality 同模型时可设环境变量覆盖 */

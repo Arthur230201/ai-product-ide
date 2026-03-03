@@ -1,17 +1,19 @@
 'use server';
 
+import { writeFileSync, mkdirSync } from 'fs';
+import { join } from 'path';
 import { createServerAction } from 'zsa';
 import { z } from 'zod';
-import { log, logError } from '@/lib/logger';
+import { log, logError, logWarn } from '@/lib/logger';
 import { getTextModel, getModelForTier, getOpenAIKey, ensureOpenAIKey } from '@/lib/ai-config';
 import type { GenerationTier } from '@/lib/ai-config';
-import { UI_CONSTITUTION } from '@/lib/prompts/ui-constitution';
+import { buildUIGenerationSystemPrompt, buildUIGenerationUserPrompt } from '@/lib/prompts/ui-generation-prompt';
 import { callText, callObject } from '@/lib/ai/llm';
 import type { AIResult } from '@/lib/ai/llm';
 
 /** UI 生成接口返回类型（generateUIFromText / generateUIFromImage） */
 export type UIGenerationResponse =
-  | { type: 'success'; code: string; requestId?: string; stages?: unknown }
+  | { type: 'success'; code: string; requestId?: string; stages?: unknown; viewportUsed?: 'mobile' | 'desktop' }
   | { type: 'skeleton'; code: string; requestId?: string; stages?: unknown }
   | { type: 'rate_limit'; cooldownSeconds: number; requestId?: string; message?: string }
   | { type: 'network_error'; requestId?: string; message?: string; retryable?: boolean }
@@ -21,9 +23,17 @@ export type UIGenerationResponse =
 
 // ==================== 直接调用的函数（用于 NodeDetailPanel）====================
 
+/** 默认美化说明：仅视觉增强，不改变结构或内容 */
+const DEFAULT_REFINE_PROMPT = `在保持布局与功能完全不变的前提下，仅做视觉美化：
+- 统一圆角（rounded-lg/rounded-xl）与阴影（shadow-md/shadow-lg）
+- 加强字体层级（标题 font-semibold/text-lg 以上，正文 text-gray-600）
+- 优化间距（p-4/p-6、gap-4）与对比度，使界面更精致
+- 主按钮使用 bg-cyan-500 或 bg-teal-500，卡片有明确边框或阴影
+不要删除已有样式，不要改 HTML 结构，不要简化或合并组件。`;
+
 export async function refineUI(
   htmlCode: string,
-  refinementPrompt: string = "Please refine styling and consistency."
+  refinementPrompt: string = DEFAULT_REFINE_PROMPT
 ): Promise<AIResult<{ code: string }>> {
   try {
     if (!getOpenAIKey()) {
@@ -35,31 +45,33 @@ export async function refineUI(
       };
     }
 
-    const textModel = getTextModel();
+    // 美化使用 quality 模型，保证效果
+    const textModel = getModelForTier('quality' as GenerationTier, 'text', {});
     
-    const systemPrompt = `You are a UI code refinement expert. Your task is to refine and improve HTML/React code based on user feedback.
+    const systemPrompt = `You are a senior UI/visual polish expert. Your ONLY job is to make the existing React/TSX code look better visually, without breaking anything.
 
-Requirements:
-1. Maintain the original functionality
-2. Improve styling consistency
-3. Fix any layout issues
-4. Ensure responsive design
-5. Return ONLY the refined code, no markdown or explanations`;
+STRICT RULES (must follow):
+1. PRESERVE: Keep the exact same component structure, JSX tree, and all functionality. Do NOT remove or merge elements.
+2. PRESERVE: Keep all existing className values that are already good; only add or refine (e.g. add shadow, rounded, spacing).
+3. ENHANCE ONLY: Improve typography hierarchy (titles bolder/larger, body text gray-600), spacing (p-4/p-6, gap-4), rounded corners (rounded-lg/xl), subtle shadows (shadow-md/shadow-lg), and color contrast. Use Tailwind only.
+4. CONSISTENCY: Buttons: prefer bg-cyan-500 or bg-teal-500; cards: rounded-lg/xl + shadow + padding; text on white: text-gray-900 for titles, text-gray-600 for body.
+5. PREMIUM: One clear focal point per section; generous whitespace (p-4/p-6, gap-4/gap-6); single accent color only; restrained shadows (shadow-md/lg), no multi-color clutter.
+6. OUTPUT: Return ONLY the complete refined .tsx code. No markdown fences, no explanations, no comments. The code must be runnable as-is.`;
 
-    const userPrompt = `Refine the following code based on this feedback: "${refinementPrompt}"
+    const userPrompt = `Apply visual polish only. User instruction: ${refinementPrompt}
 
-Original code:
+Current code (refine in place, return full code):
 \`\`\`tsx
 ${htmlCode}
 \`\`\`
 
-Return ONLY the refined code without any markdown or explanations.`;
+Return ONLY the full refined .tsx code, no markdown or explanations.`;
 
-    // ✅ 使用 callText 统一 gateway
     const result = await callText({
       model: textModel,
       prompt: `${systemPrompt}\n\n${userPrompt}`,
-      temperature: 0.3,
+      temperature: 0.25,
+      maxOutputTokens: 16000,
       actionName: 'refineUI',
       aiConfig: {},
     });
@@ -829,8 +841,10 @@ const GenerateAnalysisFromCodeInputSchema = z.object({
 });
 
 const GenerateUIFromTextInputSchema = z.object({
-  prompt: z.string().describe('页面描述，用于生成UI代码'),
-  nodeLabel: z.string().describe('节点名称'),
+  prompt: z.string().describe('用户输入，用于补充或覆盖页面描述'),
+  nodeLabel: z.string().describe('节点名称（页面名）'),
+  /** 由 getNodePageDescription(selectedNode) 得到的完整页面需求描述，优先于 prompt 用于「Context: Page Requirements」 */
+  pageDescription: z.string().optional().describe('页面需求描述（如 spec.requirements + userStories 拼接）'),
   projectMeta: z.object({
     projectName: z.string(),
     industry: z.string(),
@@ -839,12 +853,16 @@ const GenerateUIFromTextInputSchema = z.object({
     version: z.string(),
   }).optional().describe('项目画像配置'),
   themeConfig: z.any().optional().describe('UI主题配置'),
+  /** 目标视口：与编辑区当前选择一致，生成对应布局 */
+  viewportPreset: z.enum(['mobile', 'desktop']).optional().default('mobile').describe('目标视口'),
   /** Stitch 方案：draft=快速模型，quality=重量模型，默认 quality */
   tier: z.enum(['draft', 'quality']).optional().describe('生成档位'),
   aiConfig: z.object({
     visionModel: z.string().optional(),
     textModel: z.string().optional(),
   }).optional().describe('AI模型配置'),
+  /** 意图加工层产出的可选系统提示词后缀（按领域注入布局/组件约定） */
+  systemPromptSuffix: z.string().optional().describe('领域系统提示词片段'),
 });
 
 export const generateUIFromText = createServerAction()
@@ -855,282 +873,65 @@ export const generateUIFromText = createServerAction()
     
     log('='.repeat(80));
     log(`🚀 [generateUIFromText] 开始处理文本生成UI请求 [${requestId}]`);
+    const viewportPreset = (input.viewportPreset === 'desktop' || input.viewportPreset === 'mobile')
+      ? input.viewportPreset
+      : 'mobile';
+    if (input.viewportPreset !== viewportPreset) {
+      logWarn(`[generateUIFromText] viewportPreset 已纠正: 收到 "${String(input.viewportPreset)}" → 使用 "${viewportPreset}"`);
+    }
     log(`📋 [generateUIFromText] 输入参数 [${requestId}]:`, {
       promptLength: input.prompt?.length || 0,
       nodeLabel: input.nodeLabel,
+      viewportPreset,
       hasPrompt: !!input.prompt,
       timestamp: new Date().toISOString(),
     });
+    try {
+      const debugPath = join(process.cwd(), 'scripts', 'viewport-debug-last.json');
+      writeFileSync(debugPath, JSON.stringify({
+        viewportUsed: viewportPreset,
+        received: input.viewportPreset,
+        requestId,
+        timestamp: new Date().toISOString(),
+      }, null, 2), 'utf8');
+    } catch (_) { /* ignore */ }
     log('='.repeat(80));
 
     try {
       ensureOpenAIKey();
-      // 获取项目画像配置
-      const projectMeta = input.projectMeta || {
-        projectName: '未命名项目',
-        industry: 'General Internet',
-        targetAudience: 'General Users',
-        description: '',
-        version: '1.0.0',
-      };
 
-      // 根据行业动态调整设计风格
-      let toneInstruction = '';
-      const industry = projectMeta.industry.toLowerCase();
-      if (industry.includes('finance') || industry.includes('fintech') || industry.includes('healthcare') || industry.includes('医疗')) {
-        toneInstruction = '采用严谨、正式的设计风格，注重数据准确性和安全性。';
-      } else if (industry.includes('gaming') || industry.includes('游戏') || industry.includes('social') || industry.includes('社交')) {
-        toneInstruction = '采用生动、富有创意的设计风格，注重用户体验和视觉吸引力。';
-      } else if (industry.includes('logistics') || industry.includes('物流') || industry.includes('enterprise') || industry.includes('企业')) {
-        toneInstruction = '采用专业、高效的设计风格，注重信息清晰度和操作效率。';
-      } else {
-        toneInstruction = '采用清晰、专业、用户友好的设计风格。';
-      }
+      const systemPrompt = buildUIGenerationSystemPrompt(viewportPreset, input.projectMeta ?? undefined);
+      const userPromptFinal = buildUIGenerationUserPrompt(
+        input.nodeLabel || '页面',
+        input.prompt ?? '',
+        viewportPreset,
+        input.pageDescription
+      );
 
-      // 构建设计系统约束（如果提供了主题配置）
-      let designSystemEnforcement = '';
-      if (input.themeConfig) {
-        const theme = input.themeConfig;
-        // 检查用户是否明确要求深色主题（通过检查背景色是否明确设置为深色）
-        const hasExplicitDarkTheme = theme.colors?.background?.dark && 
-                                     (theme.colors.background.dark.includes('slate-9') || 
-                                      theme.colors.background.dark.includes('zinc-9') ||
-                                      theme.colors.background.dark.includes('gray-9') ||
-                                      theme.colors.background.dark.includes('slate-8') ||
-                                      theme.colors.background.dark.includes('zinc-8') ||
-                                      theme.colors.background.dark.includes('gray-8'));
-        
-        // 默认使用白色背景，除非用户明确要求深色主题
-        const backgroundColor = hasExplicitDarkTheme 
-          ? `bg-${theme.colors.background.dark}` 
-          : 'bg-white';
-        const surfaceColor = hasExplicitDarkTheme 
-          ? `bg-${theme.colors?.surface || 'slate-800'}` 
-          : 'bg-white';
-        const primaryTextColor = hasExplicitDarkTheme 
-          ? `text-${theme.colors?.text?.primary || 'slate-50'}` 
-          : 'text-gray-900';
-        const secondaryTextColor = hasExplicitDarkTheme 
-          ? `text-${theme.colors?.text?.secondary || 'slate-400'}` 
-          : 'text-gray-600';
-        const borderColor = hasExplicitDarkTheme 
-          ? `border-${theme.colors?.border || 'slate-700'}` 
-          : 'border-gray-200';
-        
-        designSystemEnforcement = `
+      // 调试：确认实际发给大模型的内容，便于排查空白/短输出
+      log(`📤 [generateUIFromText] 实际发给模型的 system 长度: ${systemPrompt.length} 字符`, {
+        systemPreview: systemPrompt.slice(0, 380),
+      });
+      log(`📤 [generateUIFromText] 实际发给模型的 user 长度: ${userPromptFinal.length} 字符`, {
+        userPreview: userPromptFinal.slice(0, 380),
+      });
 
-[DESIGN SYSTEM ENFORCEMENT]
-你必须严格遵循以下设计配置（优先级高于默认 Tailwind 选择）：
-- 主色调：使用 bg-${theme.colors?.primary || 'blue-500'} 和 text-${theme.colors?.primary || 'blue-500'}
-- 次要色调：使用 bg-${theme.colors?.secondary || 'purple-500'} 和 text-${theme.colors?.secondary || 'purple-500'}
-- 背景色：${hasExplicitDarkTheme ? `使用 ${backgroundColor}（用户明确要求深色主题）` : '**必须使用 bg-white（白色背景，默认要求）**'}
-- 表面色：使用 ${surfaceColor}
-- 主要文本：使用 ${primaryTextColor}
-- 次要文本：使用 ${secondaryTextColor}
-- 边框色：使用 ${borderColor}
-- 圆角：所有按钮、卡片、输入框必须使用 ${theme.shape?.borderRadius?.md || 'rounded-md'}
-- 按钮阴影：使用 ${theme.shadows?.buttonShadow || 'shadow-md'}
-- 卡片阴影：使用 ${theme.shadows?.cardShadow || 'shadow-lg'}
-- 密度：${theme.typography?.density === 'compact' ? '使用紧凑间距（p-2, gap-2）' : theme.typography?.density === 'spacious' ? '使用宽松间距（p-6, gap-6）' : '使用正常间距（p-4, gap-4）'}
-${hasExplicitDarkTheme ? '- 注意：背景是深色，确保所有文本使用浅色类（text-white, text-gray-200, text-slate-50等）' : '- **重要：背景是白色，确保所有文本使用深色类（text-gray-900, text-gray-600等），禁止使用浅色文本（text-white, text-gray-100等）**'}
-- 风格描述：${theme.vibe || 'Modern Professional'}
-
-重要：这些设计令牌必须严格应用，不要使用其他颜色或样式。`;
-      }
-
-      // 构建系统提示词
-      const systemPrompt = `# Role
-Senior Frontend Architect & UI/UX Expert
-
-你是一个专业的 React 前端开发专家，专注于 ${projectMeta.industry} 行业。
-
-项目背景：
-- 项目名称: "${projectMeta.projectName}"
-- 目标用户: ${projectMeta.targetAudience}
-${projectMeta.description ? `- 项目简介: ${projectMeta.description}` : ''}
-
-# Task
-Generate production-ready **React + Tailwind CSS** code based on the page description.
-
-# 核心要求
-
-${UI_CONSTITUTION}
-
-## 1. 基于描述生成UI
-- **理解需求**：仔细分析页面描述，理解页面的核心功能和用户场景
-- **设计UI结构**：根据描述设计合理的页面布局和UI组件
-- **实现交互**：为所有可交互元素添加完整的状态管理和事件处理
-- **语言要求**：**所有文本内容必须使用中文**，包括按钮文字、标签、提示信息等（除非用户明确要求英文）
-
-## 2. 背景色和文本颜色（强制要求）
-
-⚠️ **关键要求：**
-1. **默认背景色必须是白色**：最外层容器必须使用 \`bg-white\`（**统一使用白色底色，除非用户特别要求其他颜色**）
-2. **所有文本元素必须明确设置Tailwind的text-*颜色类名，不能省略！**
-
-**背景色规则（强制要求）：**
-- **默认规则**：**统一使用白色背景**（\`bg-white\`），这是默认要求
-- **最外层容器（App组件的根div）**：**必须使用** \`bg-white\`（**禁止使用** \`bg-gray-50\`、\`bg-gray-100\` 或其他非白色背景）
-- **卡片、面板等容器**：**必须使用** \`bg-white\`（**禁止使用**深色背景如 \`bg-gray-900\`、\`bg-slate-900\`、\`bg-zinc-900\`、\`bg-blue-900\`、\`bg-purple-900\` 等）
-- **例外情况**：**只有当用户明确要求深色主题**（如"深色模式"、"dark theme"、"黑色背景"等）时，才可以使用深色背景
-- **严格禁止使用深色背景**：除非用户**明确要求**深色主题，否则**所有背景必须是白色**（\`bg-white\`）
-- **错误示例（禁止）：**
-  - ❌ \`<div className="bg-gray-900">...</div>\` - 深色背景
-  - ❌ \`<div className="bg-slate-800">...</div>\` - 深色背景
-  - ❌ \`<div className="bg-blue-900">...</div>\` - 深色背景
-- **正确示例（必须）：**
-  - ✅ \`<div className="bg-white">...</div>\` - 白色背景
-
-**文本颜色规则（基于白色背景）：**
-- **主要文本（标题、重要内容）**：**必须使用** \`text-gray-900\` 或 \`text-black\`
-- **次要文本（描述、辅助信息）**：**必须使用至少** \`text-gray-600\` 或 \`text-slate-600\`（**严格禁止 text-gray-400、text-gray-300、text-gray-200、text-gray-100、text-white 或更浅**）
-- **状态文本（蓝色/紫色/绿色）**：**必须使用至少 600 级别**（如 \`text-blue-600\`、\`text-purple-600\`、\`text-green-600\`，**严格禁止 400、300、200、100 或更浅**）
-- **禁用文本**：可以使用 \`text-gray-400\` 或 \`text-gray-500\`（但仅用于禁用状态）
-- **严格禁止**在白色背景上使用以下颜色（会导致不可见或难以阅读）：
-  - ❌ \`text-white\` - 完全不可见
-  - ❌ \`text-gray-100\` - 几乎不可见
-  - ❌ \`text-gray-200\` - 几乎不可见
-  - ❌ \`text-gray-300\` - 难以阅读
-  - ❌ \`text-gray-400\` - 仅用于禁用状态，不能用于正常文本
-  - ❌ \`text-blue-400\`、\`text-purple-400\`、\`text-green-400\` 等浅色状态文本
-
-**检查清单（必须全部满足）：**
-- [ ] 最外层容器有 \`bg-white\` 或 \`bg-gray-50\`（默认白色背景）
-- [ ] 每个文本元素都有明确的 text-* 颜色类名
-- [ ] 所有正常文本颜色在白色背景上清晰可见（至少 text-gray-600 或更深）
-- [ ] **没有使用** text-white、text-gray-100、text-gray-200、text-gray-300 在白色背景上
-- [ ] **没有使用** text-gray-400 用于正常文本（仅可用于禁用状态）
-- [ ] **没有使用** text-blue-400、text-purple-400 等浅色状态文本（必须使用 600 或更深）
-
-**常见错误示例（禁止）：**
-- ❌ \`<div className="bg-white"><p className="text-white">标题</p></div>\` - 白色文字在白色背景上不可见
-- ❌ \`<div className="bg-white"><span className="text-gray-300">描述</span></div>\` - 浅灰色文字在白色背景上难以阅读
-- ❌ \`<div className="bg-white"><button className="text-blue-400">按钮</button></div>\` - 浅蓝色文字在白色背景上不够清晰
-
-**正确示例（必须）：**
-- ✅ \`<div className="bg-white"><p className="text-gray-900">标题</p></div>\` - 深色文字在白色背景上清晰可见
-- ✅ \`<div className="bg-white"><span className="text-gray-600">描述</span></div>\` - 中等深色文字在白色背景上清晰可见
-- ✅ \`<div className="bg-white"><button className="text-blue-600">按钮</button></div>\` - 深色状态文字在白色背景上清晰可见
-
-## 3. 响应式设计（移动端优先）
-
-⚠️ **关键要求：移动端布局约束**
-
-- **默认生成移动端UI**：优先考虑移动端体验，使用移动端友好的布局
-- **容器宽度**：**必须使用** \`w-full\`（不要使用 \`max-w-md\` 或其他限制宽度的类，确保内容不超出屏幕）
-- **防止内容溢出**：
-  - 最外层容器：**必须使用** \`w-full overflow-x-hidden\` 防止横向滚动
-  - 所有容器：**禁止使用**固定宽度（如 \`w-[500px]\`）或超出屏幕的宽度
-  - 文本容器：使用 \`break-words\` 或 \`truncate\` 防止文本溢出
-  - 列表和卡片：使用 \`w-full\` 确保不超出屏幕宽度
-- **间距**：使用移动端友好的间距（\`p-4\`, \`gap-4\` 等），避免过大的 padding 导致内容被挤压
-- **字体大小**：使用移动端友好的字体大小（标题 \`text-2xl\` 或 \`text-3xl\`，正文 \`text-base\` 或 \`text-sm\`）
-- **触摸目标**：按钮和交互元素至少 \`min-h-[44px]\`（移动端触摸标准）
-- **垂直布局**：优先使用垂直布局（\`flex-col\`），避免横向布局导致内容超出屏幕
-- **如果用户明确要求PC端UI**：可以使用更宽的布局（\`max-w-4xl\` 或 \`max-w-6xl\`），更大的字体和间距
-
-**检查清单：**
-- [ ] 最外层容器使用 \`w-full overflow-x-hidden\`
-- [ ] 没有使用固定宽度（如 \`w-[500px]\`）
-- [ ] 所有文本容器有 \`break-words\` 或适当的文本处理
-- [ ] 内容在移动端屏幕（375px宽度）内完整显示，不超出屏幕
-
-## 4. 代码要求
-- 使用 React Hooks（useState, useEffect, useMemo, useCallback）进行状态管理
-- 使用 Tailwind CSS 实现所有样式，禁止内联样式
-- 使用 Lucide React 图标库（从 'lucide-react' 导入）添加合适的图标
-- 所有按钮、输入框、链接等交互元素必须可交互
-- 添加 hover 和 active 状态的视觉反馈
-- 组件名称必须是 App（function App() 或 const App = ()）
-- 代码必须可直接运行，包含完整的交互逻辑
-
-## 5. 语言和内容要求
-
-⚠️ **关键要求：中文内容**
-
-- **所有文本内容必须使用中文**：
-  - 按钮文字：使用中文（如"搜索"、"保存"、"创建"等）
-  - 标签和分类：使用中文（如"技术"、"设计"、"产品"等）
-  - 提示信息：使用中文（如"暂无结果"、"加载中"等）
-  - 标题和描述：使用中文
-  - **禁止使用英文**：除非用户明确要求英文内容，否则所有文本必须是中文
-- **示例：**
-  - ❌ "Search items" → ✅ "搜索项目"
-  - ❌ "Create" → ✅ "创建"
-  - ❌ "No results found" → ✅ "暂无结果"
-  - ❌ "Save" → ✅ "保存"
-  - ❌ "Filter" → ✅ "筛选"
-
-## 6. 设计风格
-${toneInstruction}
-- 使用现代化的UI设计模式
-- 确保响应式设计（移动端优先）
-- 使用合适的间距、圆角、阴影等视觉元素
-${designSystemEnforcement}
-
-## 6.1 视觉样式（必须应用，禁止无风格页面）
-⚠️ **生成的页面必须有明确的视觉风格，禁止白底+黑字无层次的「无样式」效果。**
-
-- **统一强调色（品牌感）**：
-  - 主按钮、主要 CTA：**必须使用** \`bg-cyan-500 hover:bg-cyan-600 text-white\` 或 \`bg-teal-500 hover:bg-teal-600 text-white\`，形成统一主色，**禁止**泛用 \`bg-blue-500\` 无区分。
-  - 链接、标签、高亮信息：使用 \`text-cyan-600\` 或 \`text-teal-600\`。
-  - 次要按钮/边框：可使用 \`border-cyan-500\` 或 \`ring-cyan-500/30\`。
-- **卡片与容器**：
-  - 列表项、内容块、表单区域：**必须**带 \`rounded-lg\` 或 \`rounded-xl\`、\`shadow-md\` 或 \`shadow-lg\`、\`p-4\` 或 \`p-5\`，可选 \`border border-gray-100\`，**禁止**光秃秃白块无圆角无阴影。
-- **字体层级**：
-  - 页面/区块标题：\`font-bold\` 或 \`font-semibold\`，\`text-lg\`/\`text-xl\`/\`text-2xl\`。
-  - 正文/描述：\`text-base text-gray-600\` 或 \`text-sm text-gray-500\`。
-  - 价格/重点数字：可加 \`font-semibold text-gray-900\` 或强调色。
-- **间距与节奏**：区块之间使用 \`gap-4\`/\`gap-6\`、\`space-y-4\` 等，避免内容挤在一起或整屏单一灰底。
-- **检查**：最终页面应一眼看出「有设计」：有主色、有卡片感、有层次，而不是默认无样式。
-
-## 7. 禁止占位与示例文案（强制）
-- **严禁**出现以下或类似文案：
-  - 「这里是示例界面」「没有提供具体的页面描述」「因此展示一个基础布局」
-  - 「内容区域」「示例界面」「占位内容」「暂无描述」
-- **必须**根据【页面名称/用户描述】生成**真实、具体、可用**的界面内容：
-  - 页面标题/顶栏标题**必须与页面类型一致**：节点名/描述是「商品详情」则顶栏和内容必须是商品详情（商品图、价格、规格、购买按钮等），**禁止**输出「主页」「首页」「概览」等与页面类型不符的标题或内容。
-  - 主体内容必须与页面类型匹配：如「商品详情」需有商品图、标题、价格、规格、购买/加入购物车等；列表页需有列表项、筛选/搜索；表单页需有完整表单字段。
-  - **禁止**：当页面类型为商品详情/订单/表单等具体页时，生成「主页」「首页」「智能推荐」「最新资讯」等通用首页/概览内容。
-  - 使用合理的模拟数据（如商品名、价格、状态文案），让界面看起来像真实产品，而不是空壳
-- **审美要求**：层次清晰、主次分明；至少一处强调色（如主按钮、标签）形成焦点；避免整块空白或单一灰底，用卡片、分割、留白营造节奏
-
-## 8. 质量优先（强制）
-- **生成完整、可直接使用的静态页面**：以输出质量为优先，不要为求快而省略区块、使用占位内容或示例文案。
-- 完整实现描述中的主要模块与交互，代码可直接运行、内容充实，让用户感受到「成品」而非草稿。
-
-# Output
-- Return **ONLY** the full \`.tsx\` code.
-- **禁止**输出向用户提问、索要描述或说明性的文字（例如「我需要你提供…」「请告诉我…」「才能为你生成」等）。**必须直接输出可运行的 React 组件代码**，不要用任何理由要求用户补充信息。
-- Ensure all icons are imported from \`lucide-react\`.
-- 不要包含 \`\`\`tsx 或 \`\`\`jsx 等markdown标记
-- 不要包含任何注释或说明文字`;
-
-      // 构建用户提示词：强调真实内容与页面类型匹配，禁止占位/示例文案
-      const nodeLabel = input.nodeLabel || '页面';
-      const userPrompt = input.prompt.trim() || `请为【${nodeLabel}】页面生成**完整、可用、有真实内容**的 React 组件代码。
-
-要求：
-1. **内容必须具体**：根据页面名称「${nodeLabel}」生成与之匹配的真实界面内容，不要生成「示例界面」「没有提供具体描述」等占位文案。例如：商品详情页需包含商品图、标题、价格、规格、购买按钮；列表页需包含列表项、搜索/筛选；表单页需包含完整表单项。
-2. **标题与品牌**：顶栏或主标题**必须**使用页面名「${nodeLabel}」（与当前节点一致），禁止使用「主页」「首页」「概览」等与页面类型不符的标题；可搭配搜索、通知等常用入口，使界面像真实产品。
-3. 布局合理、层次清晰，实现所有必要的交互（点击、输入、切换等），使用现代化设计风格。
-4. **背景色**：默认使用白色背景（\`bg-white\`）；仅当用户明确要求深色主题时才使用深色背景。
-5. **视觉样式**：主按钮用 \`bg-cyan-500\` 或 \`bg-teal-500\`；卡片用 \`rounded-lg shadow-md p-4\`；标题加粗、字号层级分明；整体要有明确设计感，禁止无样式白底黑字。
-6. 所有文案使用中文；移动端内完整显示（\`w-full overflow-x-hidden\`），不出现大块空白或单一灰底。`;
-
-      // Stitch 双模型分轨：draft=快速模型，quality=重量模型
-      const tier: GenerationTier = input.tier === 'draft' ? 'draft' : 'quality';
-      const textModel = getModelForTier(tier, 'text', input.aiConfig);
-      log(`🤖 [generateUIFromText] 使用模型: ${textModel}, tier=${tier}`);
+      // 文本生成 UI 固定使用「高质量」模型（默认 gpt-5.2），忽略用户轻量配置
+      const tier: GenerationTier = 'quality';
+      const textModel = getModelForTier(tier, 'text', {});
+      log(`🤖 [generateUIFromText] 使用模型: ${textModel} (固定 quality)`);
       
       const apiStartTime = Date.now();
       
-      // ✅ 使用 callText 统一 gateway
+      // 使用 messages 分离 system/user，避免单 prompt 被模型当普通对话导致忽略约束
       const result = await callText({
         model: textModel,
-        prompt: `${systemPrompt}\n\n${userPrompt}`,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPromptFinal },
+        ],
         temperature: 0.5,
-        maxOutputTokens: 16000, // 静态页完整输出，优先质量避免截断
+        maxOutputTokens: 16000,
         actionName: 'generateUIFromText',
         aiConfig: input.aiConfig,
       });
@@ -1171,7 +972,13 @@ ${designSystemEnforcement}
       }
       
       const apiDuration = Date.now() - apiStartTime;
-      log(`✅ [generateUIFromText] OpenAI API 调用完成，耗时: ${apiDuration}ms`);
+      const rawLength = result.data.length;
+      log(`✅ [generateUIFromText] OpenAI API 调用完成`, {
+        model: textModel,
+        elapsedMs: apiDuration,
+        responseChars: rawLength,
+        hint: rawLength < 4500 ? '⚠️ 响应过短，可能为骨架或截断' : undefined,
+      });
 
       // 提取生成的代码
       let generatedCode = result.data.trim();
@@ -1186,10 +993,104 @@ ${designSystemEnforcement}
         .replace(/^```(?:tsx|jsx|typescript|javascript)?\n?/gm, '')
         .replace(/\n?```$/gm, '')
         .trim();
+
+      // 桌面视口时强制把模型输出的移动端根布局改为桌面：避免「选 PC 仍是一窄条」的画布
+      if (viewportPreset === 'desktop') {
+        const before = generatedCode;
+        generatedCode = generatedCode
+          .replace(/\bmax-w-md\b/g, 'max-w-7xl')
+          .replace(/\bmax-w-sm\b/g, 'max-w-6xl')
+          .replace(/\bw-\[375px\]\b/g, 'w-full')
+          .replace(/\bmax-w-\[375px\]\b/g, 'max-w-7xl')
+          .replace(/\bmin-w-\[375px\]\b/g, 'min-w-0');
+        // 确保根容器有桌面居中：若根 div 有 w-full + overflow-x-hidden 且无 max-w，补上 max-w-7xl mx-auto
+        if ((generatedCode.includes('w-full') && generatedCode.includes('overflow-x-hidden')) && !generatedCode.includes('max-w-7xl') && !generatedCode.includes('max-w-6xl')) {
+          generatedCode = generatedCode.replace(
+            /(<div[^>]*className=")([^"]*)(w-full\s+overflow-x-hidden)([^"]*)(")/,
+            '$1$2max-w-7xl mx-auto $3$4$5'
+          );
+          if (!generatedCode.includes('max-w-7xl')) {
+            generatedCode = generatedCode.replace(
+              /(<div[^>]*className=")([^"]*)(overflow-x-hidden\s+w-full)([^"]*)(")/,
+              '$1$2max-w-7xl mx-auto $3$4$5'
+            );
+          }
+        }
+        if (before !== generatedCode) {
+          log('🖥️ [generateUIFromText] 已对生成代码做桌面布局后处理（替换移动端根宽度为桌面）');
+        }
+      }
+
       log('🧹 [generateUIFromText] 代码清理后:', {
         cleanedLength: generatedCode.length,
         preview: generatedCode.substring(0, 200),
       });
+
+      // 结构自检：便于与图中预期对比，确认主内容区是否有实质内容
+      const hasFlex1 = /\bflex-1\b/.test(generatedCode);
+      const hasMain = /<main\b/.test(generatedCode);
+      const listItemCount = (generatedCode.match(/<ListItem\b/g) || []).length;
+      const cardCount = (generatedCode.match(/<Card\b/g) || []).length;
+      const hasNavBar = /<NavBar\b/.test(generatedCode);
+      const hasAppBar = /<AppBar\b/.test(generatedCode);
+      const rootFlexCol = /(?:className|class)=["'][^"']*\bflex\s+flex-col\b/.test(generatedCode) || /flex-col\s+flex\b/.test(generatedCode);
+      log('📐 [generateUIFromText] 生成代码结构自检（与图中预期对比）:', {
+        nodeLabel: input.nodeLabel,
+        pageDescriptionPreview: (input.pageDescription || '').slice(0, 120),
+        hasFlex1,
+        hasMain,
+        listItemCount,
+        cardCount,
+        hasNavBar,
+        hasAppBar,
+        rootFlexCol,
+        expectMainContent: listItemCount >= 5 || cardCount >= 2 ? 'ok' : '可能主区不足',
+      });
+
+      // 写入 MD 文档：AI 返回的 UI 代码 + 上下文，便于复制到本地/CodeSandbox 自行渲染对比预期
+      try {
+        const debugDir = join(process.cwd(), 'scripts', 'iteration-reports');
+        mkdirSync(debugDir, { recursive: true });
+        const mdPath = join(debugDir, 'last-generated-ui-code.md');
+        const pageDesc = (input.pageDescription || '').trim();
+        const mdContent = [
+          '# 上次 AI 返回的 UI 代码',
+          '',
+          '每次在画布上点击「生成本页 UI」成功后，会覆盖此文件。可复制下方代码块到本地或 [CodeSandbox](https://codesandbox.io) 等环境渲染，与图中预期对比。',
+          '',
+          '## 本次生成上下文',
+          '',
+          '| 项 | 值 |',
+          '| --- | --- |',
+          `| 生成时间 | ${new Date().toISOString()} |`,
+          `| 节点名称 | ${input.nodeLabel} |`,
+          `| 视口 | ${viewportPreset} |`,
+          `| flex-1 | ${hasFlex1} |`,
+          `| <main> | ${hasMain} |`,
+          `| ListItem 数量 | ${listItemCount} |`,
+          `| Card 数量 | ${cardCount} |`,
+          `| NavBar | ${hasNavBar} |`,
+          `| AppBar | ${hasAppBar} |`,
+          `| 根 flex-col | ${rootFlexCol} |`,
+          '',
+          '### 发给模型的页面描述（pageDescription）',
+          '',
+          pageDesc ? `\n${pageDesc}\n` : '_（未提供，使用了节点名 + 兜底要求）_',
+          '',
+          '---',
+          '',
+          '## 代码（复制下方整块到可运行 React+Tailwind 环境对比）',
+          '',
+          '```tsx',
+          generatedCode,
+          '```',
+          '',
+        ].join('\n');
+        writeFileSync(mdPath, mdContent, 'utf8');
+        log('📁 [generateUIFromText] 已写入 MD 文档:', { path: mdPath });
+      } catch (e) {
+        logWarn('⚠️ [generateUIFromText] 写入 MD 文档失败', e);
+      }
 
       // 拒绝「向用户索要描述」的模型回复（模型有时会输出说明文字而非代码）
       const refusalPatterns = [
@@ -1208,12 +1109,21 @@ ${designSystemEnforcement}
         );
       }
 
-      // 验证代码是否有效（最小长度提高，避免接受极短或非代码内容）
+      // 一页完整 UI 代码通常 5000–15000 字符，过短多为骨架/截断，直接拒绝
+      const MIN_FULL_PAGE_CHARS = 4500;
       if (!generatedCode || generatedCode.length < 400) {
-        logError('❌ [generateUIFromText] 生成的代码太短:', {
-          codeLength: generatedCode?.length || 0,
-        });
+        logError('❌ [generateUIFromText] 生成的代码太短:', { codeLength: generatedCode?.length || 0 });
         throw new Error('生成的代码太短或不完整，请补充页面描述后重试');
+      }
+      if (generatedCode.length < MIN_FULL_PAGE_CHARS) {
+        logError('❌ [generateUIFromText] 生成内容过短，无法视为完整一页 UI:', {
+          codeLength: generatedCode.length,
+          requiredMin: MIN_FULL_PAGE_CHARS,
+          model: textModel,
+        });
+        throw new Error(
+          `当前生成仅 ${generatedCode.length} 字符，不足一页完整 UI（需至少约 ${MIN_FULL_PAGE_CHARS} 字符）。请重试或补充更详细的页面描述；若仍过短，请检查是否使用了轻量模型（如 gpt-4o-mini），建议使用 gpt-4o 等模型。`
+        );
       }
 
       // 确保代码包含 React 组件
@@ -1235,6 +1145,7 @@ ${designSystemEnforcement}
         type: 'success' as const,
         code: generatedCode,
         requestId,
+        viewportUsed: viewportPreset,
       };
     } catch (error) {
       const errorDuration = Date.now() - startTime;

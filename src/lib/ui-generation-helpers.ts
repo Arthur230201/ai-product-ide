@@ -70,7 +70,7 @@ export function extractCooldownSeconds(error: unknown): number {
     // Check for Retry-After header in response
     if ('response' in error && error.response && typeof error.response === 'object') {
       const headers = 'headers' in error.response ? error.response.headers : null;
-      if (headers && typeof headers === 'object' && 'get' in headers) {
+      if (headers != null && typeof headers === 'object' && typeof (headers as { get?: unknown }).get === 'function') {
         const retryAfter = (headers as { get: (name: string) => string | null }).get('retry-after');
         if (retryAfter) {
           const seconds = parseInt(retryAfter, 10);
