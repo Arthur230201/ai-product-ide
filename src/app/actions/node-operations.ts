@@ -63,7 +63,7 @@ STRICT RULES:
    - Date inputs: Use <input type="date" /> or type="datetime-local" with value and onChange bound to useState (e.g. const [date, setDate] = useState(''); <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />).
    - Select/dropdown: Use useState for selected value, onChange to setState.
    - Tabs: Use useState for active tab, TabsTrigger onClick to set active, TabsContent to show only when active.
-   - Modals/dialogs: Use useState for open (e.g. const [open, setOpen] = useState(false)); button onClick={() => setOpen(true)}; overlay onClick={() => setOpen(false)}.
+   - Modals/dialogs (MUST fully cover background): Use the \`Dialog\` component only. Pattern: \`const [open, setOpen] = useState(false); <Dialog open={open} onClose={() => setOpen(false)}><DialogHeader>标题</DialogHeader><DialogContent>...</DialogContent><DialogFooter><Button onClick={() => setOpen(false)}>确定</Button></DialogFooter></Dialog>\`. NEVER use a raw \`<div className="fixed ...">\` for modals—that causes the background to show through; Dialog provides the required overlay (遮罩) that fully covers the page.
    - Buttons that should navigate to another page: Add onClick that calls window.__NAV_TO_NODE__?.('TargetPageLabel'). Map button text or intent to the given page list. Example: "查看商品详情" or "商品详情" button -> window.__NAV_TO_NODE__?.('商品详情'); "返回" -> window.__NAV_TO_NODE__?.('首页') or the previous page name.
 3. Use only React (useState). No import. All components (Button, Input, etc.) are already in scope. Use the same component names (Page or App as root).
 4. OUTPUT: Return ONLY the complete .tsx code. No markdown fences, no explanations. Root must remain export default function Page() or export default function App().`;

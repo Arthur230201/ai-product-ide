@@ -84,7 +84,8 @@ export const INTERACTION_CLOSURE_RULES = `**Interaction Closure Rules (MANDATORY
 - Any filter must affect data
 - Any status badge must correspond to a data state
 - Any action button must trigger a logical action
-- If an interaction is visible, it must be functional`;
+- If an interaction is visible, it must be functional
+- **Modals/floating windows (弹窗/浮窗)**: Must fully cover the background (必须遮盖下层). Use only the \`Dialog\` component (Dialog + DialogHeader + DialogContent + DialogFooter); never use a raw \`div\` with \`fixed\` for overlays, or the background will show through.`;
 
 /**
  * 数据规则（精简版）
@@ -308,3 +309,4 @@ export {
   type DomainId,
 } from './domains';
 export { DESIGN_PHILOSOPHY_PRINCIPLES } from './design-philosophy';
+export { GRAPH_ARCHITECTURE_SYSTEM_PROMPT } from './graph-architecture-prompt';

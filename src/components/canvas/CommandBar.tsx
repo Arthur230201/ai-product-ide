@@ -2137,18 +2137,20 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
             }
             
             if (uiCode && uiCode.length > 50) {
-              // 更新节点的 view.code（使用保存的目标节点ID，确保即使切换节点也能更新到正确的节点）
+              const vUsed = (htmlData as { viewportUsed?: 'mobile' | 'tablet' | 'desktop' })?.viewportUsed;
+              const viewportPreset = vUsed === 'mobile' ? 'mobile' : 'desktop';
+              // 更新节点的 view.code 与 viewportPreset（导出 PRD 时用于 PC/移动端排版）
               updateNodeData(targetNodeId, {
                 artifacts: {
                   view: {
                     code: uiCode,
+                    viewportPreset,
                   },
                 },
               });
               
               setLoadingStep('✅ UI代码生成完成');
               setProgress(100);
-              const vUsed = (htmlData as { viewportUsed?: 'mobile' | 'tablet' | 'desktop' })?.viewportUsed;
               const vLabel = vUsed === 'desktop' ? '桌面' : vUsed === 'mobile' ? '移动' : '';
               toast.success('UI代码生成成功', {
                 description: `已基于HTML文件为"${targetNodeLabel}"生成UI代码${vLabel ? `（服务端已按${vLabel}视口）` : ''}`,
@@ -2444,7 +2446,8 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
               });
               
               if (uiCode && uiCode.length > 50) {
-                // 更新节点的 view.code（使用保存的目标节点ID，确保即使切换节点也能更新到正确的节点）
+                const vUsed = 'viewportUsed' in response ? (response as { viewportUsed?: 'mobile' | 'tablet' | 'desktop' }).viewportUsed : undefined;
+                const viewportPreset = vUsed === 'mobile' ? 'mobile' : 'desktop';
                 log('💾 [CommandBar] 准备更新节点:', {
                   nodeId: targetNodeId,
                   nodeLabel: targetNodeLabel,
@@ -2456,6 +2459,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
               artifacts: {
                 view: {
                   code: uiCode,
+                  viewportPreset,
                 },
               },
             });
@@ -2495,7 +2499,6 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
             log('✅ [CommandBar] UI代码生成成功');
             setLoadingStep('✅ UI代码生成完成');
             setProgress(100);
-            const vUsed = 'viewportUsed' in response ? (response as { viewportUsed?: 'mobile' | 'tablet' | 'desktop' }).viewportUsed : undefined;
             const vLabel = vUsed === 'desktop' ? '桌面' : vUsed === 'mobile' ? '移动' : '';
             toast.success('UI代码生成成功', {
               description: `已为"${selectedNode.data.label}"生成UI代码${vLabel ? `（服务端已按${vLabel}视口）` : ''}`,

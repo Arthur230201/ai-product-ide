@@ -69,7 +69,7 @@ export function buildUIGenerationSystemPrompt(
 - 布局与容器：Card, CardHeader, CardTitle, CardContent, CardFooter, PageHeader, EmptyState
 - 列表与数据：StatCard, ListItem, TabsList, TabsTrigger, TabsContent
 - 导航：NavBar（移动端顶部）, BottomNav, BottomNavItem（移动端底部）, AppBar（PC 顶部）, Sidebar, SidebarItem（PC 侧边）
-- 弹窗：Dialog, DialogHeader, DialogContent, DialogFooter（浮窗/快速弹窗必须用此组合，保证遮罩盖住下层、下层按钮不透出）
+- 弹窗：Dialog, DialogHeader, DialogContent, DialogFooter（增加交互时凡浮窗必须用此组合；遮罩必须完全遮盖下层，禁止下层透出）
 
 主内容区必须用上述组件填满，禁止大块空 \`<div>\` 或占位文案。**不得使用任何未在列表中的组件或名称**（如 Stars、Rating、Icon 等会导致白屏）；星级/评分请用内联 SVG 或 Emoji 实现。
 
@@ -87,7 +87,7 @@ export function buildUIGenerationSystemPrompt(
 - **移动端**：必须使用 \`NavBar\`（包含顶部居中标题）作为主导航。若需底部标签栏，使用 \`BottomNav\` 和 \`BottomNavItem\`。整体排版在 iPhone 14 Pro 或 Oppo Find X6 Pro 等主流设备视口下，拥有合理的触控区域（如 min-h-[44px]）和边缘安全内边距（通常为 px-4）。
 - **PC 端**：必须使用 \`AppBar\` 作为顶部栏，若有侧边导航需求，使用 \`Sidebar\` 和 \`SidebarItem\` 组合；Sidebar 必须 \`min-w-[200px]\` 或 \`min-w-[240px]\`，主内容区 \`flex-1 min-w-0\` 保证有足够宽度横向排版。主内容区应具有最大宽度限制并居中对齐。禁止任何导致「整段文字竖排」的窄列或 \`writing-mode: vertical\`。
 - **侧栏/顶栏按钮可见性**：Sidebar 或 AppBar 内的所有 Button 必须带有可见内容（文案或内联 SVG/图标），禁止仅写 \`<Button />\` 或 \`<Button variant="ghost" />\` 无子节点；按钮文字颜色须与背景有对比度（避免白字白底、灰字灰底导致观感为空）。
-- **弹窗/浮窗（必须）**：任何「点击按钮弹出浮窗」的交互必须使用 \`Dialog\` 组件。写法：\`<Dialog open={isOpen} onClose={() => setIsOpen(false)}><DialogHeader>标题</DialogHeader><DialogContent>表单等</DialogContent><DialogFooter><Button onClick={...}>确定</Button></DialogFooter></Dialog>\`。禁止用裸 \`<div className="fixed ...">\` 做浮层，否则遮罩 z-index 不足会导致下层按钮透出、观感异常。
+- **弹窗/浮窗（必须遮盖）**：增加交互时，任何「点击按钮弹出浮窗」必须使用 \`Dialog\` 组件，以保证遮罩完全盖住下层、不透出。写法：\`<Dialog open={isOpen} onClose={() => setIsOpen(false)}><DialogHeader>标题</DialogHeader><DialogContent>表单等</DialogContent><DialogFooter><Button onClick={...}>确定</Button></DialogFooter></Dialog>\`。禁止用裸 \`<div className="fixed ...">\` 做浮层，否则下层会透出、观感异常。
 - ${rootContainerRule}
 
 # Design & Code Guidelines (开发规范)

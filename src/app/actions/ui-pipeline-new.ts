@@ -443,7 +443,7 @@ Keep structure stable. Use vanilla JavaScript only. Do not use external librarie
 
 INTERACTION GOALS (choose 3–6 that best match the UI):
 - Tabs / segmented control switching
-- Modal open/close (with ESC to close and backdrop click to close)
+- Modal open/close: MUST use a full-page overlay (backdrop) that fully covers the page (z-index above all content; opaque or semi-opaque). ESC and backdrop click close. No modal may allow background content to show through (遮罩必须完全遮盖下层).
 - Collapsible sections / FAQ expand-collapse
 - Search/filter over existing sample items (front-end only)
 - Simple form validation with inline errors
@@ -470,9 +470,9 @@ STRICT RULES:
 4) Output length constraint: <script> tag content should not exceed 250 lines.
 
 ACCESSIBILITY (REQUIRED):
-- Modal:
-  - ESC closes.
-  - Backdrop click closes (when clicking outside content).
+- Modal (弹窗/浮窗):
+  - Backdrop MUST fully cover the entire page (position:fixed; inset:0; high z-index; background that blocks view of content below). No background elements may show through (必须遮盖).
+  - ESC closes; backdrop click closes (when clicking outside content).
   - On open, focus moves into the modal (first focusable element or modal container).
   - On close, restore focus to the trigger when possible.
   - Use role="dialog" and aria-modal="true".

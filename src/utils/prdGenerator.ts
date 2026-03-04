@@ -289,6 +289,8 @@ export interface PageNode {
   uiCode?: string;        // React 组件代码或 HTML（含 style+body，用于界面示意）
   isHtml?: boolean;       // 为 true 时用 innerHTML 渲染，避免当 React 导致空白
   nodeId?: string;        // 节点唯一标识符（用于生成挂载点 ID）
+  /** 界面视口：mobile=保持手机框/窄视口样式，desktop=以 PC 正常比例、Word 式排版 */
+  viewportPreset?: 'mobile' | 'desktop';
   sections: RequirementSection[]; // 动态需求章节列表
   userStories?: Array<{   // 用户故事列表（用户故事模型 - 核心）
     id: string;
@@ -368,6 +370,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${data.meta.name} - PRD</title>
+    <!-- PRD export mount: v2 = 仅替换顶层组件 + nodeId 带索引，避免重复声明 -->
     <!-- React Runtime -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -597,7 +600,34 @@ export function generateFullPrdHtml(data: FullPrdData): string {
         .phone-mockup img:hover {
             transform: scale(1.02);
         }
-        /* PC 端界面示意：桌面比例，非手机框 */
+        /* 移动端界面示意：保持现有视口框样式 */
+        .mobile-ui-viewport {
+            width: 100%;
+            max-width: 400px;
+            min-height: 480px;
+            border-radius: 0.75rem;
+            border: 2px solid #e2e8f0;
+            overflow: hidden;
+            background: #fff;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08);
+            margin: 0 auto;
+        }
+        .mobile-ui-viewport .device-sandbox { min-height: 480px; }
+        /* PC 端界面示意：Word 式排版，正常文档流比例 */
+        .pc-ui-doc-flow {
+            width: 100%;
+            max-width: 100%;
+            border: 1px solid #e2e8f0;
+            border-radius: 0.5rem;
+            overflow: hidden;
+            background: #fff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+        }
+        .pc-ui-doc-flow .device-sandbox {
+            min-height: 320px;
+            width: 100%;
+        }
+        /* 兼容旧类名 */
         .desktop-viewport {
             width: 100%;
             min-width: 320px;
@@ -609,9 +639,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
             background: #fff;
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08);
         }
-        .desktop-viewport .device-sandbox {
-            min-height: 480px;
-        }
+        .desktop-viewport .device-sandbox { min-height: 480px; }
         
         /* PRD Table Styling */
         .markdown-body table {
@@ -694,29 +722,21 @@ export function generateFullPrdHtml(data: FullPrdData): string {
             <a href="#ch5" class="block px-4 py-2 hover:bg-slate-800 rounded">5. 功能详述</a>
             ${data.nodes.map((n, i) => {
                 const nodeNum = `5.${i+1}`;
-                let sectionIdx = 1;
-                // 构建三级菜单项（sections）
-                let tempSectionIdx = 1;
-                const sectionsMenu = n.sections && n.sections.length > 0
-                    ? n.sections.map((section, secIdx) => {
-                        const secNum = `${nodeNum}.${tempSectionIdx++}`;
-                        return `<a href="#node-${i}-section-${secIdx}" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">${secNum} ${section.title}</a>`;
-                    }).join('')
-                    : '';
-                // 更新 sectionIdx 以便用户故事使用正确的编号
-                sectionIdx = tempSectionIdx;
-                // 构建用户故事菜单项（如果有）
+                const sec3Title = (n.sections && n.sections[0]) ? n.sections[0].title : '功能需求说明';
+                let storySubIdx = 1;
                 const userStoriesMenu = n.userStories && n.userStories.length > 0
                     ? n.userStories.map((story, storyIdx) => {
-                        const storyNum = `${nodeNum}.${sectionIdx++}`;
+                        const storyNum = `${nodeNum}.1.${storySubIdx++}`;
                         return `<a href="#node-${i}-story-${storyIdx}" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">${storyNum} ${story.id || `US-${storyIdx + 1}`}</a>`;
                     }).join('')
                     : '';
                 return `
                     <div class="space-y-0.5">
                         <a href="#node-${i}" class="block px-4 py-1.5 hover:bg-slate-800 rounded truncate pl-6 text-xs font-medium text-slate-300 transition-colors">${nodeNum} ${n.title}</a>
-                        ${sectionsMenu}
+                        <a href="#node-${i}-stories" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">${nodeNum}.1 用户故事</a>
                         ${userStoriesMenu}
+                        <a href="#node-${i}-ui" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">${nodeNum}.2 界面示意</a>
+                        <a href="#node-${i}-section-0" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">${nodeNum}.3 ${sec3Title}</a>
                     </div>
                 `;
             }).join('')}
@@ -820,56 +840,40 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                   // 仅在有实际 UI 代码且非占位时显示“由代码渲染”挂载区；无 UI 且无真实预览图时显示「暂无 UI 预览」
                   const hasValidUiCode = !!(node.uiCode && node.uiCode.trim() && !isPlaceholderUiCode(node.uiCode));
                   
-                  // Section counter for this page (starts at 1 for UI preview)
-                  let sectionIdx = 1;
-                  
-                  // Build sections HTML
+                  // 小节顺序：5.x.1 用户故事，5.x.2 界面示意，5.x.3 功能需求说明
+                  const sec1Num = `${nodeNum}.1`;
+                  const sec2Num = `${nodeNum}.2`;
+                  const sec3Num = `${nodeNum}.3`;
                   const sectionsHtml = node.sections && node.sections.length > 0
-                    ? node.sections.map((section, secIdx) => {
-                        const currentSectionIdx = sectionIdx;
-                        const secNum = `${nodeNum}.${sectionIdx++}`;
+                    ? (() => {
+                        const section = node.sections[0];
                         const parsedContent = marked.parse(section.content || '（暂无内容）') as string;
-                        
                         if (section.type === 'table') {
                           return `
-                            <div id="node-${nodeIdx}-section-${secIdx}" class="mb-6 scroll-mt-20 prd-scroll-target">
-                                <h3>${secNum} ${section.title}</h3>
-                                <div class="overflow-x-auto">
-                                    ${parsedContent}
-                                </div>
-                            </div>
-                          `;
-                        } else {
-                          // Text/Markdown content with logic-block styling
-                          // 尝试解析内容中的三级标题
-                          let contentWithH4 = parsedContent;
-                          // 如果内容包含列表项，可以将其转换为三级标题
-                          if (typeof parsedContent === 'string' && (parsedContent.includes('<li>') || parsedContent.includes('<ul>'))) {
-                            // 保持原样，但添加 id 用于锚点
-                          }
-                          return `
-                            <div id="node-${nodeIdx}-section-${secIdx}" class="mb-6 scroll-mt-20 prd-scroll-target">
-                                <h3>${secNum} ${section.title}</h3>
-                                <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
-                                    ${contentWithH4}
-                                </div>
-                            </div>
-                          `;
+                            <div id="node-${nodeIdx}-section-0" class="mb-6 scroll-mt-20 prd-scroll-target">
+                              <h3>${sec3Num} ${section.title}</h3>
+                              <div class="overflow-x-auto">${parsedContent}</div>
+                            </div>`;
                         }
-                      }).join('')
+                        return `
+                            <div id="node-${nodeIdx}-section-0" class="mb-6 scroll-mt-20 prd-scroll-target">
+                              <h3>${sec3Num} ${section.title}</h3>
+                              <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg">${parsedContent}</div>
+                            </div>`;
+                      })()
                     : `
-                      <div class="mb-6">
-                          <h3>${nodeNum}.${sectionIdx++} 功能需求说明</h3>
-                          <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
-                              <p class="text-slate-500 italic">（暂无功能需求说明）</p>
-                          </div>
-                      </div>
-                    `;
-                  
-                  // Build User Story Cards - 用户故事模型（核心）
+                      <div id="node-${nodeIdx}-section-0" class="mb-6 scroll-mt-20 prd-scroll-target">
+                        <h3>${sec3Num} 功能需求说明</h3>
+                        <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
+                          <p class="text-slate-500 italic">（暂无功能需求说明）</p>
+                        </div>
+                      </div>`;
+                  let storySubIdx = 1;
                   const userStoriesHtml = node.userStories && node.userStories.length > 0
-                    ? node.userStories.map((story, storyIdx) => {
-                        const storyNum = `${nodeNum}.${sectionIdx++}`;
+                    ? (() => {
+                        const storiesHeader = `<div id="node-${nodeIdx}-stories" class="mb-6 scroll-mt-20 prd-scroll-target"><h3>${sec1Num} 用户故事</h3></div>`;
+                        const cards = node.userStories!.map((story, storyIdx) => {
+                        const storyNum = `${nodeNum}.1.${storySubIdx++}`;
                         return `
                           <div id="node-${nodeIdx}-story-${storyIdx}" class="mb-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-500 shadow-sm scroll-mt-20">
                               <div class="flex items-start justify-between mb-4">
@@ -924,60 +928,46 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                               </div>
                           </div>
                         `;
-                      }).join('')
-                    : '';
+                        });
+                        return storiesHeader + cards.join('');
+                      })()
+                    : `<div id="node-${nodeIdx}-stories" class="mb-6 scroll-mt-20 prd-scroll-target"><h3>${sec1Num} 用户故事</h3><div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg"><p class="text-slate-500 italic">（暂无用户故事）</p></div></div>`;
                   
+                  const isPcViewport = node.viewportPreset === 'desktop';
+                  const uiWrapClass = isPcViewport ? 'pc-ui-doc-flow' : 'mobile-ui-viewport';
                   return `
                 <div id="node-${nodeIdx}" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20 prd-scroll-target">
-                    <!-- Page Title (H2) -->
                     <h2>${nodeNum} ${node.title || `功能模块 ${nodeIdx + 1}`}</h2>
-                    
-                    <div class="grid grid-cols-12 gap-8 items-start">
-                        <!-- Left Column: UI Preview (Sticky) -->
-                        <div class="col-span-4">
-                            <div class="sticky-ui">
-                                <h3>${nodeNum}.${sectionIdx++} 界面示意</h3>
+                    <div class="markdown-body text-sm bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-6">
+                            ${userStoriesHtml}
+                            <div id="node-${nodeIdx}-ui" class="mb-8 scroll-mt-20 prd-scroll-target">
+                                <h3>${sec2Num} 界面示意</h3>
                                 ${hasValidUiCode ? `
-                                <div class="desktop-viewport bg-white">
-                                    <div id="root-${node.nodeId || `node-${nodeIdx}`}" class="device-sandbox bg-white" style="min-height: 480px; width: 100%;">
+                                <div class="${uiWrapClass} bg-white">
+                                    <div id="root-${node.nodeId || `node-${nodeIdx}`}" class="device-sandbox bg-white" style="${isPcViewport ? 'min-height: 320px; width: 100%;' : 'min-height: 480px; width: 100%;'}">
                                         <div class="flex items-center justify-center h-full text-slate-400 text-sm">UI 加载中…</div>
                                     </div>
                                 </div>
-                                <p class="text-center text-xs text-slate-500 mt-3 font-mono">图 ${nodeNum}.${sectionIdx - 1} 界面示意（PC 端由代码渲染）</p>
+                                <p class="text-center text-xs text-slate-500 mt-3 font-mono">图 ${sec2Num} 界面示意${isPcViewport ? '（PC 端，文档流）' : '（移动端）'}</p>
                                 ` : hasRealPreview ? `
-                                <div class="desktop-viewport bg-white">
-                                    <img 
-                                        src="${uiPreview}" 
-                                        class="w-full h-auto block" 
-                                        alt="UI Preview - ${node.title || `功能模块 ${nodeIdx + 1}`}"
-                                        onclick="openLightbox('${uiPreview}')"
-                                        style="cursor: zoom-in;"
-                                    />
+                                <div class="${uiWrapClass} bg-white">
+                                    <img src="${uiPreview}" class="w-full h-auto block" alt="UI Preview - ${node.title || `功能模块 ${nodeIdx + 1}`}" onclick="openLightbox('${uiPreview}')" style="cursor: zoom-in;" />
                                 </div>
-                                <p class="text-center text-xs text-slate-500 mt-3 font-mono">图 ${nodeNum}.${sectionIdx - 1} UI 示意（点击放大）</p>
+                                <p class="text-center text-xs text-slate-500 mt-3 font-mono">图 ${sec2Num} UI 示意（点击放大）</p>
                                 ` : `
-                                <div class="desktop-viewport bg-slate-50 flex items-center justify-center" style="min-height: 480px;">
+                                <div class="${uiWrapClass} bg-slate-50 flex items-center justify-center" style="min-height: ${isPcViewport ? '320px' : '480px'};">
                                     <div class="text-center text-slate-400">
                                         <div class="text-4xl mb-2">📱</div>
                                         <p class="text-sm">暂无 UI 预览</p>
                                     </div>
                                 </div>
-                                <p class="text-center text-xs text-slate-400 mt-3">图 ${nodeNum}.${sectionIdx - 1} UI 示意（待生成）</p>
+                                <p class="text-center text-xs text-slate-400 mt-3">图 ${sec2Num} UI 示意（待生成）</p>
                                 `}
                             </div>
-                        </div>
-
-                        <!-- Right Column: Requirement Sections -->
-                        <div class="col-span-8">
-                            <div class="markdown-body text-sm bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-                                <div class="p-6">
-                                    ${sectionsHtml}
-                                    ${userStoriesHtml}
-                                </div>
-                            </div>
+                            ${sectionsHtml}
                         </div>
                     </div>
-                    
                     <hr class="node-separator my-8 border-slate-300" />
                 </div>
                 `;
@@ -1080,6 +1070,8 @@ export function generateFullPrdHtml(data: FullPrdData): string {
     <script>${PREVIEW_UI_PRD_BUNDLE}</script>
     <script>${PREVIEW_UI_PRD_BUNDLE_CALL}</script>
     <script>
+        window.__PRD_EXPORT_VERSION__ = '2';
+        console.log('[PRD] Export mount v2 (single top-level replace, unique nodeId)');
         // Wait for React and ReactDOM to be loaded
         function waitForReact(callback, maxRetries = 20, delay = 200) {
           const hasReact = typeof window.React !== 'undefined';
@@ -1191,6 +1183,12 @@ export function generateFullPrdHtml(data: FullPrdData): string {
               
               console.log('📝 [mountComponents] Original code length:', componentCode.length);
               
+              // Step 0: 先替换顶层组件为 const App_xxx = () => {，避免后续 function name(params) 误匹配
+              const safeId = nodeData.nodeId.replace(/[^a-zA-Z0-9]/g, '_');
+              const componentName = 'App_' + safeId;
+              const topLevelPattern = /(?:export\\s+(?:default\\s+)?)?(?:async\\s+)?function\\s+\\w+\\s*(?:\\([^)]*\\))?\\s*\\{|const\\s+\\w+\\s*=\\s*\\([^)]*\\)\\s*=>\\s*\\{/;
+              componentCode = componentCode.replace(topLevelPattern, 'const ' + componentName + ' = () => {');
+              
               // Step 1: Remove TypeScript type definitions and annotations (Babel can't handle TS)
               // Remove type definitions using a more robust approach that handles multi-line and nested braces
               // First, remove simple single-line type definitions: type X = Y;
@@ -1237,18 +1235,32 @@ export function generateFullPrdHtml(data: FullPrdData): string {
               
               // Remove interface definitions: interface X { ... }
               componentCode = componentCode.replace(/^\\s*interface\\s+\\w+[^{]*\\{[^}]*\\}\\s*;?\\s*$/gm, '');
-              // Remove type annotations from variables: const x: Type = ...
-              componentCode = componentCode.replace(/:\\s*[A-Z][a-zA-Z0-9<>\\[\\]|&\\s,]*(\\s*=\\s*)/g, '$1');
-              // Remove type annotations from function parameters: (x: Type) => ...
-              componentCode = componentCode.replace(/\\(([^)]*)\\)/g, function(match, params) {
-                return '(' + params.replace(/:\\s*[A-Z][a-zA-Z0-9<>\\[\\]|&\\s,]*/g, '').replace(/,\\s*,/g, ',').replace(/^,\\s*|,\\s*$/g, '') + ')';
+              // Remove type annotations from variables: const x: Type = ... (含 string, number 等小写类型)
+              componentCode = componentCode.replace(/:\\s*[A-Za-z][a-zA-Z0-9<>\\[\\]|&\\s,]*(\\s*=\\s*)/g, '$1');
+              // Remove Record<...> and other generic type annotations left as ": Name = " (e.g. const x: Record<string, {...}> =)
+              componentCode = componentCode.replace(/:\\s*[A-Za-z][A-Za-z0-9]*\\s*<[\\s\\S]*?>\\s*=\\s*/g, ' = ');
+              // 先全局移除解构中的对象类型 }: { key: Type }，避免 ( ) 替换误伤
+              componentCode = componentCode.replace(/\\}\\s*:\\s*\\{[^}]*\\}\\s*/g, '} ');
+              // Remove type annotations from arrow function parameters: (x: Type) => 含小写类型 (string, number)
+              componentCode = componentCode.replace(/\\(([^)]*)\\)\\s*=>/g, function(match, params) {
+                var p = params.replace(/:\\s*[A-Za-z][a-zA-Z0-9<>\\[\\]|&\\s,]*/g, '').replace(/,\\s*,/g, ',').replace(/^,\\s*|,\\s*$/g, '');
+                return '(' + p + ') =>';
               });
-              // Remove generic type parameters: <T> or <T extends ...>
-              componentCode = componentCode.replace(/<[A-Z][a-zA-Z0-9<>\\[\\]|&\\s,=.]*>/g, '');
+              // 普通函数形参: function name(x: Type) {
+              componentCode = componentCode.replace(/function\\s+\\w+\\s*\\(([^)]*)\\)\\s*\\{/g, function(match, params) {
+                var p = params.replace(/:\\s*[A-Za-z][a-zA-Z0-9<>\\[\\]|&\\s,]*/g, '').replace(/,\\s*,/g, ',').replace(/^,\\s*|,\\s*$/g, '');
+                return match.replace(/\\([^)]*\\)/, '(' + p + ')');
+              });
+              // 不在此处用泛型正则移除 <T>，以免误删 JSX 标签（如 <Button>）；仅对 Hook 泛型单独处理见下
               // Remove 'as' type assertions: x as Type
               componentCode = componentCode.replace(/\\s+as\\s+[A-Z][a-zA-Z0-9<>\\[\\]|&\\s,]*/g, '');
               // Remove import type statements: import type { ... } from ...
               componentCode = componentCode.replace(/import\\s+type\\s+[^;]+;?\\s*/g, '');
+              // 移除 Hook 泛型：useState<"a"|"b">、useState<string> 等，避免 Babel 报错
+              componentCode = componentCode.replace(/useState\\s*<[^>]+>/g, 'useState');
+              componentCode = componentCode.replace(/useRef\\s*<[^>]+>/g, 'useRef');
+              componentCode = componentCode.replace(/useCallback\\s*<[^>]+>/g, 'useCallback');
+              componentCode = componentCode.replace(/useMemo\\s*<[^>]+>/g, 'useMemo');
               
               // Step 2: Remove Markdown code blocks if present
               const backtick = String.fromCharCode(96);
@@ -1270,15 +1282,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
               // Remove other import statements (React etc. are already global)
               componentCode = componentCode.replace(/^import\\s+.*?from\\s+['"].*?['"];?\\s*$/gm, '');
               
-              // Step 5: Replace any component definition (App, Page, etc.) with const App_[safeId] = () => {
-              const safeId = nodeData.nodeId.replace(/[^a-zA-Z0-9]/g, '_');
-              const componentName = 'App_' + safeId;
-              
-              // Handle different component definition patterns (any name: App, Page, etc.)
-              componentCode = componentCode.replace(
-                /(?:export\\s+(?:default\\s+)?)?(?:async\\s+)?function\\s+\\w+\\s*(?:\\([^)]*\\))?\\s*\\{|const\\s+\\w+\\s*=\\s*\\([^)]*\\)\\s*=>\\s*\\{/g,
-                'const ' + componentName + ' = () => {'
-              );
+              // Step 5: 顶层已在 Step 0 替换，此处仅保留 componentName 供下方使用（safeId/componentName 已在上方定义）
 
               console.log('🔧 [mountComponents] Component name:', componentName);
               console.log('📝 [mountComponents] Cleaned code length:', componentCode.length);
@@ -1297,12 +1301,23 @@ export function generateFullPrdHtml(data: FullPrdData): string {
               console.log('✅ [mountComponents] Babel transformation successful');
               console.log('📝 [mountComponents] Transformed code length:', transformedCode.length);
 
+              // 将 React Hooks 替换为 React.xxx，使组件在仅注入 React 时可用（导出 HTML 未注入 useState 等）
+              var codeToRun = transformedCode
+                .replace(/\\buseState\\b/g, 'React.useState')
+                .replace(/\\buseEffect\\b/g, 'React.useEffect')
+                .replace(/\\buseCallback\\b/g, 'React.useCallback')
+                .replace(/\\buseMemo\\b/g, 'React.useMemo')
+                .replace(/\\buseRef\\b/g, 'React.useRef')
+                .replace(/\\buseContext\\b/g, 'React.useContext')
+                .replace(/\\buseReducer\\b/g, 'React.useReducer');
+
               // Create component function（注入内联 preview-ui 参数：cn、Button、Card 等）
               console.log('🏭 [mountComponents] Creating component function...');
               var stubNames = ['cn','Button','Card','CardHeader','CardTitle','CardContent','CardFooter','AppBar','ListItem','Badge','Input','Label','TabsList','TabsTrigger','TabsContent','Switch','Progress','Dialog','DialogHeader','DialogContent','DialogFooter','Textarea','Separator','Avatar','Alert','StatCard','NavBar','BottomNav','BottomNavItem','Sidebar','SidebarItem','EmptyState','PageHeader','Skeleton'];
               var stubParams = ['React','ReactDOM'].concat(stubNames);
-              var stubArgs = [window.React, window.ReactDOM].concat(stubNames.map(function(n){ return window['__PRD_' + n + '__']; }));
-              var componentFn = new (Function.bind.apply(Function, [null].concat(stubParams, [transformedCode + '\\nreturn ' + componentName + ';'])));
+              var fallbackCn = function() { var t = []; for (var i = 0; i < arguments.length; i++) { var a = arguments[i]; if (a && typeof a === 'string') t.push(a); else if (Array.isArray(a)) t.push(fallbackCn.apply(null, a)); else if (a && typeof a === 'object') { for (var k in a) if (a[k]) t.push(k); } } return t.join(' '); };
+              var stubArgs = [window.React, window.ReactDOM].concat(stubNames.map(function(n){ var v = window['__PRD_' + n + '__']; if (n === 'cn') return (v && typeof v === 'function') ? v : fallbackCn; return v; }));
+              var componentFn = new (Function.bind.apply(Function, [null].concat(stubParams, [codeToRun + '\\nreturn ' + componentName + ';'])));
               var Component = componentFn.apply(null, stubArgs);
               
               if (!Component) {
@@ -1429,7 +1444,7 @@ ${globalRules.dataTracking || '（待补充）'}
   const dictionaryMarkdown = dataDictionary || '| 字段名 | 类型 | 说明 |\n|--------|------|------|\n| （暂无数据字典） | - | - |';
 
   // 转换节点数据为 PageNode 格式（Rich Node Model）
-  const nodeData: PageNode[] = nodes.map((node) => {
+  const nodeData: PageNode[] = nodes.map((node, nodeIdx) => {
     const spec = node.data?.artifacts?.spec;
     const view = node.data?.artifacts?.view;
     let uiCode: string | undefined;
@@ -1501,13 +1516,17 @@ ${globalRules.dataTracking || '（待补充）'}
       });
     }
 
+    const baseId = (node as any).id ?? (node.data as any).id ?? node.data?.label ?? 'node';
+    const safeBase = String(baseId).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const viewportPreset = (view as any)?.viewportPreset === 'mobile' ? 'mobile' : 'desktop';
     return {
       title: spec?.title || node.data.label || '未命名页面',
       uiPreview,
       hasRealPreview,
       uiCode,
       isHtml: !!rawHtml,
-      nodeId: (node as any).id || (node.data as any).id || node.data.label || 'node',
+      viewportPreset,
+      nodeId: `${safeBase}_${nodeIdx}`,
       sections,
       // 用户故事模型（新 - 核心）
       userStories: userStories ? userStories.map(story => ({
@@ -1599,7 +1618,7 @@ ${globalRules.dataTracking || '（待补充）'}
   `.trim();
   const dictionaryMarkdown = dataDictionary || '| 字段名 | 类型 | 说明 |\n|--------|------|------|\n| （暂无数据字典） | - | - |';
 
-  const nodeData: PageNode[] = nodes.map((node) => {
+  const nodeData: PageNode[] = nodes.map((node, nodeIdx) => {
     const spec = node.data?.artifacts?.spec;
     const view = node.data?.artifacts?.view;
     let uiCode: string | undefined;
@@ -1626,13 +1645,17 @@ ${globalRules.dataTracking || '（待补充）'}
     const userStories = node.data?.artifacts?.userStories;
     const businessContext = node.data?.artifacts?.businessContext;
     const events = node.data?.artifacts?.events;
+    const baseId = (node as any).id ?? (node.data as any).id ?? node.data?.label ?? 'node';
+    const safeBase = String(baseId).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const viewportPreset = (view as any)?.viewportPreset === 'mobile' ? 'mobile' : 'desktop';
     return {
       title: spec?.title || node.data?.label || '未命名页面',
       uiPreview,
       hasRealPreview,
       uiCode,
       isHtml: !!rawHtml,
-      nodeId: (node as any).id || (node.data as any).id || node.data?.label || 'node',
+      viewportPreset,
+      nodeId: `${safeBase}_${nodeIdx}`,
       sections,
       userStories: userStories?.map((s) => ({ id: s.id, role: s.role, activity: s.activity, value: s.value, acceptanceCriteria: s.acceptanceCriteria || [] })),
       businessContext: businessContext ? { domain: businessContext.domain, role: businessContext.role, goal: businessContext.goal } : undefined,

@@ -30,29 +30,12 @@ export interface FallbackGraphResult {
 }
 
 /**
- * Build fallback graph based on prompt keywords
+ * Build fallback graph when AI fails or returns invalid schema.
+ * 不按关键词匹配领域，统一使用通用降级图；领域与页面由大模型生成时通过提示词约束。
  */
-export function buildFallbackGraph(prompt: string): FallbackGraphResult {
+export function buildFallbackGraph(_prompt: string): FallbackGraphResult {
   const warnings: string[] = [];
-  const promptLower = prompt.toLowerCase();
-
-  // Detect domain keywords（管理系统/后台/PC 端优先，便于「生成UI」时有明确上下文）
-  const isManagement = /管理系统|后台|后台管理|pc端|桌面端|管理后台|admin/.test(promptLower);
-  const isEcommerce = /购物|电商|商品|订单|购物车|结算|支付/.test(promptLower);
-  const isTask = /任务|待办|工作流|审批|流程/.test(promptLower);
-  const isContent = /内容|文章|博客|新闻|发布/.test(promptLower);
-
-  if (isManagement) {
-    return buildManagementFallback(warnings);
-  } else if (isEcommerce) {
-    return buildEcommerceFallback(warnings);
-  } else if (isTask) {
-    return buildTaskFallback(warnings);
-  } else if (isContent) {
-    return buildContentFallback(warnings);
-  } else {
-    return buildGenericFallback(warnings);
-  }
+  return buildGenericFallback(warnings);
 }
 
 /**

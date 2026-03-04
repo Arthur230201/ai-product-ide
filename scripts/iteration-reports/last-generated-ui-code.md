@@ -6,13 +6,13 @@
 
 | 项 | 值 |
 | --- | --- |
-| 生成时间 | 2026-03-03T08:51:40.828Z |
-| 节点名称 | 数据报表 |
+| 生成时间 | 2026-03-04T14:45:47.397Z |
+| 节点名称 | 商品列表 |
 | 视口 | desktop |
 | flex-1 | true |
 | <main> | true |
 | ListItem 数量 | 2 |
-| Card 数量 | 6 |
+| Card 数量 | 5 |
 | NavBar | false |
 | AppBar | true |
 | 根 flex-col | true |
@@ -20,7 +20,7 @@
 ### 发给模型的页面描述（pageDescription）
 
 
-页面：数据报表。页面描述：数据报表页：统计图表（折线/柱状/饼图）、时间筛选、导出按钮、核心指标卡片。用于运营或业务概览。。作为管理员，查看数据报表与趋势，以便支撑决策与复盘。作为管理员，查看数据报表与趋势，以便支撑决策与复盘。验收标准：页面布局与描述一致；使用 Button/Card 等组件；内容充实非占位
+页面：商品列表。页面描述：发现/列表页，包含搜索框、筛选（类目/价格区间/是否有货）、排序（综合/销量/价格）、分页加载；状态包含无结果/加载中/错误；点击进入详情。。作为用户，筛选与排序商品，以便更快找到合适的商品。作为用户，筛选与排序商品，以便更快找到合适的商品。验收标准：选择筛选条件后列表刷新并展示结果数；切换排序后列表按所选规则重新排列；无结果时展示空态并支持清除筛选。作为用户，从列表进入商品详情，以便了解商品信息并做购买决策。验收标准：点击任一条目进入对应详情页；返回时保留筛选、排序与滚动位置
 
 
 ---
@@ -28,733 +28,554 @@
 ## 代码（复制下方整块到可运行 React+Tailwind 环境对比）
 
 ```tsx
-export default function Page() {
-  const kpi = [
+export default function App() {
+  const products = [
     {
-      title: "本月总营收（元）",
-      value: "¥ 12,684,200",
-      helper: "较上月 +8.6%",
-      trend: "up",
-      foot: "统计口径：已支付订单（含补差价）",
+      id: "SKU-240318-001",
+      name: "星野极简真皮通勤托特包 13.3 英寸",
+      category: "箱包 / 通勤",
+      price: 899,
+      marketPrice: 1099,
+      stock: 42,
+      sold30d: 128,
+      rating: 4.7,
+      reviews: 326,
+      status: "在售",
+      updatedAt: "2026-03-02 14:18",
+      tags: ["爆款", "次日达", "可开发票"],
     },
     {
-      title: "订单量",
-      value: "186,420",
-      helper: "较上月 +4.1%",
-      trend: "up",
-      foot: "统计口径：支付成功订单数",
+      id: "SKU-240521-014",
+      name: "澄川·四季恒温保温杯 480ml（磨砂黑）",
+      category: "居家 / 水具",
+      price: 129,
+      marketPrice: 169,
+      stock: 306,
+      sold30d: 986,
+      rating: 4.8,
+      reviews: 2148,
+      status: "在售",
+      updatedAt: "2026-03-01 09:40",
+      tags: ["高复购", "食品级304", "包邮"],
     },
     {
-      title: "支付转化率",
-      value: "3.72%",
-      helper: "较上月 -0.18pp",
-      trend: "down",
-      foot: "统计口径：支付订单/访问会话",
+      id: "SKU-241102-008",
+      name: "南风轻薄羽绒服 90% 白鸭绒（女款）",
+      category: "服饰 / 冬季",
+      price: 599,
+      marketPrice: 799,
+      stock: 0,
+      sold30d: 412,
+      rating: 4.6,
+      reviews: 892,
+      status: "缺货",
+      updatedAt: "2026-02-28 19:05",
+      tags: ["保暖", "轻量", "支持退换"],
     },
     {
-      title: "退款率",
-      value: "1.26%",
-      helper: "较上月 +0.09pp",
-      trend: "up",
-      foot: "统计口径：退款订单/支付订单",
+      id: "SKU-250105-021",
+      name: "澜屿海盐洗发水 500ml（控油蓬松）",
+      category: "个护 / 洗护",
+      price: 79,
+      marketPrice: 99,
+      stock: 118,
+      sold30d: 1534,
+      rating: 4.5,
+      reviews: 5312,
+      status: "在售",
+      updatedAt: "2026-03-03 11:22",
+      tags: ["新品", "无硅油", "敏感头皮适用"],
+    },
+    {
+      id: "SKU-240909-003",
+      name: "曜石机械键盘 98 键 热插拔（白光）",
+      category: "数码 / 外设",
+      price: 329,
+      marketPrice: 399,
+      stock: 67,
+      sold30d: 245,
+      rating: 4.4,
+      reviews: 764,
+      status: "在售",
+      updatedAt: "2026-03-01 16:10",
+      tags: ["热插拔", "静音轴", "两年质保"],
+    },
+    {
+      id: "SKU-240707-019",
+      name: "云栖记忆枕（高低可调）",
+      category: "家纺 / 寝具",
+      price: 159,
+      marketPrice: 219,
+      stock: 24,
+      sold30d: 368,
+      rating: 4.7,
+      reviews: 1421,
+      status: "在售",
+      updatedAt: "2026-02-27 10:08",
+      tags: ["舒压", "护颈", "满减"],
+    },
+    {
+      id: "SKU-241225-006",
+      name: "岚光氛围台灯（无极调光 / Type-C）",
+      category: "家居 / 灯具",
+      price: 119,
+      marketPrice: 149,
+      stock: 9,
+      sold30d: 176,
+      rating: 4.6,
+      reviews: 506,
+      status: "低库存",
+      updatedAt: "2026-03-03 08:12",
+      tags: ["护眼", "无频闪", "礼品装"],
     },
   ];
 
-  const topChannels = [
-    { name: "自然搜索", amount: 4126000, orders: 48620, cvr: 4.12, roi: 5.8, share: 32.5, delta: "+6.1%" },
-    { name: "信息流投放", amount: 3268000, orders: 39810, cvr: 3.36, roi: 3.9, share: 25.8, delta: "+2.4%" },
-    { name: "会员复购", amount: 2489000, orders: 31240, cvr: 6.21, roi: 9.4, share: 19.6, delta: "+1.2%" },
-    { name: "内容种草", amount: 1593000, orders: 20860, cvr: 2.74, roi: 4.6, share: 12.6, delta: "+3.7%" },
-    { name: "线下导流", amount: 865200, orders: 12640, cvr: 3.01, roi: 2.7, share: 6.8, delta: "-0.8%" },
-    { name: "联盟分销", amount: 468000, orders: 7250, cvr: 2.08, roi: 3.1, share: 3.7, delta: "+0.3%" },
-  ];
-
-  const keyEvents = [
-    {
-      title: "3.8 女神节专题页上线",
-      sub: "活动页曝光提升、客单价小幅上行；建议复盘素材与落地页转化链路",
-      time: "2026-03-01 10:00",
-      status: "已复盘",
-      severity: "低",
-      owner: "运营：宋雨婷",
-    },
-    {
-      title: "支付渠道 A 间歇性超时",
-      sub: "影响 7 分钟，支付失败率峰值 2.9%；已切换备用通道并补发券",
-      time: "2026-02-26 21:14",
-      status: "已恢复",
-      severity: "高",
-      owner: "值班：邓工",
-    },
-    {
-      title: "投放素材批次更新（信息流）",
-      sub: "CTR 提升 0.4pp，但转化率下降 0.12pp；建议优化人群包与落地页一致性",
-      time: "2026-02-22 09:30",
-      status: "观察中",
-      severity: "中",
-      owner: "投放：谢景然",
-    },
-    {
-      title: "会员积分规则调整",
-      sub: "复购占比提升；高价值会员客单价上升 3.2%",
-      time: "2026-02-18 16:40",
-      status: "已归档",
-      severity: "低",
-      owner: "产品：温之航",
-    },
-    {
-      title: "华北仓发货时效波动",
-      sub: "延迟订单占比 1.6%，已增加临时人手并调整波次策略",
-      time: "2026-02-13 12:05",
-      status: "已恢复",
-      severity: "中",
-      owner: "供应链：林嘉宁",
-    },
-    {
-      title: "App 版本 4.9.0 灰度发布",
-      sub: "新增下单页地址智能补全；崩溃率下降 0.06pp",
-      time: "2026-02-09 19:20",
-      status: "已归档",
-      severity: "低",
-      owner: "研发：周启明",
-    },
-  ];
-
-  const days = [
-    { d: "02-18", rev: 380, ord: 5150 },
-    { d: "02-19", rev: 402, ord: 5320 },
-    { d: "02-20", rev: 396, ord: 5210 },
-    { d: "02-21", rev: 438, ord: 5630 },
-    { d: "02-22", rev: 472, ord: 5970 },
-    { d: "02-23", rev: 458, ord: 5810 },
-    { d: "02-24", rev: 486, ord: 6120 },
-    { d: "02-25", rev: 508, ord: 6340 },
-    { d: "02-26", rev: 465, ord: 6020 },
-    { d: "02-27", rev: 522, ord: 6510 },
-    { d: "02-28", rev: 548, ord: 6820 },
-    { d: "03-01", rev: 596, ord: 7240 },
-    { d: "03-02", rev: 572, ord: 7080 },
-    { d: "03-03", rev: 612, ord: 7420 },
-  ];
-
-  const maxRev = Math.max(...days.map((x) => x.rev));
-  const maxOrd = Math.max(...days.map((x) => x.ord));
-
-  const pie = [
-    { label: "新客", value: 44, color: "bg-sky-500" },
-    { label: "老客复购", value: 38, color: "bg-emerald-500" },
-    { label: "会员专享", value: 12, color: "bg-indigo-500" },
-    { label: "企业团购", value: 6, color: "bg-amber-500" },
-  ];
-
-  const severityBadge = (s) => {
-    if (s === "高") return <Badge className="bg-rose-600 hover:bg-rose-600">高</Badge>;
-    if (s === "中") return <Badge className="bg-amber-500 hover:bg-amber-500">中</Badge>;
-    return <Badge className="bg-slate-200 text-slate-700 hover:bg-slate-200">低</Badge>;
+  const statusBadge = (status: string) => {
+    if (status === "在售") return <Badge className="bg-emerald-600 text-white">在售</Badge>;
+    if (status === "缺货") return <Badge className="bg-rose-600 text-white">缺货</Badge>;
+    if (status === "低库存") return <Badge className="bg-amber-500 text-white">低库存</Badge>;
+    return <Badge className="bg-slate-600 text-white">{status}</Badge>;
   };
 
-  const statusBadge = (s) => {
-    if (s === "已恢复") return <Badge className="bg-emerald-600 hover:bg-emerald-600">已恢复</Badge>;
-    if (s === "观察中") return <Badge className="bg-sky-600 hover:bg-sky-600">观察中</Badge>;
-    if (s === "已复盘") return <Badge className="bg-indigo-600 hover:bg-indigo-600">已复盘</Badge>;
-    return <Badge className="bg-slate-200 text-slate-700 hover:bg-slate-200">已归档</Badge>;
+  const Stars = ({ value }: { value: number }) => {
+    const full = Math.floor(value);
+    const half = value - full >= 0.5;
+    const empty = 5 - full - (half ? 1 : 0);
+    return (
+      <div className="flex items-center gap-1">
+        {Array.from({ length: full }).map((_, i) => (
+          <span key={`f-${i}`} className="text-amber-500">
+            ★
+          </span>
+        ))}
+        {half ? <span className="text-amber-500">☆</span> : null}
+        {Array.from({ length: empty }).map((_, i) => (
+          <span key={`e-${i}`} className="text-slate-300">
+            ★
+          </span>
+        ))}
+        <span className="ml-1 text-xs text-slate-500">{value.toFixed(1)}</span>
+      </div>
+    );
   };
 
-  const Spark = ({ up = true }) => (
-    <svg viewBox="0 0 24 24" className={cn("w-4 h-4", up ? "text-emerald-600" : "text-rose-600")} fill="none">
-      <path
-        d={up ? "M4 16l6-6 4 4 6-8" : "M4 8l6 6 4-4 6 8"}
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d={up ? "M18 6h4v4" : "M18 18h4v-4"}
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
+  const TopIcon = ({ type }: { type: "search" | "plus" | "export" | "filter" }) => {
+    const base = "w-4 h-4";
+    if (type === "search")
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={base} xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M10.5 18.5a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"
+            stroke="currentColor"
+            strokeWidth="2"
+          />
+          <path d="M16.5 16.5 21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      );
+    if (type === "plus")
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={base} xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      );
+    if (type === "export")
+      return (
+        <svg viewBox="0 0 24 24" fill="none" className={base} xmlns="http://www.w3.org/2000/svg">
+          <path
+            d="M12 3v10"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M8 7l4-4 4 4"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+        </svg>
+      );
+    return (
+      <svg viewBox="0 0 24 24" fill="none" className={base} xmlns="http://www.w3.org/2000/svg">
+        <path
+          d="M4 6h16M7 12h10M10 18h4"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+      </svg>
+    );
+  };
 
   return (
-    <div className={cn("flex flex-col h-full min-h-full bg-gray-50 text-slate-900")}>
+    <div className={cn("flex flex-col h-full min-h-full bg-gray-50")}>
       <AppBar
-        title="数据报表"
+        title="商品列表"
+        className="border-b bg-white"
         right={
           <div className="flex items-center gap-2">
-            <Button variant="secondary" className="min-h-[44px]">
-              <span className="inline-flex items-center gap-2">
-                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-                  <path
-                    d="M12 3v10"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M8 9l4 4 4-4"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M4 17v3h16v-3"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                导出
-              </span>
+            <Button variant="secondary" className="gap-2">
+              <TopIcon type="export" />
+              导出
             </Button>
-            <Button className="min-h-[44px]">
-              <span className="inline-flex items-center gap-2">
-                <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
-                  <path
-                    d="M3 11h18"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M7 11V7a5 5 0 0110 0v4"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M7 11v6a2 2 0 002 2h6a2 2 0 002-2v-6"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                生成周报
-              </span>
+            <Button className="gap-2">
+              <TopIcon type="plus" />
+              新增商品
             </Button>
           </div>
         }
       />
 
-      <main className={cn("flex-1 min-h-0 overflow-y-auto")}>
-        <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
-          <PageHeader
-            title="运营数据概览"
-            description="支持按时间范围查看趋势、渠道贡献与关键事件。数据延迟约 5–10 分钟。"
-          />
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base md:text-lg">筛选条件</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                <div className="md:col-span-3 space-y-2">
-                  <Label>时间范围</Label>
-                  <div className="flex gap-2">
-                    <Button variant="secondary" className="min-h-[44px] flex-1">
-                      近 7 天
-                    </Button>
-                    <Button variant="secondary" className="min-h-[44px] flex-1">
-                      近 30 天
-                    </Button>
-                    <Button variant="secondary" className="min-h-[44px] flex-1">
-                      本月
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="md:col-span-3 space-y-2">
-                  <Label>开始日期</Label>
-                  <Input defaultValue="2026-02-18" className="min-h-[44px]" />
-                </div>
-
-                <div className="md:col-span-3 space-y-2">
-                  <Label>结束日期</Label>
-                  <Input defaultValue="2026-03-03" className="min-h-[44px]" />
-                </div>
-
-                <div className="md:col-span-3 space-y-2">
-                  <Label>业务线/站点</Label>
-                  <Input defaultValue="电商主站（App + H5）" className="min-h-[44px]" />
-                </div>
-
-                <div className="md:col-span-4 space-y-2">
-                  <Label>渠道（可模糊搜索）</Label>
-                  <Input defaultValue="全部渠道" className="min-h-[44px]" />
-                </div>
-
-                <div className="md:col-span-4 space-y-2">
-                  <Label>指标口径</Label>
-                  <Input defaultValue="支付口径（推荐）" className="min-h-[44px]" />
-                </div>
-
-                <div className="md:col-span-4 flex items-end gap-2">
-                  <Button className="min-h-[44px] flex-1">应用筛选</Button>
-                  <Button variant="secondary" className="min-h-[44px] flex-1">
-                    重置
-                  </Button>
-                </div>
-              </div>
-
-              <Alert>
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5">
-                    <svg viewBox="0 0 24 24" className="w-5 h-5 text-slate-700" fill="none">
-                      <path
-                        d="M12 9v4"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M12 17h.01"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M10.3 4.3l-7.3 13A2 2 0 004.7 20h14.6a2 2 0 001.7-2.7l-7.3-13a2 2 0 00-3.4 0z"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="font-medium text-slate-900">数据提示</div>
-                    <div className="text-sm text-slate-600">
-                      当前选择范围内包含 1 次支付通道异常与 1 次仓配波动，可能对峰值与转化产生短期影响。导出会包含原始明细与口径说明。
-                    </div>
-                  </div>
-                </div>
-              </Alert>
-
-              <div className="flex items-center justify-between rounded-lg border bg-white p-4">
-                <div className="space-y-1">
-                  <div className="font-medium">自动刷新</div>
-                  <div className="text-sm text-slate-600">每 10 分钟拉取最新统计（仅影响图表，不影响已导出文件）。</div>
-                </div>
-                <Switch defaultChecked />
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {kpi.map((x) => (
-              <StatCard
-                key={x.title}
-                title={x.title}
-                value={x.value}
-                helper={
-                  <span className="inline-flex items-center gap-1">
-                    <Spark up={x.trend === "up"} />
-                    <span className={cn("font-medium", x.trend === "up" ? "text-emerald-700" : "text-rose-700")}>
-                      {x.helper}
-                    </span>
-                  </span>
-                }
-                footer={<span className="text-xs text-slate-500">{x.foot}</span>}
+      <div className="flex flex-1 min-h-0">
+        <Sidebar className="min-w-[240px] border-r bg-white">
+          <div className="p-4">
+            <div className="flex items-center gap-3">
+              <Avatar
+                src="https://images.unsplash.com/photo-1520975682031-a4c3ad5c3ea2?auto=format&fit=crop&w=128&q=80"
+                alt="店铺头像"
               />
-            ))}
+              <div className="min-w-0">
+                <div className="font-semibold text-slate-900 truncate">栖木生活馆（北京）</div>
+                <div className="text-xs text-slate-500 truncate">近 7 日 GMV ¥128,460</div>
+              </div>
+            </div>
           </div>
+          <Separator />
+          <div className="p-2">
+            <SidebarItem active>商品管理</SidebarItem>
+            <SidebarItem>订单管理</SidebarItem>
+            <SidebarItem>库存预警</SidebarItem>
+            <SidebarItem>营销活动</SidebarItem>
+            <SidebarItem>店铺设置</SidebarItem>
+          </div>
+          <Separator />
+          <div className="p-4">
+            <Alert className="bg-slate-50 border-slate-200 text-slate-700">
+              <div className="font-medium">经营提示</div>
+              <div className="text-sm mt-1 whitespace-normal">
+                低库存商品共 <span className="font-semibold">2</span> 款，建议补货以避免影响转化；缺货商品可一键下架。
+              </div>
+            </Alert>
+          </div>
+        </Sidebar>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <Card className="lg:col-span-8">
-              <CardHeader className="space-y-2">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <CardTitle className="text-base md:text-lg">趋势分析：营收与订单量</CardTitle>
-                    <div className="text-sm text-slate-600">近 14 天（单位：营收=万元，订单=单）</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge className="bg-slate-900 hover:bg-slate-900">营收</Badge>
-                    <Badge className="bg-slate-200 text-slate-700 hover:bg-slate-200">订单</Badge>
-                  </div>
-                </div>
-                <Separator />
-              </CardHeader>
+        <main className="flex-1 min-w-0 min-h-0 overflow-y-auto">
+          <div className="max-w-7xl mx-auto p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+              <StatCard title="在售商品" value="5" desc="可正常售卖" />
+              <StatCard title="缺货商品" value="1" desc="建议补货或下架" />
+              <StatCard title="30 天销量" value="3,849" desc="全店合计" />
+              <StatCard title="平均评分" value="4.66" desc="近 90 天" />
+            </div>
 
-              <CardContent className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="rounded-lg border bg-white p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm text-slate-600">区间营收</div>
-                        <div className="mt-1 text-lg font-bold">¥ 7,457,000</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-slate-600">峰值日</div>
-                        <div className="mt-1 font-medium">03-03（¥612 万）</div>
-                      </div>
-                    </div>
-                    <div className="mt-3 text-xs text-slate-500">说明：峰值日为选择范围内单日营收最高值。</div>
-                  </div>
-
-                  <div className="rounded-lg border bg-white p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="text-sm text-slate-600">区间订单</div>
-                        <div className="mt-1 text-lg font-bold">88,430</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-slate-600">峰值日</div>
-                        <div className="mt-1 font-medium">03-03（7,420 单）</div>
-                      </div>
-                    </div>
-                    <div className="mt-3 text-xs text-slate-500">说明：订单量按支付成功计数，不含取消/超时未支付。</div>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border bg-white p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium">折线（营收）</div>
-                    <div className="text-sm text-slate-600">最大值：{maxRev} 万</div>
-                  </div>
-                  <div className="mt-3 flex items-end gap-2 h-40">
-                    {days.map((x) => {
-                      const h = Math.max(6, Math.round((x.rev / maxRev) * 100));
-                      return (
-                        <div key={x.d} className="flex-1 min-w-0">
-                          <div className="flex flex-col items-stretch justify-end h-36">
-                            <div className="rounded-md bg-slate-900/90" style={undefined} className={cn("rounded-md bg-slate-900/90", `h-[${h}%]`)} />
-                          </div>
-                          <div className="mt-2 text-[11px] text-slate-500 text-center truncate">{x.d}</div>
+            <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>筛选与搜索</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <div className="md:col-span-5">
+                      <Label className="text-sm text-slate-700">关键词</Label>
+                      <div className="mt-2 flex gap-2">
+                        <div className="flex-1">
+                          <Input placeholder="输入商品名 / SKU / 类目" />
                         </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                    <div className="rounded-md bg-gray-50 p-3">
-                      <div className="text-slate-600">日均营收</div>
-                      <div className="mt-1 font-medium">¥ 532 万</div>
-                    </div>
-                    <div className="rounded-md bg-gray-50 p-3">
-                      <div className="text-slate-600">日均订单</div>
-                      <div className="mt-1 font-medium">6,316 单</div>
-                    </div>
-                    <div className="rounded-md bg-gray-50 p-3">
-                      <div className="text-slate-600">客单价</div>
-                      <div className="mt-1 font-medium">¥ 84.1</div>
-                    </div>
-                    <div className="rounded-md bg-gray-50 p-3">
-                      <div className="text-slate-600">支付成功率</div>
-                      <div className="mt-1 font-medium">92.7%</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-lg border bg-white p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium">柱状（订单量）</div>
-                    <div className="text-sm text-slate-600">最大值：{maxOrd} 单</div>
-                  </div>
-                  <div className="mt-3 flex items-end gap-2 h-36">
-                    {days.map((x) => {
-                      const h = Math.max(6, Math.round((x.ord / maxOrd) * 100));
-                      return (
-                        <div key={x.d} className="flex-1 min-w-0">
-                          <div className="flex flex-col items-stretch justify-end h-28">
-                            <div className={cn("rounded-md bg-slate-300", `h-[${h}%]`)} />
-                          </div>
-                          <div className="mt-2 text-[11px] text-slate-500 text-center truncate">{x.d}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-3 text-xs text-slate-500">
-                    观察：02-26 支付通道异常导致订单短暂下滑，03-01 活动上线后逐步恢复并创新高。
-                  </div>
-                </div>
-              </CardContent>
-
-              <CardFooter className="flex items-center justify-between">
-                <div className="text-sm text-slate-600">更新时间：2026-03-03 10:20（北京）</div>
-                <div className="flex items-center gap-2">
-                  <Button variant="secondary" className="min-h-[44px]">
-                    查看明细
-                  </Button>
-                  <Button className="min-h-[44px]">创建订阅</Button>
-                </div>
-              </CardFooter>
-            </Card>
-
-            <Card className="lg:col-span-4">
-              <CardHeader className="space-y-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <CardTitle className="text-base md:text-lg">用户结构（饼图）</CardTitle>
-                    <div className="text-sm text-slate-600">按支付用户去重</div>
-                  </div>
-                  <Badge className="bg-slate-200 text-slate-700 hover:bg-slate-200">近 14 天</Badge>
-                </div>
-                <Separator />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded-lg border bg-white p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="font-medium">占比概览</div>
-                    <div className="text-sm text-slate-600">总用户：1,248,600</div>
-                  </div>
-
-                  <div className="mt-4 space-y-3">
-                    {pie.map((x) => (
-                      <div key={x.label} className="space-y-1">
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2">
-                            <span className={cn("w-2.5 h-2.5 rounded-full", x.color)} />
-                            <span className="font-medium text-slate-800">{x.label}</span>
-                          </div>
-                          <span className="text-slate-600">{x.value}%</span>
-                        </div>
-                        <Progress value={x.value} />
+                        <Button variant="secondary" className="gap-2">
+                          <TopIcon type="search" />
+                          搜索
+                        </Button>
                       </div>
-                    ))}
+                    </div>
+                    <div className="md:col-span-4">
+                      <Label className="text-sm text-slate-700">状态</Label>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button variant="secondary">全部</Button>
+                        <Button variant="secondary">在售</Button>
+                        <Button variant="secondary">低库存</Button>
+                        <Button variant="secondary">缺货</Button>
+                      </div>
+                    </div>
+                    <div className="md:col-span-3">
+                      <Label className="text-sm text-slate-700">快捷操作</Label>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button variant="secondary" className="gap-2">
+                          <TopIcon type="filter" />
+                          高级筛选
+                        </Button>
+                        <Button variant="secondary">批量上下架</Button>
+                      </div>
+                    </div>
                   </div>
 
                   <Separator className="my-4" />
 
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="rounded-md bg-gray-50 p-3">
-                      <div className="text-slate-600">新客占比</div>
-                      <div className="mt-1 font-medium">44%</div>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="text-sm text-slate-600 whitespace-normal">
+                      当前共 <span className="font-semibold text-slate-900">{products.length}</span> 件商品，已按「近 30 天销量」排序。
                     </div>
-                    <div className="rounded-md bg-gray-50 p-3">
-                      <div className="text-slate-600">复购率</div>
-                      <div className="mt-1 font-medium">28.9%</div>
-                    </div>
-                    <div className="rounded-md bg-gray-50 p-3">
-                      <div className="text-slate-600">会员渗透</div>
-                      <div className="mt-1 font-medium">17.4%</div>
-                    </div>
-                    <div className="rounded-md bg-gray-50 p-3">
-                      <div className="text-slate-600">人均下单</div>
-                      <div className="mt-1 font-medium">1.36 单</div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-slate-900 text-white">默认排序</Badge>
+                      <Badge className="bg-white text-slate-700 border border-slate-200">销量</Badge>
+                      <Badge className="bg-white text-slate-700 border border-slate-200">价格</Badge>
+                      <Badge className="bg-white text-slate-700 border border-slate-200">库存</Badge>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
 
-                  <div className="mt-3 text-xs text-slate-500">
-                    建议：新客占比高时关注首单转化与首购体验；复购下滑时优先排查物流、售后与价格体系波动。
-                  </div>
-                </div>
-
-                <div className="rounded-lg border bg-white p-4 space-y-3">
-                  <div className="font-medium">目标完成度（本月）</div>
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">营收目标：¥ 1,500 万</span>
-                      <span className="font-medium text-slate-900">84.6%</span>
-                    </div>
-                    <Progress value={84.6} />
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">订单目标：22 万单</span>
-                      <span className="font-medium text-slate-900">77.1%</span>
-                    </div>
-                    <Progress value={77.1} />
-                  </div>
-                  <div className="text-xs text-slate-500">口径：自然月累计；目标由经营看板同步。</div>
-                </div>
-              </CardContent>
-              <CardFooter className="flex items-center justify-end gap-2">
-                <Button variant="secondary" className="min-h-[44px]">
-                  配置口径
-                </Button>
-                <Button className="min-h-[44px]">下载图表</Button>
-              </CardFooter>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <Card className="lg:col-span-7">
-              <CardHeader className="space-y-2">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <CardTitle className="text-base md:text-lg">渠道贡献（TOP 6）</CardTitle>
-                    <div className="text-sm text-slate-600">按营收贡献排序，含 ROI、转化率与环比</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="secondary" className="min-h-[44px]">查看全部</Button>
-                    <Button className="min-h-[44px]">导出渠道表</Button>
-                  </div>
-                </div>
-                <Separator />
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {topChannels.map((c) => (
-                  <ListItem
-                    key={c.name}
-                    title={
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900">{c.name}</span>
-                        <Badge className="bg-slate-200 text-slate-700 hover:bg-slate-200">占比 {c.share}%</Badge>
-                        <Badge className={cn(c.delta.startsWith("+") ? "bg-emerald-600 hover:bg-emerald-600" : "bg-rose-600 hover:bg-rose-600")}>
-                          环比 {c.delta}
-                        </Badge>
+              <Card>
+                <CardHeader>
+                  <CardTitle>上新与风控</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        <Badge className="bg-emerald-600 text-white">通过</Badge>
                       </div>
-                    }
-                    description={
-                      <div className="mt-1 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-slate-600">
-                        <span>营收：¥ {(c.amount / 10000).toFixed(1)} 万</span>
-                        <span>订单：{c.orders.toLocaleString()} 单</span>
-                        <span>CVR：{c.cvr.toFixed(2)}%</span>
-                        <span>ROI：{c.roi.toFixed(1)}</span>
-                      </div>
-                    }
-                    right={
-                      <div className="flex items-center gap-2">
-                        <Button variant="secondary" className="min-h-[44px]">对比</Button>
-                        <Button className="min-h-[44px]">查看</Button>
-                      </div>
-                    }
-                  />
-                ))}
-              </CardContent>
-              <CardFooter className="text-sm text-slate-600 flex items-center justify-between">
-                <span>提示：ROI 计算为（归因营收/投放花费），归因窗口 7 天。</span>
-                <span>数据源：CDP + 订单中心</span>
-              </CardFooter>
-            </Card>
-
-            <Card className="lg:col-span-5">
-              <CardHeader className="space-y-2">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <CardTitle className="text-base md:text-lg">关键事件与异常</CardTitle>
-                    <div className="text-sm text-slate-600">用于复盘：活动、系统异常、供应链波动</div>
-                  </div>
-                  <Button variant="secondary" className="min-h-[44px]">新增事件</Button>
-                </div>
-                <Separator />
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {keyEvents.map((e) => (
-                  <ListItem
-                    key={e.title + e.time}
-                    title={
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900">{e.title}</span>
-                        {severityBadge(e.severity)}
-                        {statusBadge(e.status)}
-                      </div>
-                    }
-                    description={
-                      <div className="space-y-1">
-                        <div className="text-sm text-slate-600">{e.sub}</div>
-                        <div className="text-xs text-slate-500">
-                          时间：{e.time} · 负责人：{e.owner}
+                      <div className="min-w-0">
+                        <div className="font-medium text-slate-900">资质校验</div>
+                        <div className="text-sm text-slate-600 whitespace-normal">
+                          店铺资质与类目授权有效期至 2027-01-15。
                         </div>
                       </div>
-                    }
-                    right={
-                      <div className="flex items-center gap-2">
-                        <Button variant="secondary" className="min-h-[44px]">复盘</Button>
-                        <Button className="min-h-[44px]">详情</Button>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        <Badge className="bg-amber-500 text-white">提醒</Badge>
                       </div>
-                    }
-                  />
-                ))}
-              </CardContent>
-              <CardFooter className="flex items-center justify-between text-sm text-slate-600">
-                <span>本周期事件：{keyEvents.length} 条</span>
-                <span>建议：将异常日加入对照组，避免误判投放/活动效果。</span>
-              </CardFooter>
-            </Card>
-          </div>
+                      <div className="min-w-0">
+                        <div className="font-medium text-slate-900">图片规范</div>
+                        <div className="text-sm text-slate-600 whitespace-normal">
+                          建议主图保持纯色背景并突出主体，点击「新增商品」可自动检测合规性。
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        <Badge className="bg-slate-700 text-white">建议</Badge>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-medium text-slate-900">定价策略</div>
+                        <div className="text-sm text-slate-600 whitespace-normal">
+                          近 7 日同类均价 ¥162，建议对热卖款进行 5% 促销测试。
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex items-center justify-between">
+                  <div className="text-xs text-slate-500">数据更新时间：2026-03-03 12:00</div>
+                  <Button variant="secondary">查看建议</Button>
+                </CardFooter>
+              </Card>
+            </div>
 
-          <Card>
-            <CardHeader className="space-y-2">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <CardTitle className="text-base md:text-lg">报表备注（供复盘与交接）</CardTitle>
-                  <div className="text-sm text-slate-600">记录本周期关键判断、策略调整与待跟进事项</div>
-                </div>
-                <Badge className="bg-slate-200 text-slate-700 hover:bg-slate-200">仅管理员可见</Badge>
-              </div>
+            <div className="mt-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <CardTitle>商品明细</CardTitle>
+                    <div className="text-sm text-slate-500 mt-1 whitespace-normal">
+                      支持快速编辑价格/库存与上下架管理；低库存与缺货会自动标记。
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="secondary">批量改价</Button>
+                    <Button variant="secondary">批量补货</Button>
+                    <Button variant="secondary">下载模板</Button>
+                  </div>
+                </CardHeader>
+
+                <CardContent>
+                  <div className="space-y-3">
+                    {products
+                      .slice()
+                      .sort((a, b) => b.sold30d - a.sold30d)
+                      .map((p) => (
+                        <ListItem
+                          key={p.id}
+                          title={
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-semibold text-slate-900 truncate">{p.name}</span>
+                              {statusBadge(p.status)}
+                            </div>
+                          }
+                          subtitle={
+                            <div className="mt-1 space-y-1">
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
+                                <span className="text-slate-500">SKU：</span>
+                                <span className="font-medium text-slate-800">{p.id}</span>
+                                <span className="text-slate-500">类目：</span>
+                                <span className="font-medium text-slate-800">{p.category}</span>
+                                <span className="text-slate-500">更新：</span>
+                                <span className="font-medium text-slate-800">{p.updatedAt}</span>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                                <div className="flex items-end gap-2">
+                                  <span className="text-lg font-bold text-slate-900">¥{p.price}</span>
+                                  <span className="text-sm text-slate-400 line-through">¥{p.marketPrice}</span>
+                                </div>
+                                <Separator className="hidden sm:block w-px h-4" />
+                                <div className="text-sm text-slate-600">
+                                  库存 <span className="font-semibold text-slate-900">{p.stock}</span>
+                                </div>
+                                <Separator className="hidden sm:block w-px h-4" />
+                                <div className="text-sm text-slate-600">
+                                  30天销量 <span className="font-semibold text-slate-900">{p.sold30d}</span>
+                                </div>
+                                <Separator className="hidden sm:block w-px h-4" />
+                                <div className="flex items-center gap-2 text-sm text-slate-600">
+                                  <Stars value={p.rating} />
+                                  <span className="text-slate-500">({p.reviews} 评价)</span>
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {p.tags.map((t) => (
+                                  <Badge key={t} className="bg-white text-slate-700 border border-slate-200">
+                                    {t}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          }
+                          action={
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                              <Button variant="secondary">编辑</Button>
+                              <Button variant="secondary">上下架</Button>
+                              <Button>查看</Button>
+                            </div>
+                          }
+                        />
+                      ))}
+                  </div>
+                </CardContent>
+
+                <CardFooter className="flex items-center justify-between">
+                  <div className="text-sm text-slate-600">
+                    本页展示 <span className="font-semibold text-slate-900">{products.length}</span> 条，更多筛选可使用「高级筛选」。
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="secondary">上一页</Button>
+                    <Button variant="secondary">下一页</Button>
+                  </div>
+                </CardFooter>
+              </Card>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>类目销量占比（近 30 天）</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {[
+                      { name: "个护 / 洗护", value: 1534, pct: 40 },
+                      { name: "居家 / 水具", value: 986, pct: 26 },
+                      { name: "服饰 / 冬季", value: 412, pct: 11 },
+                      { name: "家纺 / 寝具", value: 368, pct: 10 },
+                      { name: "数码 / 外设", value: 245, pct: 6 },
+                      { name: "箱包 / 通勤", value: 128, pct: 3 },
+                      { name: "家居 / 灯具", value: 176, pct: 4 },
+                    ].map((row) => (
+                      <div key={row.name} className="space-y-2">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="font-medium text-slate-900">{row.name}</div>
+                          <div className="text-sm text-slate-600">
+                            {row.value} 件 <span className="text-slate-400">·</span> {row.pct}%
+                          </div>
+                        </div>
+                        <Progress value={row.pct} />
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>今日待处理</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {[
+                      {
+                        title: "处理缺货商品下架",
+                        desc: "南风轻薄羽绒服已连续缺货 3 天，建议先下架以避免差评。",
+                        tag: "紧急",
+                      },
+                      {
+                        title: "补货：岚光氛围台灯",
+                        desc: "当前库存 9，近 7 日日均销量 8，建议补货 80。",
+                        tag: "库存",
+                      },
+                      {
+                        title: "优化主图：记忆枕",
+                        desc: "主图点击率低于类目均值 12%，建议更换对比图提升转化。",
+                        tag: "运营",
+                      },
+                      {
+                        title: "活动报名：春季焕新专场",
+                        desc: "爆款保温杯可报名满减，预计提升 18% 转化。",
+                        tag: "营销",
+                      },
+                      {
+                        title: "核对运费模板",
+                        desc: "西北地区运费略高，建议调整以减少下单流失。",
+                        tag: "设置",
+                      },
+                    ].map((t) => (
+                      <ListItem
+                        key={t.title}
+                        title={
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-slate-900">{t.title}</span>
+                            <Badge className="bg-white text-slate-700 border border-slate-200">{t.tag}</Badge>
+                          </div>
+                        }
+                        subtitle={<div className="text-sm text-slate-600 whitespace-normal mt-1">{t.desc}</div>}
+                        action={
+                          <div className="flex items-center gap-2">
+                            <Button variant="secondary">稍后</Button>
+                            <Button>去处理</Button>
+                          </div>
+                        }
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+                <CardFooter className="flex items-center justify-between">
+                  <div className="text-xs text-slate-500">建议按「紧急」优先处理，减少售后风险。</div>
+                  <Button variant="secondary">查看全部任务</Button>
+                </CardFooter>
+              </Card>
+            </div>
+
+            <div className="mt-8">
               <Separator />
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-              <div className="lg:col-span-8 space-y-2">
-                <Label>备注</Label>
-                <Textarea
-                  className="min-h-[140px]"
-                  defaultValue={
-                    "1）信息流投放 CTR 提升但 CVR 下降：优先排查落地页首屏信息与素材一致性，建议将“到手价/发货时效”前置。\n2）02-26 支付通道异常对转化有短时影响，复盘时需剔除该时间段。\n3）会员复购渠道 ROI 表现最佳，建议加大会员权益曝光与召回触达频次（控制频控）。"
-                  }
-                />
-                <div className="text-xs text-slate-500">提示：备注会随导出一起写入“口径说明”页。</div>
-              </div>
-              <div className="lg:col-span-4 space-y-3">
-                <div className="rounded-lg border bg-white p-4 space-y-2">
-                  <div className="font-medium">本周期结论</div>
-                  <div className="text-sm text-slate-600">营收稳步上行，活动上线后峰值明显；需重点优化投放链路转化与支付稳定性。</div>
-                  <Separator />
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">优先级 P0</span>
-                      <span className="font-medium">支付链路稳定性</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">优先级 P1</span>
-                      <span className="font-medium">投放落地页一致性</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">优先级 P2</span>
-                      <span className="font-medium">会员召回策略</span>
-                    </div>
-                  </div>
+              <div className="py-6 flex items-center justify-between">
+                <div className="text-sm text-slate-500 whitespace-normal">
+                  © 2026 栖木生活馆 · 商品管理台（示例数据）
                 </div>
-
-                <div className="rounded-lg border bg-white p-4 space-y-2">
-                  <div className="font-medium">协作人</div>
-                  <div className="flex items-center gap-3">
-                    <Avatar fallback="宋" />
-                    <div className="min-w-0">
-                      <div className="font-medium">宋雨婷</div>
-                      <div className="text-sm text-slate-600 truncate">运营负责人 · 活动/转化</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Avatar fallback="邓" />
-                    <div className="min-w-0">
-                      <div className="font-medium">邓子安</div>
-                      <div className="text-sm text-slate-600 truncate">平台值班 · 支付/稳定性</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Avatar fallback="林" />
-                    <div className="min-w-0">
-                      <div className="font-medium">林嘉宁</div>
-                      <div className="text-sm text-slate-600 truncate">供应链 · 仓配时效</div>
-                    </div>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="secondary">帮助中心</Button>
+                  <Button variant="secondary">联系运营</Button>
                 </div>
               </div>
-            </CardContent>
-            <CardFooter className="flex items-center justify-end gap-2">
-              <Button variant="secondary" className="min-h-[44px]">保存草稿</Button>
-              <Button className="min-h-[44px]">发布到经营群</Button>
-            </CardFooter>
-          </Card>
-
-          <div className="pb-2 text-xs text-slate-500">
-            © 2026 运营数据平台 · 报表口径如有变更，请在「配置口径」中同步更新并重新导出。
+            </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

@@ -3577,7 +3577,7 @@ var PRDPreviewUI = (() => {
       return /* @__PURE__ */ React22.createElement(React22.Fragment, null, /* @__PURE__ */ React22.createElement(
         "div",
         {
-          className: "fixed inset-0 z-[9998] bg-black/50",
+          className: "fixed inset-0 z-[99998] min-w-full min-h-full bg-black/70 backdrop-blur-[2px]",
           "aria-hidden": true,
           onClick: onClose
         }
@@ -3585,7 +3585,7 @@ var PRDPreviewUI = (() => {
         "div",
         {
           ref,
-          className: "fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none"
+          className: "fixed inset-0 z-[99999] flex items-center justify-center p-4 pointer-events-none"
         },
         /* @__PURE__ */ React22.createElement(
           "div",
@@ -3671,4 +3671,4 @@ var PRDPreviewUI = (() => {
   return __toCommonJS(entry_preview_ui_prd_exports);
 })();
 `;
-export const PREVIEW_UI_PRD_BUNDLE_CALL = 'if (typeof PRDPreviewUI === "function") PRDPreviewUI(window.React);';
+export const PREVIEW_UI_PRD_BUNDLE_CALL = 'if (typeof PRDPreviewUI !== "undefined") { var __fn = typeof PRDPreviewUI === "function" ? PRDPreviewUI : (PRDPreviewUI && PRDPreviewUI.default); if (typeof __fn === "function") __fn(window.React); }';

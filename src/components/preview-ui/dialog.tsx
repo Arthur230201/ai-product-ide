@@ -14,29 +14,33 @@ const Dialog = React.forwardRef<HTMLDivElement, DialogProps>(
   ({ open, onClose, children }, ref) => {
     if (!open) return null;
     return (
-      <>
-        {/* 全屏遮罩：高 z-index、较深遮罩，确保完全盖住下层内容，点击关闭 */}
+      <div
+        className="fixed inset-0 min-w-full min-h-full z-[2147483647] isolate"
+        aria-modal
+        role="dialog"
+      >
+        {/* 全屏不透明遮罩：完全盖住下层，点击关闭 */}
         <div
-          className="fixed inset-0 z-[99998] min-w-full min-h-full bg-black/70 backdrop-blur-[2px]"
+          className="absolute inset-0 min-w-full min-h-full bg-black/85 backdrop-blur-sm"
           aria-hidden
           onClick={onClose}
         />
-        {/* 内容层高于遮罩，居中；内层 pointer-events-auto 防止点击穿透 */}
+        {/* 内容层：居中，内层 pointer-events-auto 防止点击穿透 */}
         <div
           ref={ref}
-          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 pointer-events-none"
+          className="absolute inset-0 flex items-center justify-center p-4 pointer-events-none"
         >
           <div
             className={cn(
               'pointer-events-auto w-full max-w-lg max-h-[90vh] overflow-y-auto',
-              'rounded-xl border border-gray-200 bg-white shadow-xl'
+              'rounded-xl border border-gray-200 bg-white shadow-2xl'
             )}
             onClick={(e) => e.stopPropagation()}
           >
             {children}
           </div>
         </div>
-      </>
+      </div>
     );
   }
 );

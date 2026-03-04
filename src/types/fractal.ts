@@ -10,6 +10,7 @@ export const ViewArtifactSchema = z.object({
   code: z.string().describe('可运行的 React/Tailwind 代码'),
   previewUrl: z.string().url().optional().describe('预览 URL（如果已生成）'),
   htmlTemplate: z.string().optional().describe('原始 HTML 模板（如果提供，将自动转换为 React 代码）'),
+  viewportPreset: z.enum(['mobile', 'desktop']).optional().describe('生成 UI 时的视口：mobile=移动端，desktop=PC 端（导出 PRD 时用于排版）'),
 });
 
 export type ViewArtifact = z.infer<typeof ViewArtifactSchema>;

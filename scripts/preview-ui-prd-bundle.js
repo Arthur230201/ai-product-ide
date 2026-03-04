@@ -3576,7 +3576,7 @@ var PRDPreviewUI = (() => {
       return /* @__PURE__ */ React22.createElement(React22.Fragment, null, /* @__PURE__ */ React22.createElement(
         "div",
         {
-          className: "fixed inset-0 z-[9998] bg-black/50",
+          className: "fixed inset-0 z-[99998] min-w-full min-h-full bg-black/70 backdrop-blur-[2px]",
           "aria-hidden": true,
           onClick: onClose
         }
@@ -3584,7 +3584,7 @@ var PRDPreviewUI = (() => {
         "div",
         {
           ref,
-          className: "fixed inset-0 z-[9999] flex items-center justify-center p-4 pointer-events-none"
+          className: "fixed inset-0 z-[99999] flex items-center justify-center p-4 pointer-events-none"
         },
         /* @__PURE__ */ React22.createElement(
           "div",

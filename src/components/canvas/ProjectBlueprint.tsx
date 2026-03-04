@@ -178,26 +178,6 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
     };
   }, [isOpen]);
 
-  // 调试：记录 modal 容器和内容容器的布局指标
-  useEffect(() => {
-    if (isOpen && modalContainerRef.current && scrollContainerRef.current) {
-      const modal = modalContainerRef.current;
-      const content = scrollContainerRef.current;
-      
-      console.log('ProjectBlueprint modal metrics', {
-        clientHeight: modal.clientHeight,
-        scrollHeight: modal.scrollHeight,
-        offsetHeight: modal.offsetHeight
-      });
-      
-      console.log('ProjectBlueprint content metrics', {
-        clientHeight: content.clientHeight,
-        scrollHeight: content.scrollHeight,
-        offsetHeight: content.offsetHeight
-      });
-    }
-  }, [isOpen, activeTab]);
-  
   // 项目画像本地状态 - 提供默认值防止 undefined
   const defaultProjectMeta = useMemo(() => ({
     projectName: '未命名项目',
@@ -693,103 +673,68 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
     return null;
   }
 
-  // 模态框内容 - 使用 React.createElement 避免 JSX 解析问题
+  const TAB_LIST: { id: TabType; label: string; icon: string }[] = [
+    { id: 'profile', label: '项目画像', icon: '🎭' },
+    { id: 'userStories', label: '用户故事', icon: '📖' },
+    { id: 'business', label: '业务泳道图', icon: '🏊' },
+    { id: 'interaction', label: '交互拓扑图', icon: '🔄' },
+    { id: 'data', label: '全局数据字典', icon: '📊' },
+    { id: 'topology', label: '架构拓扑图', icon: '🗺️' },
+    { id: 'rules', label: '全局规则', icon: '📋' },
+  ];
+
   return createPortal(
-    React.createElement('div', {
-      className: 'fixed inset-0 z-[10002] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-opacity duration-300',
-      style: { 
-        opacity: isOpen ? 1 : 0,
-        pointerEvents: isOpen ? 'auto' : 'none'
-      },
-      onMouseDown: (e: React.MouseEvent) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }
-    },
-    React.createElement('div', {
-      ref: modalContainerRef,
-      className: 'relative w-full max-w-[98vw] h-[98vh] bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl flex flex-col transition-all duration-300',
-      onClick: (e: React.MouseEvent) => e.stopPropagation(),
-      style: { 
-        display: 'flex', 
-        flexDirection: 'column',
-        height: '98vh',
-        maxHeight: '98vh',
-        overflow: 'hidden',
-        transform: isOpen ? 'scale(1)' : 'scale(0.95)',
-        opacity: isOpen ? 1 : 0
-      }
-    },
-    // Header - 固定顶部
-    React.createElement('div', { 
-      className: 'flex items-center justify-between p-4 border-b border-zinc-800 flex-shrink-0 bg-zinc-900 sticky top-0 z-30',
-      style: { position: 'sticky', top: 0, zIndex: 30 }
-    },
-      React.createElement('h2', { className: 'text-xl font-semibold text-zinc-100' }, '📘 项目蓝图'),
-      React.createElement('button', {
-        onClick: onClose,
-        className: 'p-2 hover:bg-zinc-800 rounded-md transition-all duration-200 hover:scale-110 active:scale-95',
-        title: '关闭 (ESC)',
-        'aria-label': '关闭项目蓝图'
-      }, React.createElement(X, { className: 'w-5 h-5 text-zinc-400 hover:text-zinc-200 transition-colors' }))
-    ),
-    // Tabs - 固定顶部（在 Header 下方）
-    React.createElement('div', { 
-      className: 'flex border-b border-zinc-800 bg-zinc-900/95 backdrop-blur-sm overflow-x-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent flex-shrink-0',
-      style: { 
-        position: 'sticky', 
-        top: '73px', // Header 高度（p-4 + 内容高度）
-        zIndex: 20,
-        backgroundColor: 'rgba(24, 24, 27, 0.95)' // zinc-900/95
-      }
-    },
-      [
-        { id: 'profile' as TabType, label: '项目画像', icon: '🎭' },
-        { id: 'userStories' as TabType, label: '用户故事', icon: '📖' },
-        { id: 'business' as TabType, label: '业务泳道图', icon: '🏊' },
-        { id: 'interaction' as TabType, label: '交互拓扑图', icon: '🔄' },
-        { id: 'data' as TabType, label: '全局数据字典', icon: '📊' },
-        { id: 'topology' as TabType, label: '架构拓扑图', icon: '🗺️' },
-        { id: 'rules' as TabType, label: '全局规则', icon: '📋' },
-      ].map((tab, index) =>
-        React.createElement('button', {
-          key: tab.id,
-          onClick: () => handleTabChange(tab.id),
-          className: clsx(
-            "flex-shrink-0 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-all duration-200 whitespace-nowrap",
-            activeTab === tab.id
-              ? "border-blue-500 text-blue-400 bg-blue-500/5 scale-105"
-              : "border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50 hover:scale-102"
-          ),
-          title: `切换到${tab.label} (Ctrl+${index + 1})`,
-          'aria-label': tab.label,
-          'aria-selected': activeTab === tab.id
-        },
-        React.createElement('span', {}, tab.icon),
-        React.createElement('span', {}, tab.label)
-        )
-      )
-    ),
-    // Content - 内容区域（可滚动）
-    React.createElement('div', { 
-      ref: scrollContainerRef,
-      className: clsx(
-        'p-6 overflow-y-auto overflow-x-hidden transition-opacity duration-200',
-        isTransitioning && 'opacity-50'
-      ),
-      style: { 
-        flex: '1 1 0%',
-        minHeight: 0,
-        overflowY: 'auto',
-        overflowX: 'hidden',
-        WebkitOverflowScrolling: 'touch', // iOS 平滑滚动
-        scrollbarWidth: 'thin', // Firefox
-        scrollbarColor: '#71717a #27272a', // Firefox: thumb track
-        scrollBehavior: 'smooth' // 平滑滚动
-      }
-    },
-      activeTab === 'profile' && React.createElement('div', { className: 'space-y-6', style: { minHeight: 0 } },
+    <div
+      className="fixed inset-0 z-[10002] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-opacity duration-300"
+      style={{ opacity: isOpen ? 1 : 0, pointerEvents: isOpen ? 'auto' : 'none' }}
+      onMouseDown={(e: React.MouseEvent) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        ref={modalContainerRef}
+        className="relative w-full max-w-[98vw] h-[98vh] bg-zinc-900 border border-zinc-800 rounded-lg shadow-2xl flex flex-col overflow-hidden transition-all duration-300"
+        style={{ transform: isOpen ? 'scale(1)' : 'scale(0.95)', opacity: isOpen ? 1 : 0 }}
+        onClick={(e: React.MouseEvent) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-zinc-800 flex-shrink-0 bg-zinc-900">
+          <h2 className="text-xl font-semibold text-zinc-100">📘 项目蓝图</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 hover:bg-zinc-800 rounded-md transition-all duration-200"
+            title="关闭 (ESC)"
+            aria-label="关闭项目蓝图"
+          >
+            <X className="w-5 h-5 text-zinc-400 hover:text-zinc-200 transition-colors" />
+          </button>
+        </div>
+        <div className="flex border-b border-zinc-800 bg-zinc-900/95 overflow-x-auto flex-shrink-0">
+          {TAB_LIST.map((tab, index) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => handleTabChange(tab.id)}
+              className={clsx(
+                'flex-shrink-0 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-all duration-200 whitespace-nowrap',
+                activeTab === tab.id
+                  ? 'border-blue-500 text-blue-400 bg-blue-500/5'
+                  : 'border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+              )}
+              title={`切换到${tab.label} (Ctrl+${index + 1})`}
+              aria-label={tab.label}
+              aria-selected={activeTab === tab.id}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
+        <div
+          ref={scrollContainerRef}
+          className={`flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6 transition-opacity duration-200 ${isTransitioning ? 'opacity-50' : ''}`}
+        >
+          {activeTab === 'profile' && React.createElement('div', { className: 'space-y-6' },
         // 如果有初始数据，显示提示信息
         initialData && React.createElement('div', { 
           className: 'bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-4' 
@@ -949,8 +894,8 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
             })
           )
         )
-      ),
-      activeTab === 'business' && React.createElement('div', { className: 'space-y-4' },
+      )}
+      {activeTab === 'business' && React.createElement('div', { className: 'space-y-4' },
         React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '基于节点和边的角色信息生成业务流程图。'),
         React.createElement('div', { 
           className: 'bg-zinc-950 rounded-lg border border-zinc-800',
@@ -962,8 +907,8 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
         },
           React.createElement(MermaidDiagram, { code: businessProcessDiagram, compact: true })
         )
-      ),
-      activeTab === 'interaction' && React.createElement('div', { className: 'space-y-4' },
+      )}
+      {activeTab === 'interaction' && React.createElement('div', { className: 'space-y-4' },
         React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '显示所有页面节点之间的导航关系。'),
         React.createElement('div', { 
           className: 'bg-zinc-950 rounded-lg border border-zinc-800',
@@ -975,8 +920,8 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
         },
           React.createElement(MermaidDiagram, { definition: interactionFlowDiagram, compact: true })
         )
-      ),
-      activeTab === 'data' && React.createElement('div', { className: 'space-y-4' },
+      )}
+      {activeTab === 'data' && React.createElement('div', { className: 'space-y-4' },
         React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '聚合所有节点的数据规则。'),
         dataDictionary.length === 0 ? React.createElement('div', { className: 'bg-zinc-900/50 rounded-lg border border-zinc-800 p-8 text-center' },
           React.createElement('div', { className: 'text-zinc-500 text-sm' }, '暂无数据字典')
@@ -1006,12 +951,12 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
             )
           )
         )
-      ),
-      activeTab === 'topology' && React.createElement('div', { className: 'space-y-4' },
+      )}
+      {activeTab === 'topology' && React.createElement('div', { className: 'space-y-4' },
         React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '上传架构拓扑图，自动解析并生成节点和连接关系。'),
         React.createElement(ArchitectureTopology)
-      ),
-      activeTab === 'rules' && React.createElement('div', { className: 'space-y-6' },
+      )}
+      {activeTab === 'rules' && React.createElement('div', { className: 'space-y-6' },
         React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '定义项目的全局规则和非功能性需求（NFR）。'),
         React.createElement('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-6' },
           React.createElement('div', { className: 'flex flex-col' },
@@ -1064,116 +1009,100 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
               onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => updateGlobalRules({ dataTracking: e.target.value })
             })
           )
-          )
         )
-      ),
-      activeTab === 'userStories' && React.createElement('div', { className: 'space-y-4' },
-        React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '展示所有节点的用户故事和用户旅程图。'),
-        nodes.length === 0 ? React.createElement('div', { className: 'bg-zinc-950 rounded-lg p-4 border border-zinc-800' },
+      )}
+      {activeTab === 'userStories' && (() => {
+        // 与 business / data / interaction 等 tab 一致：单层 space-y-4 容器，无 IIFE 内嵌复杂结构
+        const desc = React.createElement('div', { className: 'text-sm text-zinc-400 mb-4' }, '展示所有节点的用户故事和用户旅程图。');
+        const nodesWithStories = nodes.filter(node => {
+          const stories = node.data.artifacts?.userStories;
+          return stories && Array.isArray(stories) && stories.length > 0;
+        });
+        const emptyState = React.createElement('div', { className: 'bg-zinc-950 rounded-lg p-4 border border-zinc-800' },
           React.createElement('div', { className: 'text-zinc-500 text-sm text-center py-8' }, '暂无用户故事')
-        ) : (() => {
-          const nodesWithStories = nodes.filter(node => {
-            const stories = node.data.artifacts?.userStories;
-            return stories && Array.isArray(stories) && stories.length > 0;
-          });
-          
-          if (nodesWithStories.length === 0) {
-            return React.createElement('div', { className: 'bg-zinc-950 rounded-lg p-4 border border-zinc-800' },
-              React.createElement('div', { className: 'text-zinc-500 text-sm text-center py-8' }, '暂无用户故事')
-            );
-          }
-          
-          const userStoriesElements = nodesWithStories.map((node) => {
-            const userStories = node.data.artifacts?.userStories || [];
-            if (userStories.length === 0) return null;
-            
-            const nodeKey = `stories-${node.id}`;
-            const isExpanded = expandedNodes[nodeKey] !== false;
-            
-            return React.createElement('div', { key: node.id, className: 'bg-zinc-950 rounded-lg p-4 border border-zinc-800' },
-              React.createElement('button', {
-                onClick: () => setExpandedNodes(prev => ({ ...prev, [nodeKey]: !isExpanded })),
-                className: 'flex items-center justify-between w-full text-left mb-4 hover:bg-zinc-800/30 rounded-lg p-2 -m-2 transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]'
-              },
-                React.createElement('h3', { className: 'text-lg font-semibold text-zinc-200' },
-                  React.createElement('span', { className: 'text-blue-400' }, '📄 '),
-                  node.data.label || node.id,
-                  React.createElement('span', { className: 'ml-2 text-sm font-normal text-zinc-500' }, `(${userStories.length} 个用户故事)`)
-                ),
-                React.createElement('div', { className: 'flex-shrink-0 ml-4 transition-transform duration-200', style: { transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' } },
-                  React.createElement(ChevronDown, { className: 'w-5 h-5 text-zinc-400' })
-                )
-              ),
-              isExpanded && React.createElement('div', { 
-                className: 'space-y-4 animate-in fade-in slide-in-from-top-2 duration-300'
-              },
-                userStories.map((story, storyIndex) => {
-                  const sequenceDiagram = generateStorySequenceDiagram(node.id, story.id);
-                  
-                  return React.createElement('div', { 
-                    key: storyIndex, 
-                    className: 'bg-zinc-900/50 rounded-lg border border-zinc-700 p-4 transition-all duration-200 hover:border-zinc-600 hover:bg-zinc-900/70' 
-                  },
-                    React.createElement('div', { className: 'flex items-center gap-2 mb-2' },
-                      React.createElement('span', { className: 'text-xs font-medium px-2 py-1 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30' }, story.id),
-                    ),
-                    React.createElement('div', { className: 'text-sm text-zinc-300 mb-3' },
-                      React.createElement('span', { className: 'text-zinc-500' }, '作为 '),
-                      React.createElement('span', { className: 'font-medium text-zinc-200' }, story.role),
-                      React.createElement('span', { className: 'text-zinc-500' }, '，我想要 '),
-                      React.createElement('span', { className: 'font-medium text-zinc-200' }, story.activity),
-                      React.createElement('span', { className: 'text-zinc-500' }, '，以便 '),
-                      React.createElement('span', { className: 'font-medium text-zinc-200' }, story.value)
-                    ),
-                    story.acceptanceCriteria && story.acceptanceCriteria.length > 0 && React.createElement('div', { className: 'mt-3 pt-3 border-t border-zinc-700' },
-                      React.createElement('div', { className: 'text-xs font-medium text-zinc-400 mb-2' }, '验收标准:'),
-                      React.createElement('ul', { className: 'space-y-1' },
-                        story.acceptanceCriteria.map((criterion, critIndex) =>
-                          React.createElement('li', { key: critIndex, className: 'text-sm text-zinc-300 flex items-start gap-2' },
-                            React.createElement('span', { className: 'text-green-400 mt-1 flex-shrink-0' }, '✓'),
-                            React.createElement('span', { className: 'flex-1' }, criterion)
-                          )
-                        )
-                      )
-                    ),
-                      sequenceDiagram && React.createElement('div', { className: 'mt-4 pt-4 border-t border-zinc-700' },
-                        React.createElement('div', { className: 'text-xs font-medium text-zinc-400 mb-3' }, '业务流转逻辑:'),
-                        React.createElement('div', { 
-                          style: { 
-                            display: 'inline-block',
-                            width: '100%'
-                          }
-                        },
-                          React.createElement(MermaidDiagram, { code: sequenceDiagram, compact: true })
-                        )
-                      )
-                  );
-                })
-              )
-            );
-          }).filter(Boolean);
-          
-          return React.createElement('div', { className: 'space-y-4' },
-            generateUserJourneyTable && generateUserJourneyTable.allUserStories.length > 0 && generateUserJourneyDiagram && React.createElement('div', { className: 'bg-zinc-950 rounded-lg border border-zinc-800', style: { padding: '12px' } },
+        );
+        if (nodes.length === 0 || nodesWithStories.length === 0) {
+          return React.createElement('div', { className: 'space-y-4' }, desc, emptyState);
+        }
+        // 用户旅程图区块：与 business tab 的 Mermaid 区块结构一致
+        const journeyBlock = generateUserJourneyTable && generateUserJourneyTable.allUserStories.length > 0 && generateUserJourneyDiagram
+          ? React.createElement('div', { className: 'bg-zinc-950 rounded-lg border border-zinc-800 p-4' },
               React.createElement('h3', { className: 'text-lg font-semibold text-zinc-200 mb-4' },
                 React.createElement('span', { className: 'text-blue-400' }, '🗺️ '),
                 '用户旅程图'
               ),
-              React.createElement('div', { 
-                style: { 
-                  display: 'inline-block',
-                  width: '100%'
-                }
-              },
+              React.createElement('div', { className: 'w-full' },
                 React.createElement(MermaidDiagram, { code: generateUserJourneyDiagram, compact: true })
               )
+            )
+          : null;
+        // 各节点用户故事列表：与 data / rules 等 tab 的列表结构一致，纯 className
+        const nodeBlocks = nodesWithStories.map((node) => {
+          const userStories = node.data.artifacts?.userStories || [];
+          if (userStories.length === 0) return null;
+          const nodeKey = `stories-${node.id}`;
+          const isExpanded = expandedNodes[nodeKey] !== false;
+          return React.createElement('div', { key: node.id, className: 'bg-zinc-950 rounded-lg p-4 border border-zinc-800' },
+            React.createElement('button', {
+              type: 'button',
+              onClick: () => setExpandedNodes(prev => ({ ...prev, [nodeKey]: !isExpanded })),
+              className: 'flex items-center justify-between w-full text-left mb-4 hover:bg-zinc-800/30 rounded-lg p-2 -m-2 transition-all duration-200'
+            },
+              React.createElement('h3', { className: 'text-lg font-semibold text-zinc-200' },
+                React.createElement('span', { className: 'text-blue-400' }, '📄 '),
+                node.data.label || node.id,
+                React.createElement('span', { className: 'ml-2 text-sm font-normal text-zinc-500' }, `(${userStories.length} 个用户故事)`)
+              ),
+              React.createElement('div', { className: 'flex-shrink-0 ml-4 transition-transform duration-200', style: { transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)' } },
+                React.createElement(ChevronDown, { className: 'w-5 h-5 text-zinc-400' })
+              )
             ),
-            ...userStoriesElements
+            isExpanded && React.createElement('div', { className: 'space-y-4' },
+              userStories.map((story, storyIndex) => {
+                const sequenceDiagram = generateStorySequenceDiagram(node.id, story.id);
+                return React.createElement('div', {
+                  key: storyIndex,
+                  className: 'bg-zinc-900/50 rounded-lg border border-zinc-700 p-4'
+                },
+                  React.createElement('div', { className: 'flex items-center gap-2 mb-2' },
+                    React.createElement('span', { className: 'text-xs font-medium px-2 py-1 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30' }, story.id),
+                  ),
+                  React.createElement('div', { className: 'text-sm text-zinc-300 mb-3' },
+                    React.createElement('span', { className: 'text-zinc-500' }, '作为 '),
+                    React.createElement('span', { className: 'font-medium text-zinc-200' }, story.role),
+                    React.createElement('span', { className: 'text-zinc-500' }, '，我想要 '),
+                    React.createElement('span', { className: 'font-medium text-zinc-200' }, story.activity),
+                    React.createElement('span', { className: 'text-zinc-500' }, '，以便 '),
+                    React.createElement('span', { className: 'font-medium text-zinc-200' }, story.value)
+                  ),
+                  story.acceptanceCriteria && story.acceptanceCriteria.length > 0 && React.createElement('div', { className: 'mt-3 pt-3 border-t border-zinc-700' },
+                    React.createElement('div', { className: 'text-xs font-medium text-zinc-400 mb-2' }, '验收标准:'),
+                    React.createElement('ul', { className: 'space-y-1' },
+                      story.acceptanceCriteria.map((criterion, critIndex) =>
+                        React.createElement('li', { key: critIndex, className: 'text-sm text-zinc-300 flex items-start gap-2' },
+                          React.createElement('span', { className: 'text-green-400 mt-1 flex-shrink-0' }, '✓'),
+                          React.createElement('span', { className: 'flex-1' }, criterion)
+                        )
+                      )
+                    )
+                  ),
+                  sequenceDiagram && React.createElement('div', { className: 'mt-4 pt-4 border-t border-zinc-700' },
+                    React.createElement('div', { className: 'text-xs font-medium text-zinc-400 mb-3' }, '业务流转逻辑:'),
+                    React.createElement('div', { className: 'w-full' },
+                      React.createElement(MermaidDiagram, { code: sequenceDiagram, compact: true })
+                    )
+                  )
+                );
+              })
+            )
           );
-        })()
-      )
-    )
-    ),
+        }).filter(Boolean);
+        const children = [desc, journeyBlock, ...nodeBlocks].filter(Boolean);
+        return React.createElement('div', { className: 'space-y-4' }, ...children);
+      })()}
+        </div>
+      </div>
+    </div>,
     document.body
   );
 }

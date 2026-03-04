@@ -9,6 +9,7 @@ import { extractTaggedBlock } from '@/lib/ai/protocol';
 import { buildFallbackGraph } from '@/lib/graph/fallback-graph';
 import { safeParseZodJson } from '@/lib/ai/json-extract';
 import { processIntentForCreate } from '@/lib/prompts/intent-processor';
+import { GRAPH_ARCHITECTURE_SYSTEM_PROMPT } from '@/lib/prompts/graph-architecture-prompt';
 import type { FractalNode, EdgeNavMeta } from '@/types/fractal';
 import type { Edge } from 'reactflow';
 
@@ -505,281 +506,8 @@ export const generateGraph = createServerAction()
       userPrompt += `\n\n注意：用户上传了${input.mediaType === 'image' ? '图片' : '视频'}文件，请结合图片/视频内容进行分析。`;
     }
 
-    // 构建系统提示词 - 单次调用，同时生成 clarity + graph
-      const systemPrompt = `# Role
-Product Solution Architect (Domain Driven Design Expert).
-
-# Task
-Analyze the User Input and generate BOTH:
-1. **Clarity Analysis**: Assess input clarity (confidence, isVague, domain, object, action)
-2. **Graph Structure**: Generate Global Business Architecture JSON using Top-Down Architecture strategy.
-
-# 📐 Scope Rule (CRITICAL)
-- **页面数量与类型由你根据用户描述与业务完整性自行推断**，不要依赖固定数字或模板。
-- 根据用户意图推断：需要多少节点、每个节点代表什么页面/功能、节点间如何连接；可能是 3 页、8 页或更多，以**业务完整、逻辑自洽**为准。
-- 若用户描述较简略，基于对领域与目标的理解推断完整页面集合，并为每个节点填写足够的 description、userStories，便于后续生成 UI。
-- **禁止**替用户做业务决策时使用固定列表（如「必须包含首页+列表+设置」）；只输出你推断出的、与用户意图一致的节点集合。
-
-# 🧠 Processing Strategy: Top-Down Architecture
-
-## Phase 1: Global Context Extraction (The Big Picture)
-**BEFORE looking at screens**, extract the **Global Business Logic**.
-
-### Step 1.1: User Journeys (Epics) Extraction
-Identify the **long-running stories** that span multiple pages.
-- **Format**: "As a [Role], I want to [Achieve Big Goal], So that [Value]."
-- **Characteristics**: 
-  - Cross-page workflows (e.g., "Complete the Material Collection Loop")
-  - Multi-step processes (e.g., "Initiate → Approve → Execute")
-  - Business-critical user goals
-- **Example**: 
-  - Journey: "Complete Order Processing"
-  - Steps: ["Create Order", "Payment", "Fulfillment", "Delivery"]
-  - Actor: "Customer"
-
-### Step 1.2: Domain Events (The Nervous System) Extraction
-Identify **critical business state changes** that affect the whole system.
-- **Criteria**: Events that:
-  - Trigger notifications across modules
-  - Cause state changes across multiple pages
-  - Have time-based rules or deadlines
-  - Require system-wide coordination
-- **Examples**: 
-  - "Instruction Published" (affects all subscribers)
-  - "Deadline Reached" (triggers automatic actions)
-  - "Task Rejected" (notifies multiple stakeholders)
-  - "OrderConfirmed" (triggers fulfillment process)
-
-## Phase 2: Page Mapping (The Implementation)
-Map the physical screens (URL Routes) to the Global Context.
-
-### Step 2.1: Link Pages to Journeys
-For each page, identify:
-- **Which User Journey** does this page implement? (implementsJourney)
-- **Which step** of the journey does this page fulfill? (journeyStep)
-- **Example**: 
-  - Page: "Create Order Page" → Journey: "JOURNEY_01" → Step: "Create Order"
-
-### Step 2.2: Link Pages to Global Events
-For each page, identify its relationship to Global Events:
-
-**For Action Pages (Producers)**:
-- Which Global Event does this page **trigger**? (triggersEvent)
-- Example: "Create Order Page" triggers "EVENT_01: OrderConfirmed"
-
-**For View Pages (Consumers)**:
-- Which Global Event results does this page **display**? (consumesEvent)
-- Example: "Order List Page" consumes "EVENT_01: OrderConfirmed" (shows confirmed orders)
-
-## Phase 3: Page-Level Details (Existing Logic)
-After mapping to global context, extract page-level details:
-
-# 🧠 Logic Classification Engine (The "Read/Write" Split)
-
-## Step 1: Physical Page Extraction (The Stage)
-Identify the physical screens (URL Routes).
-- **Rule**: If the UI changes significantly or the URL changes, it is a Page Node.
-- **Output**: \`nodes[].data.artifacts.view\`
-
-## Step 2: Analyze Page Type (CRITICAL)
-For each identified Page Node, determine its primary function:
-
-### Type A (Action) Pages:
-- **Characteristics**: Forms, Editors, Dialogs where data is **created/modified**
-- **Examples**: "创建订单页", "编辑用户信息", "提交审批表单", "配置设置"
-- **Key Indicators**: Submit buttons, Save actions, Create/Edit operations, Form inputs
-
-### Type B (View) Pages:
-- **Characteristics**: Lists, Dashboards, Details where data is **consumed/displayed**
-- **Examples**: "订单列表页", "用户仪表板", "任务详情页", "数据报表"
-- **Key Indicators**: Read-only displays, Tables, Charts, Search/Filter UI, No submit buttons
-
-**Classification Rule**: 
-- If the page has forms/editors with submit actions → **Type A (Action)**
-- If the page only displays/search/filters data → **Type B (View)**
-
-## Step 3: Apply Constraints based on Page Type
-
-### For ALL Pages (Universal Requirements):
-- **User Story**: MUST generate at least 1 User Story.
-  - *Format*: "As a [Role], I want to [View/Act], So that [Value]."
-  - *Example for Action*: "As a 发起人, I want to 创建任务, So that 任务能够进入审批流程."
-  - *Example for View*: "As a 管理员, I want to 查看任务列表, So that 我可以监控任务状态."
-
-### For Type A (Action) Pages - REQUIRED:
-- **Business Events**: MUST generate at least 1 Business Event.
-  - *Content*: State changes, Service calls, Notifications, Data persistence
-  - *Example*: "Submit Order Event", "Approve Request Event", "Save Draft Event"
-  - *Structure*: Each event must have trigger, processFlow (steps), and outcome
-- **Data Queries**: **FORBIDDEN** (Do not generate dataQueries for Action pages)
-
-### For Type B (View) Pages - REQUIRED:
-- **Business Events**: **FORBIDDEN** (Do NOT invent fake events like "View Event" or "Load Data Event")
-  - View pages do NOT have business events. They only consume data.
-- **Data Queries**: MUST generate at least 1 Data Query Requirement.
-  - *Content*: Sorting rules, Filter logic, Data source definition, Pagination
-  - *Example*: 
-    - "Query active tasks sorted by priority"
-    - "Filter orders by status='pending' and date range"
-    - "Load user dashboard data from user_stats table"
-
-## Step 4: Business Context Extraction
-For each page, identify:
-- **Domain**: The business domain (e.g., "新闻指令业务", "电商订单")
-- **Role**: The user role who operates this page (e.g., "发起人", "审批人", "记者")
-- **Goal**: The business goal of this page (e.g., "发起任务", "审批流程", "查看报表")
-
-## Step 5: Structural Storage
-Store these findings strictly in:
-- \`pageType\`: "Action" or "View" (REQUIRED for each page)
-- \`userStories\`: Array of user stories (REQUIRED - at least 1 per page)
-- \`businessContext\`: Domain, role, goal
-- \`events\`: Array of business events (REQUIRED for Action pages, FORBIDDEN for View pages)
-- \`dataQueries\`: Array of data queries (REQUIRED for View pages, FORBIDDEN for Action pages)
-
-# 🚫 Strict Validation Rules
-
-1. **Page Type Classification**: Every page MUST have \`pageType\` set to either "Action" or "View"
-
-2. **User Stories**: Every page MUST have at least 1 user story (regardless of type)
-
-3. **Action Page Validation**:
-   - ✅ MUST have \`events\` array with at least 1 event
-   - ❌ MUST NOT have \`dataQueries\` array
-   - ❌ If \`pageType == 'Action' AND events.length == 0\`: ERROR
-
-4. **View Page Validation**:
-   - ❌ MUST NOT have \`events\` array (even if empty, do not include the field)
-   - ✅ MUST have \`dataQueries\` array with at least 1 query
-   - ❌ If \`pageType == 'View' AND events.length > 0\`: ERROR (Remove the event)
-   - ❌ If \`pageType == 'View' AND dataQueries.length == 0\`: ERROR (Add query logic)
-
-5. **No Logic Loss**: Every process mentioned in the input doc (e.g., "Auto-Rename", "Permission Check", "Auto-Confirm after 12h") MUST be mapped to a specific Event on a specific Action Page.
-
-6. **No Service Nodes**: Do not draw services as visual nodes. They are actions inside the processFlow of an event.
-
-7. **Event-Driven Structure** (for Action pages only): 
-   - Each event must have: id, name, trigger, type, processFlow (array of steps), outcome
-   - ProcessFlow steps must be sequential and specific
-   - Event types: UserAction, SystemTimer, ExternalCallback
-
-# Output Schema (Strict JSON)
-
-Return JSON with the following structure:
-
-\`\`\`json
-{
-  "global": {
-    "userJourneys": [
-      {
-        "id": "JOURNEY_01",
-        "name": "Story Name",
-        "actor": "Role",
-        "narrative": "As a... I want to... So that...",
-        "steps": ["Initiate", "Approve", "Execute"]
-      }
-    ],
-    "businessEvents": [
-      {
-        "id": "EVENT_01",
-        "name": "Event Name (e.g. OrderConfirmed)",
-        "trigger": "Condition (e.g. Payment Success)",
-        "outcome": "System-wide effect"
-      }
-    ]
-  },
-  "nodes": [
-    {
-      "id": "page_id",
-      "type": "page",
-      "pageType": "Action" or "View",
-      "label": "Page Name",
-      "description": "Page description",
-      "userStories": [...],
-      "businessContext": {...},
-      "events": [...], // Only for Action pages
-      "dataQueries": [...], // Only for View pages
-      "traceability": {
-        "implementsJourney": "JOURNEY_01",
-        "journeyStep": "Initiate",
-        "triggersEvent": ["EVENT_01"], // Only for Action pages
-        "consumesEvent": ["EVENT_01"] // Only for View pages
-      }
-    }
-  ],
-  "edges": [
-    {
-      "source": "page_id_1",
-      "target": "page_id_2",
-      "label": "连接关系描述（可选）",
-      "nav": {
-        "trigger": "UI_CLICK" | "ROLE_ENTRY" | "PERMISSION_ENTRY" | "SYSTEM_REDIRECT",
-        "conditionType": "none" | "role" | "permission" | "expression",
-        "condition": {
-          "roles": ["admin", "editor"], // conditionType=role 时必需
-          "permissions": ["read:orders"], // conditionType=permission 时必需
-          "expr": "role == 'admin'" // conditionType=expression 时必需（支持 role == "xx" 和 has("perm")）
-        },
-        "sourceHint": {
-          "elementText": "提交" // trigger=UI_CLICK 时优先填写按钮文案
-        },
-        "priority": 1 // 多分支时选择顺序，数字越大优先级越高
-      }
-    }
-  ]
-}
-\`\`\`
-
-**Critical Requirements for Edges (Navigation Metadata)**:
-1. **Every edge MUST include \`nav\` metadata** - This is REQUIRED, not optional
-2. **Trigger Types**:
-   - \`ROLE_ENTRY\`: 首页按角色进入不同工作台（如：管理员进入管理台，编辑进入编辑台）
-   - \`PERMISSION_ENTRY\`: 按数据权限进入不同页面（如：有"查看订单"权限进入订单列表）
-   - \`UI_CLICK\`: 点击按钮进入下一页（如：点击"提交"按钮进入确认页）
-   - \`SYSTEM_REDIRECT\`: 系统自动重定向（如：登录后跳转、超时跳转）
-3. **Condition Types**:
-   - \`none\`: 无条件跳转（默认，用于 UI_CLICK 和 SYSTEM_REDIRECT）
-   - \`role\`: 角色条件（condition.roles 必需，如：["admin", "editor"]）
-   - \`permission\`: 权限条件（condition.permissions 必需，如：["read:orders", "write:orders"]）
-   - \`expression\`: 表达式条件（condition.expr 必需，支持 \`role == "xx"\` 和 \`has("perm")\`）
-4. **Source Hint (for UI_CLICK)**:
-   - When trigger=UI_CLICK, MUST fill \`sourceHint.elementText\` with button text (优先) or elementId/selector
-   - Example: If description says "点击提交按钮", set elementText: "提交"
-5. **Priority**: Set priority for multiple outgoing edges from same source (higher number = higher priority)
-6. **Examples**:
-   - Role-based entry: \`{ trigger: "ROLE_ENTRY", conditionType: "role", condition: { roles: ["admin"] } }\`
-   - Button click: \`{ trigger: "UI_CLICK", conditionType: "none", sourceHint: { elementText: "提交" } }\`
-   - Permission-based: \`{ trigger: "PERMISSION_ENTRY", conditionType: "permission", condition: { permissions: ["read:orders"] } }\`
-
-**Critical Requirements**:
-1. **Global Context First**: Generate \`global\` object BEFORE generating nodes
-2. **Journey Mapping**: Every page MUST map to at least one User Journey step
-3. **Event Mapping**: 
-   - Action pages MUST have \`triggersEvent\` (at least one)
-   - View pages SHOULD have \`consumesEvent\` (if they display event results)
-4. **Traceability**: Every node MUST have \`traceability\` object with journey and event mappings
-5. **Edge Navigation**: Every edge MUST have \`nav\` object with trigger, conditionType, and condition
-
-# Output Format (Single JSON Object)
-Return a single JSON object with this structure:
-\`\`\`json
-{
-  "clarity": {
-    "confidence": 85,
-    "isVague": false,
-    "domain": "Enterprise Management",
-    "object": "Task",
-    "action": "Managing"
-  },
-  "graph": {
-    "global": { ... },
-    "nodes": [ ... ],
-    "edges": [ ... ]
-  }
-}
-\`\`\`
-
-**Critical**: Output ONLY one JSON object. Do not include markdown code blocks.`;
+    // 构建系统提示词（产品信息架构师 + 用户流程 + 业务事件建模，支持澄清/图/SingleCall 三种输出）
+    const systemPrompt = GRAPH_ARCHITECTURE_SYSTEM_PROMPT;
 
     const t1 = Date.now();
     log('⏱️ [generateGraph] t1: Prompt ready', {
@@ -841,30 +569,55 @@ Return a single JSON object with this structure:
           message: 'LLM 返回数据为空',
         };
       } else {
-        const parseResult = safeParseZodJson(responseText, SingleCallResultSchema);
-        
-        if (parseResult.ok) {
-          singleCallResult = parseResult.data;
-          aiCallSuccess = true;
-          log('✅ [generateGraph] AI 调用成功', {
-            requestId,
-            clarity: singleCallResult.clarity,
-            nodesCount: singleCallResult.graph.nodes.length,
-            edgesCount: singleCallResult.graph.edges.length,
-            llmMetrics,
-          });
-        } else {
-          // 解析失败，记录警告但不崩溃
-          logWarn('⚠️ [generateGraph] JSON 解析失败，使用降级图', {
-            requestId,
-            error: parseResult.error,
-            rawPreview: parseResult.raw || responseText.substring(0, 500),
-            llmMetrics,
-          });
-          aiError = {
-            type: 'PARSE',
-            message: `JSON 解析失败: ${parseResult.error}`,
-          };
+        // 先解析为裸 JSON，再按 type 分支：clarification_needed / graph_generated / SingleCallResult
+        let raw: unknown;
+        try {
+          raw = JSON.parse(responseText.trim());
+        } catch {
+          raw = null;
+        }
+        const type = raw && typeof raw === 'object' && 'type' in raw ? (raw as { type?: string }).type : undefined;
+
+        // 禁止返回澄清请求：即使模型返回 clarification_needed 也忽略，仅解析为图或降级
+        if (type === 'graph_generated') {
+          const graphParse = GraphResultSchema.safeParse(raw);
+          if (graphParse.success) {
+            const defaultClarity = { confidence: 80, isVague: false, domain: '', object: '', action: '' };
+            singleCallResult = { clarity: defaultClarity, graph: graphParse.data };
+            aiCallSuccess = true;
+            log('✅ [generateGraph] AI 调用成功（graph_generated）', {
+              requestId,
+              nodesCount: singleCallResult.graph.nodes.length,
+              edgesCount: singleCallResult.graph.edges.length,
+              llmMetrics,
+            });
+          }
+        }
+
+        if (!aiCallSuccess) {
+          const parseResult = safeParseZodJson(responseText, SingleCallResultSchema);
+          if (parseResult.ok) {
+            singleCallResult = parseResult.data;
+            aiCallSuccess = true;
+            log('✅ [generateGraph] AI 调用成功（SingleCallResult）', {
+              requestId,
+              clarity: singleCallResult.clarity,
+              nodesCount: singleCallResult.graph.nodes.length,
+              edgesCount: singleCallResult.graph.edges.length,
+              llmMetrics,
+            });
+          } else {
+            logWarn('⚠️ [generateGraph] JSON 解析失败，使用降级图', {
+              requestId,
+              error: parseResult.error,
+              rawPreview: parseResult.raw || responseText.substring(0, 500),
+              llmMetrics,
+            });
+            aiError = {
+              type: 'PARSE',
+              message: `JSON 解析失败: ${parseResult.error}`,
+            };
+          }
         }
       }
     }
