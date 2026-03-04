@@ -7,11 +7,13 @@ import { CommandBar } from './CommandBar';
 import { NodeTree } from './NodeTree';
 import { MobileDevicePreview } from './MobileDevicePreview';
 import { PrdConfigDialog } from './PrdConfigDialog';
-import { generateImplementation, generateTestCases, reverseGenerateSpec, refineUI, generateAnalysisFromCode } from '@/app/actions/node-operations';
+import { generateImplementation, generateTestCases, reverseGenerateSpec, addInteractionsToReact, generateAnalysisFromCode } from '@/app/actions/node-operations';
 import { useServerAction } from 'zsa-react';
 import { generatePageLevelPrd, inferPrdOptions, PrdOptions } from '@/utils/codeToPrdTable';
+import { getViewportSize } from '@/lib/viewport-constants';
 import { toast } from 'sonner';
 import { clsx } from 'clsx';
+import { isPlaceholderUiCode } from '@/utils/prdGenerator';
 
 // 简单的编辑器组件
 const EditorSection = ({ value, onChange, onBlur, placeholder }: { value: string, onChange: (v: string) => void, onBlur?: () => void, placeholder: string }) => {
@@ -150,22 +152,31 @@ export function NodeDetailPanel() {
 
   // --- Actions ---
 
-  const handleRefineUI = async () => {
+  const handleAddInteractions = async () => {
     setIsLoading(true);
     try {
       const currentCode = data.artifacts.view.code;
-      const result = await refineUI(currentCode);
+      if (!currentCode?.trim()) {
+        toast.error('请先生成 UI 代码');
+        setIsLoading(false);
+        return;
+      }
+      const nodeList = nodes.map((n) => ({
+        id: n.id,
+        label: (n.data?.label as string) || (n.data?.artifacts?.spec?.title as string) || '',
+      }));
+      const result = await addInteractionsToReact(currentCode, nodeList);
       if (!result.ok) {
-        toast.error(`优化失败: ${result.message}`);
+        toast.error(`增加交互失败: ${result.message}`);
         return;
       }
       updateNodeData(selectedNode.id, {
-        artifacts: { ...data.artifacts, view: { ...data.artifacts.view, code: result.data.code } }
+        artifacts: { ...data.artifacts, view: { ...data.artifacts.view, code: result.data.code } },
       });
-      toast.success('界面优化完成');
+      toast.success('已为当前页增加交互逻辑（日期选择、跳转等）');
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : '未知错误';
-      toast.error(`优化失败: ${errorMessage}`);
+      toast.error(`增加交互失败: ${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -567,34 +578,43 @@ export function NodeDetailPanel() {
           <div className="h-10 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900/30">
             <span className="text-xs text-zinc-400 font-mono">实时预览</span>
             <div className="flex items-center gap-2">
-              <div className="flex rounded-lg border border-zinc-700 overflow-hidden" role="group" aria-label="视口预设">
-                {[
-                  { id: 'mobile', label: '移动', icon: Smartphone, title: '移动端 375px' },
-                  { id: 'desktop', label: '桌面', icon: Monitor, title: '桌面 1280px' },
-                ].map(({ id, label, icon: Icon, title }) => (
-                  <button
-                    key={id}
-                    type="button"
-                    data-testid={id === 'desktop' ? 'viewport-desktop' : 'viewport-mobile'}
-                    aria-label={`视口: ${label}${id === 'desktop' ? ' (PC)' : ''}`}
-                    onClick={() => {
-                      const preset = id as 'mobile' | 'desktop';
-                      setViewportPreset(preset);
-                      viewportSubmitRef.current = preset;
-                    }}
-                    title={title}
-                    className={clsx(
-                      'px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-colors',
-                      viewportPreset === id
-                        ? 'bg-cyan-600 text-white'
-                        : 'text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800'
-                    )}
-                  >
-                    <Icon size={14} />
-                    {label}
-                  </button>
-                ))}
-              </div>
+              {(() => {
+                const viewCode = selectedNode?.data?.artifacts?.view?.code;
+                const hasGeneratedUi = !!viewCode?.trim() && !isPlaceholderUiCode(viewCode);
+                return (
+                  <div className="flex rounded-lg border border-zinc-700 overflow-hidden" role="group" aria-label="视口预设">
+                    {[
+                      { id: 'mobile', label: '移动', icon: Smartphone, title: '移动端 375px' },
+                      { id: 'desktop', label: '桌面', icon: Monitor, title: '桌面 1280px' },
+                    ].map(({ id, label, icon: Icon, title }) => (
+                      <button
+                        key={id}
+                        type="button"
+                        data-testid={id === 'desktop' ? 'viewport-desktop' : 'viewport-mobile'}
+                        aria-label={hasGeneratedUi ? `视口已锁定: ${label}` : `视口: ${label}${id === 'desktop' ? ' (PC)' : ''}`}
+                        disabled={hasGeneratedUi}
+                        onClick={() => {
+                          if (hasGeneratedUi) return;
+                          const preset = id as 'mobile' | 'desktop';
+                          setViewportPreset(preset);
+                          viewportSubmitRef.current = preset;
+                        }}
+                        title={hasGeneratedUi ? '已生成 UI，不可再切换移动端/PC 端' : title}
+                        className={clsx(
+                          'px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-colors',
+                          hasGeneratedUi && 'cursor-not-allowed opacity-70',
+                          viewportPreset === id
+                            ? 'bg-cyan-600 text-white'
+                            : 'text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800'
+                        )}
+                      >
+                        <Icon size={14} />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
               <button
                 onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
                 title="缩小预览"
@@ -611,15 +631,15 @@ export function NodeDetailPanel() {
                 <ZoomIn size={14} />
               </button>
               <button
-                onClick={handleRefineUI}
+                onClick={handleAddInteractions}
                 disabled={isLoading}
-                title="优化 UI 样式"
+                title="为当前页增加交互逻辑（日期选择、下拉、按钮跳转等）"
                 className={clsx(
                   'ml-2 text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors',
                   isLoading ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-cyan-500 hover:bg-cyan-400 text-white'
                 )}
               >
-                <Wand2 size={10} /> 美化
+                <Wand2 size={10} /> 增加交互
               </button>
             </div>
           </div>
@@ -630,7 +650,7 @@ export function NodeDetailPanel() {
             className="flex-1 min-w-0 w-full overflow-hidden flex justify-center items-start pt-2 pb-2 px-2 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] relative"
           >
             {(() => {
-              const presetSize = viewportPreset === 'mobile' ? { w: 375, h: 812 } : { w: 1280, h: 800 };
+              const presetSize = getViewportSize(viewportPreset);
               const { w: cw, h: ch } = previewContainerSize;
               const fitScale = cw > 0 && ch > 0
                 ? Math.min(1, cw / presetSize.w, ch / presetSize.h)
@@ -668,16 +688,18 @@ export function NodeDetailPanel() {
         </div>
       </div>
 
-      {/* 需求文档/测试用例抽屉：从右侧滑出 */}
+      {/* 需求文档/测试用例抽屉：从右侧滑出，遮盖层需高于底部 CommandBar(z-50) */}
       {docDrawerOpen && (
         <>
           <div
-            className="fixed inset-0 bg-black/60 z-[100]"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-black/70 z-[9998] pointer-events-auto"
+            style={{ zIndex: 9998 }}
             aria-hidden
             onClick={() => setDocDrawerOpen(false)}
           />
           <div
-            className="fixed top-0 right-0 bottom-0 w-full max-w-lg bg-zinc-900 border-l border-zinc-800 shadow-xl z-[110] flex flex-col overflow-hidden animate-in slide-in-from-right duration-200"
+            className="fixed top-0 right-0 bottom-0 w-full max-w-lg bg-zinc-900 border-l border-zinc-800 shadow-xl z-[9999] flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 pointer-events-auto"
+            style={{ zIndex: 9999 }}
             role="dialog"
             aria-label={docDrawerTab === 'spec' ? '需求文档' : '测试用例'}
           >

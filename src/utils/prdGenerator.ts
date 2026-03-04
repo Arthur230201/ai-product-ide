@@ -7,13 +7,15 @@ import type { Edge } from 'reactflow';
 import { extractBodyContent, extractStylesFromHtml, isHtmlCode } from './html-body-extractor';
 import { PREVIEW_UI_PRD_BUNDLE, PREVIEW_UI_PRD_BUNDLE_CALL } from '@/lib/preview-ui-prd-bundle.generated';
 
-/** 判断是否为占位 UI 代码（无实际界面，导出时不应显示「UI 加载中」） */
-function isPlaceholderUiCode(code: string | undefined): boolean {
+/** 判断是否为占位 UI 代码（无实际界面，导出时不应显示「UI 加载中」）。可供画布侧判断「是否已生成真实 UI」以锁定视口切换。 */
+export function isPlaceholderUiCode(code: string | undefined): boolean {
   if (!code || !code.trim()) return true;
   const t = code.trim();
   if (t === '// PLACEHOLDER') return true;
   if (/生成\s*UI\s*后将替换/.test(code)) return true;
   if (code.length < 280 && /这是\s*[\s\S]*?\s*页面[\s\S]*?生成\s*UI/.test(code)) return true;
+  // 「这是 XXX 页面」类简单占位（无真实组件），不展示为「由代码渲染」、不参与 mount
+  if (code.length < 520 && /这是\s*[\s\S]*?页面/.test(code) && !/Button|Card|Input|ListItem|AppBar|Sidebar|Dialog|Badge|StatCard|PageHeader|NavBar|TabsList|Separator|Progress|Alert|Avatar/.test(code)) return true;
   return false;
 }
 
@@ -815,8 +817,8 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                   
                   const uiPreview = node.uiPreview || '';
                   const hasRealPreview = !!node.hasRealPreview;
-                  // 仅在有实际 UI 代码时显示“由代码渲染”挂载区；无 UI 且无真实预览图时显示「暂无 UI 预览」
-                  const hasValidUiCode = !!(node.uiCode && node.uiCode.trim() && node.uiCode !== '// PLACEHOLDER');
+                  // 仅在有实际 UI 代码且非占位时显示“由代码渲染”挂载区；无 UI 且无真实预览图时显示「暂无 UI 预览」
+                  const hasValidUiCode = !!(node.uiCode && node.uiCode.trim() && !isPlaceholderUiCode(node.uiCode));
                   
                   // Section counter for this page (starts at 1 for UI preview)
                   let sectionIdx = 1;
@@ -1106,14 +1108,23 @@ export function generateFullPrdHtml(data: FullPrdData): string {
           }
         }
 
-        // Mount React components
+        // Mount React components（依赖内联 preview-ui bundle 已执行，__PRD_CN__ 等已挂到 window）
         function mountComponents() {
+          if (typeof window.__PRD_CN__ === 'undefined') {
+            console.warn('⚠️ [mountComponents] preview-ui 未加载（请使用最新导出重新生成 PRD）');
+            document.querySelectorAll('[id^="root-"].device-sandbox').forEach(function(el) {
+              if (el.textContent && el.textContent.indexOf('加载中') !== -1) {
+                el.innerHTML = '<div style="padding:20px;color:#64748b;text-align:center;font-size:13px;">请使用「导出 PRD」重新生成此文件以正确渲染 UI</div>';
+              }
+            });
+            return;
+          }
           console.log('🔧 [mountComponents] Starting component mounting...');
           
           const nodesWithCode = ${JSON.stringify(
             data.nodes
               .map((node, nodeIdx) => ({ node, nodeIdx }))
-              .filter(({ node }) => node.uiCode && node.uiCode.trim() && node.uiCode !== '// PLACEHOLDER')
+              .filter(({ node }) => node.uiCode && node.uiCode.trim() && !isPlaceholderUiCode(node.uiCode))
               .map(({ node, nodeIdx }) => ({
                 nodeId: node.nodeId || `node-${nodeIdx}`,
                 uiCode: node.uiCode || '',
