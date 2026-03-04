@@ -10,7 +10,8 @@
     "selfcheck": "node scripts/self-check.mjs",
     "journey:full": "node scripts/run-journey-export.mjs",
     "viewport:debug": "node scripts/viewport-debug-run.mjs",
-    "viewport:read": "node scripts/viewport-debug-read.mjs"
+    "viewport:read": "node scripts/viewport-debug-read.mjs",
+    "build:prd-bundle": "node scripts/build-preview-ui-prd-bundle.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.46",
@@ -60,6 +61,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.20",
+    "esbuild": "^0.24.2",
     "eslint": "^8",
     "eslint-config-next": "^14.2.0",
     "postcss": "^8.4.47",

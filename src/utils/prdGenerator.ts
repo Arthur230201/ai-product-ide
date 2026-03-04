@@ -5,6 +5,17 @@ import type { ProjectMeta, GlobalRules } from '@/types/fractal';
 import type { FractalNode } from '@/types/fractal';
 import type { Edge } from 'reactflow';
 import { extractBodyContent, extractStylesFromHtml, isHtmlCode } from './html-body-extractor';
+import { PREVIEW_UI_PRD_BUNDLE, PREVIEW_UI_PRD_BUNDLE_CALL } from '@/lib/preview-ui-prd-bundle.generated';
+
+/** 判断是否为占位 UI 代码（无实际界面，导出时不应显示「UI 加载中」） */
+function isPlaceholderUiCode(code: string | undefined): boolean {
+  if (!code || !code.trim()) return true;
+  const t = code.trim();
+  if (t === '// PLACEHOLDER') return true;
+  if (/生成\s*UI\s*后将替换/.test(code)) return true;
+  if (code.length < 280 && /这是\s*[\s\S]*?\s*页面[\s\S]*?生成\s*UI/.test(code)) return true;
+  return false;
+}
 
 // 1. 定义文档的样式 (打印友好 + 屏幕阅读友好)
 const STYLES = `
@@ -271,6 +282,8 @@ export interface RequirementSection {
 export interface PageNode {
   title: string;          // e.g., "订单列表页"
   uiPreview: string;      // Base64 图片
+  /** 是否有真实预览图（导出截图或 view.previewUrl），无 UI 代码且无真实预览时显示「暂无 UI 预览」 */
+  hasRealPreview?: boolean;
   uiCode?: string;        // React 组件代码或 HTML（含 style+body，用于界面示意）
   isHtml?: boolean;       // 为 true 时用 innerHTML 渲染，避免当 React 导致空白
   nodeId?: string;        // 节点唯一标识符（用于生成挂载点 ID）
@@ -358,6 +371,9 @@ export function generateFullPrdHtml(data: FullPrdData): string {
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide React (UMD expects window.react); export PRD 中保留图标等外部依赖 -->
+    <script>window.react=window.React;</script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide-react@0.484.0/dist/umd/lucide-react.min.js"></script>
     <script type="module">
       import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
       mermaid.initialize({ 
@@ -397,6 +413,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
             border-radius: 3px;
         }
         .main-content { margin-left: 280px; min-height: 100vh; background: #fff; }
+        [id].prd-scroll-target { scroll-margin-top: 1.5rem; }
         .device-sandbox { position: relative; width: 100%; min-height: 400px; height: 100%; overflow: hidden; border-radius: 1rem; border: 2px solid #e2e8f0; background: #fff; }
         .device-sandbox > div { width: 100%; height: 100%; min-height: 100%; box-sizing: border-box; }
         .prd-ui-viewport { min-height: 100%; box-sizing: border-box; }
@@ -578,6 +595,21 @@ export function generateFullPrdHtml(data: FullPrdData): string {
         .phone-mockup img:hover {
             transform: scale(1.02);
         }
+        /* PC 端界面示意：桌面比例，非手机框 */
+        .desktop-viewport {
+            width: 100%;
+            min-width: 320px;
+            max-width: 100%;
+            min-height: 480px;
+            border-radius: 0.75rem;
+            border: 2px solid #e2e8f0;
+            overflow: hidden;
+            background: #fff;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08);
+        }
+        .desktop-viewport .device-sandbox {
+            min-height: 480px;
+        }
         
         /* PRD Table Styling */
         .markdown-body table {
@@ -666,7 +698,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                 const sectionsMenu = n.sections && n.sections.length > 0
                     ? n.sections.map((section, secIdx) => {
                         const secNum = `${nodeNum}.${tempSectionIdx++}`;
-                        return `<a href="#node-${i}-section-${tempSectionIdx - 1}" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">${secNum} ${section.title}</a>`;
+                        return `<a href="#node-${i}-section-${secIdx}" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">${secNum} ${section.title}</a>`;
                     }).join('')
                     : '';
                 // 更新 sectionIdx 以便用户故事使用正确的编号
@@ -692,7 +724,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
     <main class="main-content">
         <div class="max-w-5xl mx-auto p-12">
             
-            <section id="version-control" class="mb-16">
+            <section id="version-control" class="mb-16 prd-scroll-target">
                 <div class="bg-slate-50 rounded-xl border p-6">
                     <h2 style="margin-top:0; border:none; padding-bottom:0;">📝 文档版本记录</h2>
                     <table class="w-full text-sm text-left mt-4 border-collapse bg-white">
@@ -718,7 +750,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
 
             <hr class="my-12 border-slate-200" />
 
-            <section id="ch1" class="mb-20 scroll-mt-10">
+            <section id="ch1" class="mb-20 scroll-mt-10 prd-scroll-target">
                 <h1>第 1 章：项目综述</h1>
                 
                 <h3>1.1 项目背景</h3>
@@ -732,7 +764,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                 </div>
             </section>
 
-            <section id="ch2" class="mb-20 scroll-mt-10">
+            <section id="ch2" class="mb-20 scroll-mt-10 prd-scroll-target">
                 <h1>第 2 章：全局规范</h1>
                 
                 <h3>2.1 全局交互/数据规则</h3>
@@ -747,7 +779,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                 </div>
             </section>
 
-            <section id="ch3" class="mb-20 scroll-mt-10">
+            <section id="ch3" class="mb-20 scroll-mt-10 prd-scroll-target">
                 <h1>第 3 章：系统架构</h1>
                 
                 <h3>3.1 架构拓扑图</h3>
@@ -762,7 +794,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                 ${renderTopology(data.images.topology || '')}
             </section>
 
-            <section id="ch4" class="mb-20 scroll-mt-10">
+            <section id="ch4" class="mb-20 scroll-mt-10 prd-scroll-target">
                 <h1>第 4 章：业务流程</h1>
                 
                 <h3>4.1 核心业务泳道图</h3>
@@ -773,7 +805,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                 </div>
             </section>
 
-            <section id="ch5" class="mb-32 scroll-mt-10">
+            <section id="ch5" class="mb-32 scroll-mt-10 prd-scroll-target">
                 <h1>第 5 章：功能详述</h1>
                 <p class="text-gray-500 mb-8">本章节包含各个页面的 UI 原型图及详细的功能需求说明。</p>
 
@@ -781,9 +813,10 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                   // Automatic Numbering: Chapter 5, Node level (5.1, 5.2, ...)
                   const nodeNum = `5.${nodeIdx + 1}`;
                   
-                  // Ensure UI preview exists
                   const uiPreview = node.uiPreview || '';
-                  const hasUIPreview = uiPreview && uiPreview.length > 0;
+                  const hasRealPreview = !!node.hasRealPreview;
+                  // 仅在有实际 UI 代码时显示“由代码渲染”挂载区；无 UI 且无真实预览图时显示「暂无 UI 预览」
+                  const hasValidUiCode = !!(node.uiCode && node.uiCode.trim() && node.uiCode !== '// PLACEHOLDER');
                   
                   // Section counter for this page (starts at 1 for UI preview)
                   let sectionIdx = 1;
@@ -797,7 +830,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                         
                         if (section.type === 'table') {
                           return `
-                            <div id="node-${nodeIdx}-section-${secIdx - 1}" class="mb-6 scroll-mt-20">
+                            <div id="node-${nodeIdx}-section-${secIdx}" class="mb-6 scroll-mt-20 prd-scroll-target">
                                 <h3>${secNum} ${section.title}</h3>
                                 <div class="overflow-x-auto">
                                     ${parsedContent}
@@ -813,7 +846,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                             // 保持原样，但添加 id 用于锚点
                           }
                           return `
-                            <div id="node-${nodeIdx}-section-${secIdx - 1}" class="mb-6 scroll-mt-20">
+                            <div id="node-${nodeIdx}-section-${secIdx}" class="mb-6 scroll-mt-20 prd-scroll-target">
                                 <h3>${secNum} ${section.title}</h3>
                                 <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg">
                                     ${contentWithH4}
@@ -893,7 +926,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                     : '';
                   
                   return `
-                <div id="node-${nodeIdx}" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20">
+                <div id="node-${nodeIdx}" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20 prd-scroll-target">
                     <!-- Page Title (H2) -->
                     <h2>${nodeNum} ${node.title || `功能模块 ${nodeIdx + 1}`}</h2>
                     
@@ -902,8 +935,15 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                         <div class="col-span-4">
                             <div class="sticky-ui">
                                 <h3>${nodeNum}.${sectionIdx++} 界面示意</h3>
-                                ${hasUIPreview ? `
-                                <div class="phone-mockup bg-white">
+                                ${hasValidUiCode ? `
+                                <div class="desktop-viewport bg-white">
+                                    <div id="root-${node.nodeId || `node-${nodeIdx}`}" class="device-sandbox bg-white" style="min-height: 480px; width: 100%;">
+                                        <div class="flex items-center justify-center h-full text-slate-400 text-sm">UI 加载中…</div>
+                                    </div>
+                                </div>
+                                <p class="text-center text-xs text-slate-500 mt-3 font-mono">图 ${nodeNum}.${sectionIdx - 1} 界面示意（PC 端由代码渲染）</p>
+                                ` : hasRealPreview ? `
+                                <div class="desktop-viewport bg-white">
                                     <img 
                                         src="${uiPreview}" 
                                         class="w-full h-auto block" 
@@ -914,7 +954,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                                 </div>
                                 <p class="text-center text-xs text-slate-500 mt-3 font-mono">图 ${nodeNum}.${sectionIdx - 1} UI 示意（点击放大）</p>
                                 ` : `
-                                <div class="phone-mockup bg-slate-50 flex items-center justify-center" style="min-height: 400px;">
+                                <div class="desktop-viewport bg-slate-50 flex items-center justify-center" style="min-height: 480px;">
                                     <div class="text-center text-slate-400">
                                         <div class="text-4xl mb-2">📱</div>
                                         <p class="text-sm">暂无 UI 预览</p>
@@ -984,51 +1024,60 @@ export function generateFullPrdHtml(data: FullPrdData): string {
             }
         });
 
-        // Sidebar Smooth Scroll
-        document.querySelectorAll('nav a').forEach(anchor => {
-            anchor.addEventListener('click', function (e) {
-                e.preventDefault();
-                const targetId = this.getAttribute('href');
-                const target = document.querySelector(targetId);
+        // Sidebar 锚点跳转：点击左侧目录滚动到对应内容
+        document.querySelectorAll('aside nav a[href^="#"]').forEach(function(anchor) {
+            anchor.addEventListener('click', function(e) {
+                var href = this.getAttribute('href');
+                if (!href || href === '#') return;
+                var target = document.querySelector(href);
                 if (target) {
-                    target.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                });
+                    e.preventDefault();
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             });
         });
 
-        // Highlight active section in sidebar on scroll
-        const sections = document.querySelectorAll('section[id]');
-        const navLinks = document.querySelectorAll('nav a[href^="#"]');
-        
+        // 滚动高亮：左侧目录高亮当前可见的章节（含 section 与 node 块）
+        var scrollTargets = document.querySelectorAll('section[id], [id^="node-"]');
+        var navLinks = document.querySelectorAll('aside nav a[href^="#"]');
         function updateActiveNav() {
-            let current = '';
-            sections.forEach(section => {
-                const sectionTop = section.getBoundingClientRect().top;
-                if (sectionTop <= 100) {
-                    current = section.getAttribute('id') || '';
+            var current = '';
+            var minTop = 1e9;
+            scrollTargets.forEach(function(el) {
+                var rect = el.getBoundingClientRect();
+                if (rect.top <= 120 && rect.top > -rect.height * 0.5) {
+                    if (rect.top < minTop) {
+                        minTop = rect.top;
+                        current = el.getAttribute('id') || '';
+                    }
                 }
             });
-            
-            navLinks.forEach(link => {
-                link.classList.remove('bg-slate-800', 'text-white');
-                link.classList.add('text-slate-400');
-                if (link.getAttribute('href') === '#' + current) {
+            navLinks.forEach(function(link) {
+                var h = link.getAttribute('href') || '';
+                if (h === '#' + current) {
                     link.classList.add('bg-slate-800', 'text-white');
                     link.classList.remove('text-slate-400');
+                } else {
+                    link.classList.remove('bg-slate-800', 'text-white');
+                    link.classList.add('text-slate-400');
                 }
             });
         }
-        
         window.addEventListener('scroll', updateActiveNav);
-        updateActiveNav(); // Initial call
+        updateActiveNav();
 
         // ============================================================================
         // React Component Mounting Logic
         // ============================================================================
-        
+        // Lucide 未加载时（如 file:// 或 CDN 失败）提供占位，避免组件报错导致一直「UI 加载中」
+        if (typeof window.LucideReact === 'undefined') {
+          window.LucideReact = new Proxy({}, { get: function() { return function(props) { return window.React.createElement('span', { className: 'inline-block w-4 h-4 bg-slate-300 rounded', title: 'icon' }); }; }; });
+        }
+    </script>
+    <!-- PRD 内联 preview-ui：与项目内一致的 cn + 组件，离线打开时 UI 一致 -->
+    <script>${PREVIEW_UI_PRD_BUNDLE}</script>
+    <script>${PREVIEW_UI_PRD_BUNDLE_CALL}</script>
+    <script>
         // Wait for React and ReactDOM to be loaded
         function waitForReact(callback, maxRetries = 20, delay = 200) {
           const hasReact = typeof window.React !== 'undefined';
@@ -1063,9 +1112,10 @@ export function generateFullPrdHtml(data: FullPrdData): string {
           
           const nodesWithCode = ${JSON.stringify(
             data.nodes
-              .filter((node) => node.uiCode)
-              .map((node, idx) => ({
-                nodeId: node.nodeId || `node-${idx}`,
+              .map((node, nodeIdx) => ({ node, nodeIdx }))
+              .filter(({ node }) => node.uiCode && node.uiCode.trim() && node.uiCode !== '// PLACEHOLDER')
+              .map(({ node, nodeIdx }) => ({
+                nodeId: node.nodeId || `node-${nodeIdx}`,
                 uiCode: node.uiCode || '',
                 title: node.title || '未命名页面',
                 isHtml: !!node.isHtml,
@@ -1133,11 +1183,11 @@ export function generateFullPrdHtml(data: FullPrdData): string {
               // Step 1: Remove TypeScript type definitions and annotations (Babel can't handle TS)
               // Remove type definitions using a more robust approach that handles multi-line and nested braces
               // First, remove simple single-line type definitions: type X = Y;
-              componentCode = componentCode.replace(/^\s*type\s+\w+\s*=\s*[^;{]+;?\s*$/gm, '');
+              componentCode = componentCode.replace(/^\\s*type\\s+\\w+\\s*=\\s*[^;{]+;?\\s*$/gm, '');
               
               // Then, remove multi-line type definitions: type X = { ... } (handles nested braces)
               // This regex matches: type NAME = { ... } where ... can contain nested braces
-              let typeRegex = /^\s*type\s+\w+\s*=\s*\{/gm;
+              let typeRegex = /^\\s*type\\s+\\w+\\s*=\\s*\\{/gm;
               let match;
               while ((match = typeRegex.exec(componentCode)) !== null) {
                 let start = match.index;
@@ -1165,7 +1215,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                 
                 if (!foundEnd) {
                   // If we didn't find the end, just remove from start to end of line
-                  let lineEnd = componentCode.indexOf('\n', start);
+                  let lineEnd = componentCode.indexOf('\\n', start);
                   if (lineEnd === -1) lineEnd = componentCode.length;
                   componentCode = componentCode.substring(0, start) + componentCode.substring(lineEnd);
                 }
@@ -1175,38 +1225,47 @@ export function generateFullPrdHtml(data: FullPrdData): string {
               }
               
               // Remove interface definitions: interface X { ... }
-              componentCode = componentCode.replace(/^\s*interface\s+\w+[^{]*\{[^}]*\}\s*;?\s*$/gm, '');
+              componentCode = componentCode.replace(/^\\s*interface\\s+\\w+[^{]*\\{[^}]*\\}\\s*;?\\s*$/gm, '');
               // Remove type annotations from variables: const x: Type = ...
-              componentCode = componentCode.replace(/:\s*[A-Z][a-zA-Z0-9<>\[\]|&\s,]*(\s*=\s*)/g, '$1');
+              componentCode = componentCode.replace(/:\\s*[A-Z][a-zA-Z0-9<>\\[\\]|&\\s,]*(\\s*=\\s*)/g, '$1');
               // Remove type annotations from function parameters: (x: Type) => ...
-              componentCode = componentCode.replace(/\(([^)]*)\)/g, function(match, params) {
-                return '(' + params.replace(/:\s*[A-Z][a-zA-Z0-9<>\[\]|&\s,]*/g, '').replace(/,\s*,/g, ',').replace(/^,\s*|,\s*$/g, '') + ')';
+              componentCode = componentCode.replace(/\\(([^)]*)\\)/g, function(match, params) {
+                return '(' + params.replace(/:\\s*[A-Z][a-zA-Z0-9<>\\[\\]|&\\s,]*/g, '').replace(/,\\s*,/g, ',').replace(/^,\\s*|,\\s*$/g, '') + ')';
               });
               // Remove generic type parameters: <T> or <T extends ...>
-              componentCode = componentCode.replace(/<[A-Z][a-zA-Z0-9<>\[\]|&\s,=.]*>/g, '');
+              componentCode = componentCode.replace(/<[A-Z][a-zA-Z0-9<>\\[\\]|&\\s,=.]*>/g, '');
               // Remove 'as' type assertions: x as Type
-              componentCode = componentCode.replace(/\s+as\s+[A-Z][a-zA-Z0-9<>\[\]|&\s,]*/g, '');
+              componentCode = componentCode.replace(/\\s+as\\s+[A-Z][a-zA-Z0-9<>\\[\\]|&\\s,]*/g, '');
               // Remove import type statements: import type { ... } from ...
-              componentCode = componentCode.replace(/import\s+type\s+[^;]+;?\s*/g, '');
+              componentCode = componentCode.replace(/import\\s+type\\s+[^;]+;?\\s*/g, '');
               
               // Step 2: Remove Markdown code blocks if present
               const backtick = String.fromCharCode(96);
               componentCode = componentCode.replace(new RegExp(backtick + backtick + backtick + 'tsx|' + backtick + backtick + backtick + 'jsx|' + backtick + backtick + backtick + 'javascript|' + backtick + backtick + backtick + 'typescript|' + backtick + backtick + backtick, 'g'), '').trim();
               
               // Step 3: Remove export statements
-              componentCode = componentCode.replace(/^export\s+.*?;?\s*$/gm, '');
-              componentCode = componentCode.replace(/export\s+default\s+/g, '');
+              componentCode = componentCode.replace(/^export\\s+.*?;?\\s*$/gm, '');
+              componentCode = componentCode.replace(/export\\s+default\\s+/g, '');
               
-              // Step 4: Remove import statements (we'll handle dependencies separately if needed)
-              componentCode = componentCode.replace(/^import\s+.*?from\s+['"].*?['"];?\s*$/gm, '');
+              // Step 4: Replace lucide-react imports with window.LucideReact (保留图标等外部依赖)
+              componentCode = componentCode.replace(
+                /import\\s*\\{\\s*([^}]+)\\s*\\}\\s*from\\s*['"]lucide-react['"]\\s*;?/g,
+                'const { $1 } = window.LucideReact || {};'
+              );
+              componentCode = componentCode.replace(
+                /import\\s*\\*\\s*as\\s+(\\w+)\\s*from\\s*['"]lucide-react['"]\\s*;?/g,
+                'const $1 = window.LucideReact || {};'
+              );
+              // Remove other import statements (React etc. are already global)
+              componentCode = componentCode.replace(/^import\\s+.*?from\\s+['"].*?['"];?\\s*$/gm, '');
               
-              // Step 5: Replace function App with const App_[safeId] = () => {
+              // Step 5: Replace any component definition (App, Page, etc.) with const App_[safeId] = () => {
               const safeId = nodeData.nodeId.replace(/[^a-zA-Z0-9]/g, '_');
               const componentName = 'App_' + safeId;
               
-              // Handle different component definition patterns
+              // Handle different component definition patterns (any name: App, Page, etc.)
               componentCode = componentCode.replace(
-                /(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:function\s+App|const\s+App\s*=\s*\(.*?\)\s*=>|export\s+default\s+function\s+App)\s*(?:\(\))?\s*\{/g,
+                /(?:export\\s+(?:default\\s+)?)?(?:async\\s+)?function\\s+\\w+\\s*(?:\\([^)]*\\))?\\s*\\{|const\\s+\\w+\\s*=\\s*\\([^)]*\\)\\s*=>\\s*\\{/g,
                 'const ' + componentName + ' = () => {'
               );
 
@@ -1227,14 +1286,13 @@ export function generateFullPrdHtml(data: FullPrdData): string {
               console.log('✅ [mountComponents] Babel transformation successful');
               console.log('📝 [mountComponents] Transformed code length:', transformedCode.length);
 
-              // Create component function
+              // Create component function（注入内联 preview-ui 参数：cn、Button、Card 等）
               console.log('🏭 [mountComponents] Creating component function...');
-              const componentFn = new Function('React', 'ReactDOM', 
-                transformedCode + '\\nreturn ' + componentName + ';'
-              );
-
-              console.log('🎨 [mountComponents] Executing component function...');
-              const Component = componentFn(window.React, window.ReactDOM);
+              var stubNames = ['cn','Button','Card','CardHeader','CardTitle','CardContent','CardFooter','AppBar','ListItem','Badge','Input','Label','TabsList','TabsTrigger','TabsContent','Switch','Progress','Dialog','DialogHeader','DialogContent','DialogFooter','Textarea','Separator','Avatar','Alert','StatCard','NavBar','BottomNav','BottomNavItem','Sidebar','SidebarItem','EmptyState','PageHeader','Skeleton'];
+              var stubParams = ['React','ReactDOM'].concat(stubNames);
+              var stubArgs = [window.React, window.ReactDOM].concat(stubNames.map(function(n){ return window['__PRD_' + n + '__']; }));
+              var componentFn = new (Function.bind.apply(Function, [null].concat(stubParams, [transformedCode + '\\nreturn ' + componentName + ';'])));
+              var Component = componentFn.apply(null, stubArgs);
               
               if (!Component) {
                 throw new Error('Component function returned undefined');
@@ -1305,6 +1363,15 @@ export function generateFullPrdHtml(data: FullPrdData): string {
             console.log('🔄 [init] Retry mount (3000ms)');
             mountComponents();
           }, 3000);
+          
+          // 超时回退：若仍为「加载中」，提示用户
+          setTimeout(function() {
+            document.querySelectorAll('[id^="root-"]').forEach(function(el) {
+              if (el.textContent && el.textContent.indexOf('加载中') !== -1) {
+                el.innerHTML = '<div style="padding: 20px; color: #94a3b8; text-align: center; font-size: 13px;"><p>UI 未能渲染</p><p style="margin-top: 8px;">请用浏览器打开此 HTML 并允许加载脚本（React/Babel CDN）</p></div>';
+              }
+            });
+          }, 8000);
         });
     </script>
 </body>
@@ -1368,8 +1435,10 @@ ${globalRules.dataTracking || '（待补充）'}
       const bodyContent = extractBodyContent(rawHtml);
       uiCode = styles ? `${styles}\n${bodyContent}` : bodyContent;
     }
+    if (uiCode && isPlaceholderUiCode(uiCode)) uiCode = undefined;
     const placeholderSvg = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==';
     const uiPreview = nodePreviewUrls?.[node.id] ?? view?.previewUrl ?? placeholderSvg;
+    const hasRealPreview = !!(nodePreviewUrls?.[node.id] || (view?.previewUrl && view.previewUrl.trim().length > 0));
     
     // 构建需求章节数组
     const sections: RequirementSection[] = [];
@@ -1424,6 +1493,7 @@ ${globalRules.dataTracking || '（待补充）'}
     return {
       title: spec?.title || node.data.label || '未命名页面',
       uiPreview,
+      hasRealPreview,
       uiCode,
       isHtml: !!rawHtml,
       nodeId: (node as any).id || (node.data as any).id || node.data.label || 'node',
@@ -1531,7 +1601,9 @@ ${globalRules.dataTracking || '（待补充）'}
       const bodyContent = extractBodyContent(rawHtml);
       uiCode = styles ? `${styles}\n${bodyContent}` : bodyContent;
     }
+    if (uiCode && isPlaceholderUiCode(uiCode)) uiCode = undefined;
     const uiPreview = view?.previewUrl || (uiCode ? 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==' : 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YzZjRmNiIvPjx0ZXh0IHg9IjUwIiB5PSI1MCIgZm9udC1mYW1pbHk9IkFyaWFsIiBmb250LXNpemU9IjE0IiBmaWxsPSIjNjY2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+5peg5Zu+54mH5pyN5YqhPC90ZXh0Pjwvc3ZnPg==');
+    const hasRealPreview = !!(view?.previewUrl && view.previewUrl.trim().length > 0);
     const sections: RequirementSection[] = [];
     if (spec?.requirements) {
       const requirements = Array.isArray(spec.requirements) ? spec.requirements.join('\n') : spec.requirements;
@@ -1546,6 +1618,7 @@ ${globalRules.dataTracking || '（待补充）'}
     return {
       title: spec?.title || node.data?.label || '未命名页面',
       uiPreview,
+      hasRealPreview,
       uiCode,
       isHtml: !!rawHtml,
       nodeId: (node as any).id || (node.data as any).id || node.data?.label || 'node',
