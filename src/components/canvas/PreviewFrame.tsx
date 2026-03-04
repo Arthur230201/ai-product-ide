@@ -14,9 +14,15 @@ const PREVIEW_FRAME_CSS = `
     overflow-y: auto !important;
     overflow-x: hidden !important;
     -webkit-overflow-scrolling: touch;
+    display: flex !important;
+    flex-direction: column !important;
   }
   .preview-frame__inner > * {
     box-sizing: border-box !important;
+    flex: 1 1 0% !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
 `;
 

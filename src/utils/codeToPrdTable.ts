@@ -243,83 +243,105 @@ function generateFunctionDescription(
   return `用于展示${componentType}相关的内容信息。`;
 }
 
+/** Tailwind 常见色阶对应色号（用于展示规范中写出具体色号） */
+const TAILWIND_TO_HEX: Record<string, string> = {
+  'blue-500': '#3B82F6', 'blue-600': '#2563EB', 'blue-700': '#1D4ED8',
+  'red-500': '#EF4444', 'red-600': '#DC2626', 'rose-500': '#F43F5E', 'rose-600': '#E11D48',
+  'green-500': '#22C55E', 'green-600': '#16A34A', 'emerald-500': '#10B981', 'emerald-600': '#059669',
+  'yellow-500': '#EAB308', 'amber-500': '#F59E0B', 'amber-600': '#D97706',
+  'orange-500': '#F97316', 'orange-600': '#EA580C',
+  'purple-500': '#A855F7', 'purple-600': '#9333EA', 'indigo-500': '#6366F1',
+  'cyan-500': '#06B6D4', 'cyan-600': '#0891B2', 'teal-500': '#14B8A6',
+  'gray-400': '#9CA3AF', 'gray-500': '#6B7280', 'gray-600': '#4B5563', 'gray-700': '#374151',
+  'slate-400': '#94A3B8', 'slate-500': '#64748B', 'slate-600': '#475569', 'slate-700': '#334155',
+};
+
+function tailwindClassToHex(className: string): { label: string; hex: string } | null {
+  const m = className.match(/(?:bg|text|border)-(blue|red|rose|green|emerald|yellow|amber|orange|purple|indigo|cyan|teal|gray|slate)-(\d{3,4})/);
+  if (!m) return null;
+  const key = `${m[1]}-${m[2]}`;
+  const hex = TAILWIND_TO_HEX[key];
+  if (!hex) return null;
+  const role = className.includes('bg-') ? '背景色' : className.includes('text-') ? '文字色' : '边框色';
+  return { label: `${role} ${hex}`, hex };
+}
+
 /**
- * 翻译 Tailwind 类名为展示规范
+ * 翻译 Tailwind 类名为展示规范（有意义的文字+色号，禁止无意义的纯色块）
  */
 function translateDisplaySpecs(className: string, componentType: string, props: Record<string, any>): string {
   const specs: string[] = [];
 
-  // 颜色检测
+  // 颜色：用「语义 + 色号」描述，不单独使用色块
+  const colorSpecs: string[] = [];
   if (className.includes('bg-blue-') || className.includes('text-blue-')) {
-    specs.push('🔵 品牌色/主色（蓝色）');
+    const info = tailwindClassToHex(className) || { label: '蓝色', hex: '#2563EB' };
+    colorSpecs.push(`主色/链接色：${info.hex}`);
   }
-  if (className.includes('bg-red-') || className.includes('text-red-')) {
-    specs.push('🔴 警示/高危（红色）');
+  if (className.includes('bg-red-') || className.includes('text-red-') || className.includes('bg-rose-') || className.includes('text-rose-')) {
+    const info = tailwindClassToHex(className) || { label: '红色', hex: '#DC2626' };
+    colorSpecs.push(`警示/高危：${info.hex}`);
   }
-  if (className.includes('bg-green-') || className.includes('text-green-')) {
-    specs.push('🟢 成功/正常（绿色）');
+  if (className.includes('bg-green-') || className.includes('text-green-') || className.includes('bg-emerald-') || className.includes('text-emerald-')) {
+    const info = tailwindClassToHex(className) || { label: '绿色', hex: '#16A34A' };
+    colorSpecs.push(`成功/完成：${info.hex}`);
   }
-  if (className.includes('bg-orange-') || className.includes('text-orange-') || 
-      className.includes('bg-yellow-') || className.includes('text-yellow-')) {
-    specs.push('🟠 警告/待处理（橙色/黄色）');
+  if (className.includes('bg-orange-') || className.includes('text-orange-') || className.includes('bg-amber-') || className.includes('text-amber-') || className.includes('bg-yellow-') || className.includes('text-yellow-')) {
+    const info = tailwindClassToHex(className) || { label: '橙黄', hex: '#D97706' };
+    colorSpecs.push(`警告/待处理：${info.hex}`);
   }
-  if (className.includes('bg-purple-') || className.includes('text-purple-')) {
-    specs.push('🟣 特色功能（紫色）');
+  if (className.includes('bg-purple-') || className.includes('text-purple-') || className.includes('bg-indigo-') || className.includes('text-indigo-')) {
+    const info = tailwindClassToHex(className) || { label: '紫色', hex: '#9333EA' };
+    colorSpecs.push(`强调/品牌：${info.hex}`);
   }
-  if (className.includes('text-gray-') || className.includes('bg-gray-')) {
-    specs.push('⚪ 次要信息（灰色）');
+  if (className.includes('text-gray-') || className.includes('bg-gray-') || className.includes('text-slate-') || className.includes('bg-slate-')) {
+    const info = tailwindClassToHex(className) || { label: '灰色', hex: '#6B7280' };
+    colorSpecs.push(`次要/置灰：${info.hex}`);
   }
+  if (className.includes('bg-cyan-') || className.includes('text-cyan-') || className.includes('bg-teal-') || className.includes('text-teal-')) {
+    const info = tailwindClassToHex(className) || { label: '青色', hex: '#0891B2' };
+    colorSpecs.push(`主按钮/强调：${info.hex}`);
+  }
+  if (colorSpecs.length > 0) specs.push(colorSpecs.join('；'));
 
   // 形状
   if (className.includes('rounded-full')) {
-    specs.push('💊 胶囊样式');
+    specs.push('胶囊样式');
   } else if (className.includes('rounded')) {
     specs.push('圆角矩形');
   }
 
   // 字体
-  if (className.includes('font-bold')) {
-    specs.push('粗体高亮');
-  }
-  if (className.includes('text-xs')) {
-    specs.push('辅助小字');
-  }
-  if (className.includes('text-sm')) {
-    specs.push('小号文字');
+  if (className.includes('font-bold')) specs.push('粗体');
+  if (className.includes('text-xs')) specs.push('小号字');
+  if (className.includes('text-sm')) specs.push('正文小字');
+
+  // 按钮：明确写出「主按钮」「次要按钮」及色号
+  const lowerType = componentType.toLowerCase();
+  if (lowerType.includes('button') && colorSpecs.length > 0) {
+    specs.push('按钮样式见上方色号');
   }
 
-  // 图标
+  // 状态标签/徽章：建议写出「状态文案 + 颜色 + 色号」的规范
+  if ((lowerType.includes('badge') || lowerType.includes('tag')) && colorSpecs.length > 0) {
+    specs.push('状态文案与色号对应（如：执行中→蓝色 #2563EB，执行完毕→绿色 #16A34A）');
+  }
+
+  // 图标：用文字描述，不用色块
   if (componentType.includes('Icon') || componentType.match(/^[A-Z][a-z]+Icon$/)) {
     const iconName = componentType.replace('Icon', '').toLowerCase();
-    const iconEmoji: Record<string, string> = {
-      search: '🔍',
-      user: '👤',
-      calendar: '📅',
-      chevron: '⬇️',
-      close: '❌',
-      edit: '✏️',
-      delete: '🗑️',
+    const iconDesc: Record<string, string> = {
+      search: '搜索图标', user: '用户图标', calendar: '日历图标',
+      chevron: '下拉箭头', close: '关闭图标', edit: '编辑图标', delete: '删除图标',
     };
-    const emoji = iconEmoji[iconName] || '📌';
-    specs.push(`${emoji} ${translateElementName(componentType, props)}`);
+    specs.push(iconDesc[iconName] || '图标');
   }
 
-  // 占位符
-  if (props.placeholder) {
-    specs.push(`占位符："${props.placeholder}"`);
-  }
+  if (props.placeholder) specs.push(`占位符："${props.placeholder}"`);
+  if (props.defaultValue) specs.push(`默认值："${props.defaultValue}"`);
+  if (props.showActionButton === false || props.conditional) specs.push('仅在需要时显示');
 
-  // 默认值
-  if (props.defaultValue) {
-    specs.push(`默认值："${props.defaultValue}"`);
-  }
-
-  // 条件显示
-  if (props.showActionButton === false || props.conditional) {
-    specs.push('仅在需要时显示');
-  }
-
-  return specs.length > 0 ? specs.join(' + ') : '标准样式';
+  return specs.length > 0 ? specs.join('；') : '标准样式';
 }
 
 /**

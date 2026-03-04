@@ -2,6 +2,10 @@ import dagre from 'dagre';
 import type { Edge } from 'reactflow';
 import type { FractalNode } from '@/types/fractal';
 
+/** 画布节点默认宽高，与 FractalNode 视觉一致（w-64 ≈ 256px），供 React Flow 计算边连接点，避免生产环境首帧未测量时连线脱节 */
+export const DEFAULT_NODE_WIDTH = 256;
+export const DEFAULT_NODE_HEIGHT = 180;
+
 /**
  * 使用 dagre 自动布局节点
  * dagre 是一个专门用于有向图层次布局的库
@@ -19,9 +23,8 @@ export function getLayoutedElements(
     return nodes;
   }
 
-  // 节点尺寸（我们的自定义节点是卡片，宽度约 300px，高度约 200px）
-  const nodeWidth = 300;
-  const nodeHeight = 200;
+  const nodeWidth = DEFAULT_NODE_WIDTH;
+  const nodeHeight = DEFAULT_NODE_HEIGHT;
 
   // 如果没有边，使用简单的水平布局
   if (edges.length === 0) {
@@ -31,6 +34,8 @@ export function getLayoutedElements(
         x: 100 + index * 320, // 更紧凑的水平间距
         y: 200,
       },
+      width: node.width ?? nodeWidth,
+      height: node.height ?? nodeHeight,
     }));
   }
 
@@ -63,7 +68,7 @@ export function getLayoutedElements(
   // 计算布局
   dagre.layout(dagreGraph);
 
-  // 更新节点位置
+  // 更新节点位置，保留 width/height 供 React Flow 边连接点计算
   return nodes.map((node) => {
     const nodeWithPosition = dagreGraph.node(node.id);
     return {
@@ -72,6 +77,8 @@ export function getLayoutedElements(
         x: nodeWithPosition.x - nodeWidth / 2,
         y: nodeWithPosition.y - nodeHeight / 2,
       },
+      width: node.width ?? nodeWidth,
+      height: node.height ?? nodeHeight,
     };
   });
 }

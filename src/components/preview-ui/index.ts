@@ -24,4 +24,5 @@ export { StatCard } from './stat-card';
 export { ListItem } from './list-item';
 export { EmptyState } from './empty-state';
 export { PageHeader } from './page-header';
+export { Dialog, DialogHeader, DialogContent, DialogFooter } from './dialog';
 export { cn } from './cn';

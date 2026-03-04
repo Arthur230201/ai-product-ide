@@ -14,6 +14,7 @@ import { buildInjectorScript } from '@/lib/ui/injector';
 import { toast } from 'sonner';
 import { clsx } from 'clsx';
 import { selectNavigationEdge } from '@/lib/navigation/edge-navigator';
+import { getViewportSize } from '@/lib/viewport-constants';
 
 interface PresentationModeProps {
   initialNodeId: string | null;
@@ -65,32 +66,28 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
     return nodes.find((node) => node.id === currentSlideNodeId) || null;
   }, [currentSlideNodeId, nodes]);
 
-  // 查找下一个节点（第一个出边的目标节点）
-  const getNextNode = (): string | null => {
-    if (!currentSlideNodeId) return null;
-    
-    const outgoingEdges = edges.filter((edge) => edge.source === currentSlideNodeId);
-    if (outgoingEdges.length === 0) return null;
-    
-    // 返回第一个出边的目标节点
-    return outgoingEdges[0].target;
-  };
+  // 演示顺序：按画布节点列表顺序，保证左右键可遍历所有页面
+  const orderedNodeIds = useMemo(() => nodes.map((n) => n.id), [nodes]);
 
-  // 查找上一个节点（第一个入边的源节点）
+  // 下一页：顺序中的下一个节点
+  const getNextNode = useCallback((): string | null => {
+    if (!currentSlideNodeId || orderedNodeIds.length === 0) return null;
+    const idx = orderedNodeIds.indexOf(currentSlideNodeId);
+    if (idx === -1 || idx >= orderedNodeIds.length - 1) return null;
+    return orderedNodeIds[idx + 1] ?? null;
+  }, [currentSlideNodeId, orderedNodeIds]);
+
+  // 上一页：顺序中的上一个节点
   const getPrevNode = useCallback((): string | null => {
-    if (!currentSlideNodeId) return null;
-    
-    const incomingEdges = edges.filter((edge) => edge.target === currentSlideNodeId);
-    if (incomingEdges.length === 0) return null;
-    
-    // 返回第一个入边的源节点
-    return incomingEdges[0].source;
-  }, [currentSlideNodeId, edges]);
+    if (!currentSlideNodeId || orderedNodeIds.length === 0) return null;
+    const idx = orderedNodeIds.indexOf(currentSlideNodeId);
+    if (idx <= 0) return null;
+    return orderedNodeIds[idx - 1] ?? null;
+  }, [currentSlideNodeId, orderedNodeIds]);
 
   const handleNext = () => {
     const nextId = getNextNode();
     if (nextId) {
-      // 将当前节点添加到历史记录
       if (currentSlideNodeId) {
         navigationHistoryRef.current.push(currentSlideNodeId);
       }
@@ -99,18 +96,18 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
   };
 
   const handlePrev = () => {
-    // 优先从历史记录中恢复
+    // 左右键按顺序翻页，不依赖历史记录，以便在所有页面间切换
+    const prevId = getPrevNode();
+    if (prevId) {
+      setCurrentSlideNodeId(prevId);
+      return;
+    }
+    // 仅当顺序上没有上一页时，再尝试从历史恢复（例如从链接跳转后的返回）
     if (navigationHistoryRef.current.length > 0) {
       const previousNodeId = navigationHistoryRef.current.pop();
       if (previousNodeId) {
         setCurrentSlideNodeId(previousNodeId);
-        return;
       }
-    }
-    // 如果没有历史记录，使用 getPrevNode
-    const prevId = getPrevNode();
-    if (prevId) {
-      setCurrentSlideNodeId(prevId);
     }
   };
 
@@ -320,12 +317,19 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
         </button>
       </div>
 
-      {/* Main Content - 全屏时只显示预览区且占满，否则预览与说明各占 1/2 */}
-      <div className={clsx('flex-1 overflow-hidden h-full flex', isFullscreen ? '' : 'grid grid-cols-[1fr_1fr]')}>
-        {/* Left Column - Preview (全屏时占满，否则 1/2) */}
+      {/* Main Content - 以预览区比例合适为优先：PC 端多给预览、少给右侧文档；移动端可接近 1:1 */}
+      <div
+        className={clsx(
+          'flex-1 overflow-hidden h-full flex',
+          isFullscreen ? '' : 'grid',
+          !isFullscreen && viewportPreset === 'desktop' && 'grid-cols-[minmax(0,2.5fr)_minmax(0,1fr)]',
+          !isFullscreen && viewportPreset === 'mobile' && 'grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]'
+        )}
+      >
+        {/* Left Column - Preview (PC 端占约 2/3+，移动端略大于 1/2，全屏时占满) */}
         <div 
           ref={leftPanelRef}
-          className={clsx('border-r border-gray-200 bg-gray-100 flex flex-col overflow-hidden relative', isFullscreen && 'flex-1 min-w-0')}
+          className={clsx('border-r border-gray-200 bg-gray-100 flex flex-col overflow-hidden relative min-w-0', isFullscreen && 'flex-1')}
           style={{ 
             height: '100%',
             maxHeight: '100%',
@@ -386,9 +390,9 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
               paddingRight: '20px',
             }}
           >
-            {/* 设备模拟器容器 - 尺寸随 viewportPreset 变化 */}
+            {/* 设备模拟器容器 - 使用标准视口比例（与编辑模式一致） */}
             {(() => {
-              const presetSize = viewportPreset === 'mobile' ? { w: 375, h: 812 } : { w: 1280, h: 800 };
+              const presetSize = getViewportSize(viewportPreset);
               const isPhone = viewportPreset === 'mobile';
               return (
             <div 
@@ -534,7 +538,23 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
                             </div>
                           ) : (
                             <div className="w-full h-full">
-                              <LivePreview code={artifacts.view.code} zoom={1} isPresentationMode={true} />
+                              <LivePreview
+                                code={artifacts.view.code}
+                                zoom={1}
+                                isPresentationMode={true}
+                                onNavigateToNode={(target) => {
+                                  const node = nodes.find(
+                                    (n) =>
+                                      n.id === target ||
+                                      n.data?.label === target ||
+                                      n.data?.artifacts?.spec?.title === target
+                                  );
+                                  if (node) {
+                                    if (currentSlideNodeId) navigationHistoryRef.current.push(currentSlideNodeId);
+                                    setCurrentSlideNodeId(node.id);
+                                  }
+                                }}
+                              />
                             </div>
                           )}
                         </div>
@@ -592,9 +612,9 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
           
         </div>
 
-        {/* Right Column - 全屏时隐藏 */}
+        {/* Right Column - 全屏时隐藏；宽度由 grid 控制，PC 端较窄以让预览区足够大 */}
         {!isFullscreen && (
-        <div className="overflow-hidden bg-zinc-900 border-l border-gray-200 flex flex-col h-full">
+        <div className="overflow-hidden bg-zinc-900 border-l border-gray-200 flex flex-col h-full min-w-0">
           <div className="flex-1 overflow-y-auto min-h-0 bg-zinc-900 p-6">
             {/* 使用 SpecViewer 组件，与编辑模式一致 */}
             {(() => {

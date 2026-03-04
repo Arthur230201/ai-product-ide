@@ -101,6 +101,7 @@ export const UI_BUILDING_BLOCKS = `
 ## 通用
 - \`<Badge>\`、\`<Avatar>\`、\`<Separator>\`、\`<Textarea>\`、\`<Switch>\`、\`<Alert>\`、\`<Skeleton>\`、\`<Progress>\`
 - Tab：\`<TabsList><TabsTrigger data-state="active">Tab1</TabsTrigger>...</TabsList><TabsContent>...</TabsContent>\`
+- 弹窗（必须用 Dialog，避免下层透出）：\`<Dialog open={isOpen} onClose={() => setIsOpen(false)}><DialogHeader>标题</DialogHeader><DialogContent>...</DialogContent><DialogFooter><Button>确定</Button></DialogFooter></Dialog>\`
 
 ## 新增组件（仪表盘/列表/空态/页头）
 - **StatCard**：\`<StatCard title="指标名" value="123" icon={<TrendingUp />} description="说明" />\`

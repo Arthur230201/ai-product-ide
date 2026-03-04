@@ -150,111 +150,13 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
         return;
       }
 
-      // 检查是否为澄清请求
-      // generateGraph 返回格式：{ data: { type: 'clarification_needed', data: {...} } }
+      // 澄清逻辑已取消：不再根据 clarification_needed 跳转或阻塞，一律按图结构结果处理（无图时由后续空结果逻辑统一处理）
       const responseData = resultData?.data;
-      log('🔍 [CommandBar] 检查返回数据类型:', {
+      log('🔍 [CommandBar] 检查返回数据，按图结构处理', {
         hasData: !!responseData,
         dataType: responseData?.type,
-        dataKeys: responseData ? Object.keys(responseData) : [],
-        fullData: JSON.stringify(responseData).substring(0, 1000),
-        isClarification: responseData?.type === 'clarification_needed',
         resultDataKeys: resultData ? Object.keys(resultData) : [],
-        resultDataFull: JSON.stringify(resultData).substring(0, 1000),
       });
-      
-      // 检查是否为澄清请求（优先检查，避免继续处理图结构）
-      // 检查多种可能的数据结构
-      let isClarification = false;
-      let clarificationData: any = null;
-      
-      // 方式1: 直接检查 responseData.type
-      if (responseData && responseData.type === 'clarification_needed') {
-        isClarification = true;
-        clarificationData = responseData.data;
-      }
-      // 方式2: 检查 resultData 是否直接包含 clarification_needed
-      else if (resultData && (resultData as any).type === 'clarification_needed') {
-        isClarification = true;
-        clarificationData = (resultData as any).data;
-      }
-      // 方式3: 检查 resultData.data 是否是一个对象且包含 type 字段
-      else if (resultData?.data && typeof resultData.data === 'object' && 'type' in resultData.data && resultData.data.type === 'clarification_needed') {
-        isClarification = true;
-        clarificationData = resultData.data.data;
-      }
-      
-      if (isClarification) {
-        log('💬 [CommandBar] 收到澄清请求，跳转到项目画像页面', {
-          clarificationData,
-          hasMessage: !!clarificationData?.message,
-          hasQuestion: !!clarificationData?.question,
-          hasOptions: !!clarificationData?.options,
-        });
-        setIsProcessingVideo(false);
-        clearLoadingTimers();
-        
-        if (!clarificationData) {
-          logError('❌ [CommandBar] 澄清请求数据不完整:', {
-            responseData,
-            resultData,
-            dataKeys: responseData ? Object.keys(responseData) : [],
-          });
-          // 即使数据不完整，也打开项目画像页面，让用户能够补充信息
-          log('⚠️ [CommandBar] 澄清数据不完整，但仍打开项目画像页面以便用户补充信息');
-          openBlueprint('profile', {
-            description: prompt.trim(),
-          });
-          setIsProcessingVideo(false);
-          setIsTimeoutOverride(false);
-          clearLoadingTimers();
-          setProgress(0);
-          setLoadingStep('');
-        toast.info('需要更多信息', {
-          description: '请在项目画像页面补充详细信息',
-          duration: 4000,
-        });
-          return;
-        }
-        
-        log('📋 [CommandBar] 澄清请求详情:', {
-          message: clarificationData.message,
-          question: clarificationData.question,
-          optionsCount: clarificationData.options?.length || 0,
-        });
-        
-        // 跳转到项目蓝图的项目画像页面，而不是显示对话框
-        // 构建初始数据，将澄清信息填充到项目画像中
-        const initialData: Partial<import('@/types/fractal').ProjectMeta> = {
-          description: prompt.trim(), // 保留原始输入作为项目简介
-        };
-        
-        // 如果检测到领域信息，可以填充到行业字段
-        if (clarificationData.message) {
-          // 尝试从消息中提取领域信息
-          const domainMatch = clarificationData.message.match(/已检测到领域[：:]([^。，,]+)/);
-          if (domainMatch) {
-            initialData.industry = domainMatch[1].trim();
-          }
-        }
-
-        // 打开项目蓝图并跳转到项目画像标签（但不阻塞流程）
-        // 注意：现在即使输入不够明确，也会继续生成图结构
-        // 所以这里只是提示用户可以在项目画像中补充信息，但不阻止继续
-        openBlueprint('profile', initialData);
-        
-        log('✅ [CommandBar] 已打开项目画像页面，提示用户补充信息（但继续生成基础图结构）');
-        toast.info('将生成基础结构', {
-          description: '可在项目画像页面补充详细信息',
-          duration: 4000,
-        });
-        
-        // 不再提前返回，继续处理图结构生成
-        // return; // 注释掉，让流程继续
-      }
-
-      // 如果不是澄清请求，继续处理图结构
-      log('📊 [CommandBar] 不是澄清请求，继续处理图结构数据');
 
       // 详细记录 resultData 的结构
       log('🔍 [CommandBar] resultData 详细结构:', {
@@ -329,63 +231,15 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
           fullDataString: JSON.stringify(data).substring(0, 1000),
         });
         
-        // 如果 data 中只有一个键，且这个键的值是对象，检查是否是澄清请求
+        // 如果 data 中只有一个键，且这个键的值是对象，尝试从中提取 nodes/edges（不再处理 clarification_needed，避免无法继续）
         if (dataKeys.length === 1 && typeof data[dataKeys[0]] === 'object' && data[dataKeys[0]] !== null) {
           const firstKeyValue = data[dataKeys[0]];
           log('🔍 [CommandBar] 检测到 data 只有一个键，检查其内容:', {
             key: dataKeys[0],
-            valueType: typeof firstKeyValue,
             valueKeys: Object.keys(firstKeyValue),
-            hasType: 'type' in firstKeyValue,
-            typeValue: firstKeyValue.type,
             hasNodes: 'nodes' in firstKeyValue,
             hasEdges: 'edges' in firstKeyValue,
           });
-          
-          // 检查是否是澄清请求（可能在嵌套结构中）
-          if (firstKeyValue.type === 'clarification_needed') {
-            log('💬 [CommandBar] 在嵌套结构中检测到澄清请求');
-            setIsProcessingVideo(false);
-            clearLoadingTimers();
-            
-            const clarificationData = firstKeyValue.data;
-            if (!clarificationData) {
-              logError('❌ [CommandBar] 澄清请求数据不完整:', {
-                data: firstKeyValue,
-                dataKeys: Object.keys(firstKeyValue),
-              });
-              toast.error('澄清请求数据格式错误', {
-                description: '请重试',
-                duration: 3000,
-              });
-              return;
-            }
-            
-            const initialData: Partial<import('@/types/fractal').ProjectMeta> = {
-              description: prompt.trim(),
-            };
-            
-            if (clarificationData.message) {
-              const domainMatch = clarificationData.message.match(/已检测到领域[：:]([^。，,]+)/);
-              if (domainMatch) {
-                initialData.industry = domainMatch[1].trim();
-              }
-            }
-
-            openBlueprint('profile', initialData);
-            setIsProcessingVideo(false);
-            setIsTimeoutOverride(false);
-            clearLoadingTimers();
-            setProgress(0);
-            setLoadingStep('');
-            
-            log('✅ [CommandBar] 已打开项目蓝图的项目画像页面（从嵌套结构）');
-            toast.info('需要更多信息', {
-              description: '请在项目画像页面中补充详细信息',
-              duration: 5000,
-            });
-            return;
-          }
           
           // 如果这个对象中有 nodes 和 edges，使用它们
           if (Array.isArray(firstKeyValue.nodes) && !nodes) {
@@ -522,7 +376,7 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
         });
       }
       
-      // 如果 nodes 和 edges 都无效，可能是澄清请求没有被正确识别
+      // 如果 nodes 和 edges 都无效，或返回结果无图
       // 或者输入确实不够明确，打开项目画像页面让用户补充信息
       if ((!nodes || !Array.isArray(nodes) || nodes.length === 0) && 
           (!edges || !Array.isArray(edges) || edges.length === 0)) {
@@ -2200,6 +2054,12 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                 throw new Error(`executeUIText 不是一个函数: ${typeof executeUIText}`);
               }
               
+              const existingCodeForHtml =
+                selectedNode?.data?.artifacts?.view?.code?.trim() &&
+                selectedNode.data.artifacts.view.code.trim().length >= 200 &&
+                selectedNode.data.artifacts.view.code.trim() !== '// PLACEHOLDER'
+                  ? selectedNode.data.artifacts.view.code
+                  : undefined;
               uiResult = await executeUIText({
                 prompt: htmlReferencePrompt,
                 nodeLabel: targetNodeLabel,
@@ -2208,6 +2068,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                 viewportPreset: viewportPresetForCall,
                 tier: uiGenerationTier,
                 aiConfig: aiConfig,
+                existingCode: existingCodeForHtml,
               });
               
               const callDuration = Date.now() - callStartTime;
@@ -2460,9 +2321,15 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
             timestamp: new Date().toISOString(),
           });
           
-          setLoadingStep('🤖 正在调用AI生成UI代码...');
+          const existingCodeForText =
+            selectedNode?.data?.artifacts?.view?.code?.trim() &&
+            selectedNode.data.artifacts.view.code.trim().length >= 200 &&
+            selectedNode.data.artifacts.view.code.trim() !== '// PLACEHOLDER'
+              ? selectedNode.data.artifacts.view.code
+              : undefined;
+          setLoadingStep(existingCodeForText ? '✏️ 正在现有 UI 基础上修改…' : '🤖 正在调用AI生成UI代码...');
           setProgress(20);
-          toast.info('正在生成完整页面（质量优先），请稍候…', { duration: 4000 });
+          toast.info(existingCodeForText ? '正在现有页面上按你的要求修改…' : '正在生成完整页面（质量优先），请稍候…', { duration: 4000 });
           
           const callStartTime = Date.now();
           log('⏱️ [CommandBar] executeUIText 调用开始 (文本模式)，时间戳:', callStartTime);
@@ -2488,6 +2355,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
             viewportPreset: viewportPresetForCall,
             tier: uiGenerationTier,
             aiConfig: aiConfig,
+            existingCode: existingCodeForText,
           });
           
           const callDuration = Date.now() - callStartTime;

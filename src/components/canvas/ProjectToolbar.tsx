@@ -7,6 +7,7 @@ import { ProjectBlueprint } from './ProjectBlueprint';
 import { toast } from 'sonner';
 import { exportToFullPrdHtml, exportToWord } from '@/utils/prdGenerator';
 import { captureNodePreviews } from '@/utils/capture-node-preview';
+import { isHtmlCode } from '@/utils/html-body-extractor';
 
 export function ProjectToolbar() {
   const { clearCanvas, exportProject, loadProject, addBlankNode, isDetailPanelOpen, nodes, edges, projectMeta, globalRules } = useCanvasStore();
@@ -164,8 +165,10 @@ export function ProjectToolbar() {
     setIsExportMenuOpen(false);
     const toastId = toast.loading('正在准备导出…', { description: '为各页面生成预览图' });
     try {
+      // 仅对 HTML 代码做截图；React/JSX 在导出 PRD 中通过挂载点由脚本渲染，不当作 HTML 写入 iframe
       const nodePreviewInputs = nodes
         .filter((n) => n.data?.artifacts?.view?.code?.trim())
+        .filter((n) => isHtmlCode((n.data!.artifacts!.view as { code?: string }).code!))
         .map((n) => ({ id: n.id, html: (n.data!.artifacts!.view as { code?: string }).code! }));
       const nodePreviewUrls = nodePreviewInputs.length > 0
         ? await captureNodePreviews(nodePreviewInputs, { timeoutPerNode: 10000, concurrency: 1 })

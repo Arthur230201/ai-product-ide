@@ -62,7 +62,9 @@ export const CORE_REQUIREMENTS = `# System: UI Rationalization Engine
 export const OUTPUT_CONTRACT = {
   REACT: `# Output
 - Return ONLY the full .tsx code
-- Icon Rules: Material Icons use <span className="material-icons-round">name</span>; Others use lucide-react
+- Root component: must be \`export default function Page() { ... }\` or \`export default function App() { ... }\` (no other names)
+- Do NOT write any \`import\` statements (preview injects React, Lucide, etc.)
+- Icons: use Lucide component names in JSX (e.g. <Search />, <User />) or inline SVG/Emoji; no import
 - No markdown, no comments, no explanations
 - All text must be in Chinese`,
 

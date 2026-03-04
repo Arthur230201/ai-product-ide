@@ -10,6 +10,7 @@ import { isHTMLContent } from '@/utils/html-rationalizer';
 import { buildInjectorScript } from '@/lib/ui/injector';
 import { preview } from '@/lib/safe/preview';
 import { PreviewFrame } from './PreviewFrame';
+import { PC_VIEWPORT_WIDTH, PC_VIEWPORT_HEIGHT, MOBILE_VIEWPORT_WIDTH, MOBILE_VIEWPORT_HEIGHT } from '@/lib/viewport-constants';
 
 export type ViewportPreset = 'mobile' | 'desktop';
 
@@ -46,17 +47,19 @@ class PreviewErrorBoundary extends React.Component<
 }
 
 // 安全的动态组件渲染器。viewportPreset 由父级传入，决定预览画布尺寸逻辑，不随代码内容反推
-export const LivePreview = ({ 
-  code, 
+export const LivePreview = ({
+  code,
   zoom = 1,
   isPresentationMode = false,
   viewportPreset = 'mobile',
-}: { 
-  code: string; 
+  /** 点击「跳转」类按钮时调用，参数为节点 id 或 label，由宿主切换选中节点 */
+  onNavigateToNode,
+}: {
+  code: string;
   zoom?: number;
   isPresentationMode?: boolean;
-  /** 当前用户选择的视口，桌面时不再用 375px 包裹，与 NodeDetailPanel 一致 */
   viewportPreset?: ViewportPreset;
+  onNavigateToNode?: (target: string) => void;
 }) => {
   // ========== 所有 Hooks 必须在组件顶层，在任何条件返回之前 ==========
   // 1. 所有 useState hooks
@@ -158,7 +161,18 @@ export const LivePreview = ({
   }, [code, viewportPreset]);
   const isMobile = useMobileFrame;
 
-  // 3. 所有 useEffect hooks
+  // 注入页面跳转回调，供生成代码中的 window.__NAV_TO_NODE__?.('页面名') 使用
+  useEffect(() => {
+    const win = typeof window !== 'undefined' ? window : undefined;
+    if (win) {
+      (win as unknown as { __NAV_TO_NODE__?: (target: string) => void }).__NAV_TO_NODE__ =
+        onNavigateToNode ?? (() => {});
+    }
+    return () => {
+      if (win) (win as unknown as { __NAV_TO_NODE__?: (target: string) => void }).__NAV_TO_NODE__ = undefined;
+    };
+  }, [onNavigateToNode]);
+
   // 1. 清理和编译代码
   useEffect(() => {
     if (!code || code === "// PLACEHOLDER") {
@@ -225,38 +239,36 @@ export const LivePreview = ({
       
       // Component name extracted
 
-      // 步骤 4.5: 检测并替换不存在的图标名
-      // 提取代码中使用的图标名（匹配 <IconName 或 IconName( 模式）
+      // 步骤 4.5: 检测并替换不存在的图标名（仅对 Lucide 图标做替换，绝不替换 PreviewUI 组件名）
+      const previewUIKeys = new Set(Object.keys(PreviewUI || {}));
       const iconUsageRegex = /<(\w+)(?:\s|>)/g;
       const usedIconNames = new Set<string>();
       let match;
       while ((match = iconUsageRegex.exec(cleaned)) !== null) {
         const iconName = match[1];
-        // 过滤掉明显的非图标名（HTML标签、React组件等）
-        if (iconName && /^[A-Z]/.test(iconName) && 
+        // 过滤：HTML 标签、React/App/Page、以及 PreviewUI 组件名（NavBar/ListItem/Button/Card 等不得当图标替换）
+        if (iconName && /^[A-Z]/.test(iconName) &&
             !['div', 'span', 'button', 'input', 'form', 'section', 'article', 'header', 'footer', 'nav', 'main', 'aside'].includes(iconName.toLowerCase()) &&
-            !['React', 'App', 'Page', 'Component', 'Fragment'].includes(iconName)) {
+            !['React', 'App', 'Page', 'Component', 'Fragment'].includes(iconName) &&
+            !previewUIKeys.has(iconName)) {
           usedIconNames.add(iconName);
         }
       }
       
-      // 检查使用的图标是否存在于 LucideIcons 中，如果不存在则替换为备用图标
-      const fallbackIcon = 'FileText'; // 默认备用图标
+      // 仅对「在 Lucide 中不存在的」图标名做替换；PreviewUI 组件已在上方排除，不会被替换
+      const fallbackIcon = 'FileText';
       const iconReplacements: Array<{ from: string; to: string }> = [];
       
       usedIconNames.forEach(iconName => {
-        // Icon 为 lucide 基类，需 iconNode，生成代码不得直接使用；其他检查是否存在
         const isReserved = iconName === 'Icon';
-        const iconExists = !isReserved && iconName in LucideIcons && 
+        const iconExists = !isReserved && iconName in LucideIcons &&
           (typeof (LucideIcons as any)[iconName] === 'function' || typeof (LucideIcons as any)[iconName] === 'object');
         
         if (!iconExists) {
-          // 尝试找到类似的图标名
-          const similarIcon = Object.keys(LucideIcons).find(key => 
+          const similarIcon = Object.keys(LucideIcons).find(key =>
             key.toLowerCase().includes(iconName.toLowerCase().replace(/square|pen|message/gi, '')) ||
             iconName.toLowerCase().replace(/square|pen/gi, '').includes(key.toLowerCase())
           );
-          
           const replacementIcon = similarIcon || fallbackIcon;
           iconReplacements.push({ from: iconName, to: replacementIcon });
           console.warn(`⚠️ [LivePreview] 图标 "${iconName}" 不存在，将替换为 "${replacementIcon}"`);
@@ -298,8 +310,7 @@ export const LivePreview = ({
             !['createLucideIcon', 'IconNode', 'lucide', 'Icon'].includes(key)
           );
           if (iconNames && Array.isArray(iconNames) && iconNames.length > 0) {
-            // 与 PreviewUI 同名的必须用组件，不能被 Lucide 图标覆盖（否则 NavBar/ListItem 等会变成 SVG）
-            const previewUIKeys = new Set(Object.keys(PreviewUI || {}));
+            // 与 PreviewUI 同名的必须用组件，不能被 Lucide 图标覆盖（previewUIKeys 已在步骤 4.5 定义）
             const validIconNames = iconNames.filter(name => {
               if (previewUIKeys.has(name)) return false;
               const isValid = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name);
@@ -442,6 +453,9 @@ export const LivePreview = ({
           return (function() {
             // 在 IIFE 内部声明变量，从外部作用域获取
             var React = _React;
+            // 挂到全局，避免生成代码中 const { useMemo } = React 在部分打包/闭包下取不到 React
+            if (typeof globalThis !== 'undefined') globalThis.React = React;
+            if (typeof window !== 'undefined') window.React = React;
             var LucideIcons = _LucideIcons;
             var Recharts = _Recharts;
             var Button = _PreviewUI.Button;
@@ -473,6 +487,10 @@ export const LivePreview = ({
             var ListItem = _PreviewUI.ListItem;
             var EmptyState = _PreviewUI.EmptyState;
             var PageHeader = _PreviewUI.PageHeader;
+            var Dialog = _PreviewUI.Dialog;
+            var DialogHeader = _PreviewUI.DialogHeader;
+            var DialogContent = _PreviewUI.DialogContent;
+            var DialogFooter = _PreviewUI.DialogFooter;
             var cn = typeof _PreviewUI.cn === 'function' ? _PreviewUI.cn : function() { return Array.prototype.slice.call(arguments).filter(Boolean).join(' '); };
             
             // 全局保护：确保数组方法在 undefined 上不会报错
@@ -588,6 +606,10 @@ export const LivePreview = ({
               if (_PreviewUI.ListItem != null) ListItem = _PreviewUI.ListItem;
               if (_PreviewUI.EmptyState != null) EmptyState = _PreviewUI.EmptyState;
               if (_PreviewUI.PageHeader != null) PageHeader = _PreviewUI.PageHeader;
+              if (_PreviewUI.Dialog != null) Dialog = _PreviewUI.Dialog;
+              if (_PreviewUI.DialogHeader != null) DialogHeader = _PreviewUI.DialogHeader;
+              if (_PreviewUI.DialogContent != null) DialogContent = _PreviewUI.DialogContent;
+              if (_PreviewUI.DialogFooter != null) DialogFooter = _PreviewUI.DialogFooter;
               if (typeof _PreviewUI.cn === 'function') cn = _PreviewUI.cn;
             }
             
@@ -690,10 +712,10 @@ export const LivePreview = ({
     }
   }, [isHTMLCode]);
   
-  // 调试条：开发环境或 window.__SHOW_LIVE_PREVIEW_DEBUG__ 时显示，便于排查白屏
+  // 调试条：仅当在控制台设置 window.__SHOW_LIVE_PREVIEW_DEBUG__ = true 时显示
   const showDebug =
-    (typeof window !== 'undefined' && (window as unknown as { __SHOW_LIVE_PREVIEW_DEBUG__?: boolean }).__SHOW_LIVE_PREVIEW_DEBUG__) ||
-    process.env.NODE_ENV === 'development';
+    typeof window !== 'undefined' &&
+    (window as unknown as { __SHOW_LIVE_PREVIEW_DEBUG__?: boolean }).__SHOW_LIVE_PREVIEW_DEBUG__ === true;
   const debugBranch = isHTMLCode
     ? 'html'
     : compilationError
@@ -785,13 +807,26 @@ export const LivePreview = ({
     );
   }
 
-  // 5. 渲染内容（重写）：薄壳 + PreviewFrame 单一容器，由专家商议结论执行
-  const PREVIEW_MIN_HEIGHT = viewportPreset === 'desktop' ? 800 : 812;
+  // 5. 渲染内容：标准视口比例，桌面端强制最小宽度，避免「一句话竖向排列」等布局错乱
+  const PREVIEW_MIN_HEIGHT = viewportPreset === 'desktop' ? PC_VIEWPORT_HEIGHT : MOBILE_VIEWPORT_HEIGHT;
   const content = (
     <PreviewFrame ref={previewScrollRef} minHeight={PREVIEW_MIN_HEIGHT}>
-      <PreviewErrorBoundary key={code} onError={setCompilationError}>
-        {renderedElement}
-      </PreviewErrorBoundary>
+      <div
+        className="preview-generated-root-wrapper"
+        style={{
+          height: '100%',
+          minHeight: PREVIEW_MIN_HEIGHT,
+          width: '100%',
+          ...(viewportPreset === 'desktop' ? { minWidth: PC_VIEWPORT_WIDTH } : {}),
+          display: 'flex',
+          flexDirection: 'column',
+          flex: '1 1 0%',
+        }}
+      >
+        <PreviewErrorBoundary key={code} onError={setCompilationError}>
+          {renderedElement}
+        </PreviewErrorBoundary>
+      </div>
     </PreviewFrame>
   );
 
@@ -807,17 +842,19 @@ export const LivePreview = ({
     );
   }
 
-  const deviceWidth = viewportPreset === 'desktop' ? '100%' : 375;
+  const deviceWidth = viewportPreset === 'desktop' ? '100%' : MOBILE_VIEWPORT_WIDTH;
   return (
     <div
-      className="rounded-xl overflow-hidden bg-white shrink-0"
+      className="rounded-xl overflow-hidden bg-white shrink-0 flex flex-col min-h-0 w-full"
       style={{
         width: deviceWidth,
         height: '100%',
         minHeight: PREVIEW_MIN_HEIGHT,
-        maxWidth: viewportPreset === 'desktop' ? '100%' : 375,
+        ...(viewportPreset === 'desktop' ? { minWidth: PC_VIEWPORT_WIDTH } : {}),
+        maxWidth: viewportPreset === 'desktop' ? '100%' : MOBILE_VIEWPORT_WIDTH,
         transform: zoom !== 1 ? `scale(${zoom})` : undefined,
         transformOrigin: 'top center',
+        flex: '1 1 0%',
       }}
     >
       {showDebug && debugStrip}

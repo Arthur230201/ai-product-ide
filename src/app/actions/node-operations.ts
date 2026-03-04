@@ -7,9 +7,17 @@ import { z } from 'zod';
 import { log, logError, logWarn } from '@/lib/logger';
 import { getTextModel, getModelForTier, getOpenAIKey, ensureOpenAIKey } from '@/lib/ai-config';
 import type { GenerationTier } from '@/lib/ai-config';
-import { buildUIGenerationSystemPrompt, buildUIGenerationUserPrompt } from '@/lib/prompts/ui-generation-prompt';
+import {
+  buildUIGenerationSystemPrompt,
+  buildUIGenerationUserPrompt,
+  shouldUseEditMode,
+  buildUIEditUserPrompt,
+} from '@/lib/prompts/ui-generation-prompt';
 import { callText, callObject } from '@/lib/ai/llm';
 import type { AIResult } from '@/lib/ai/llm';
+
+/** refineUI 默认说明（仅视觉优化，不改变结构） */
+const DEFAULT_REFINE_PROMPT = '仅做视觉优化：改善层次、间距与圆角阴影，不改变布局与功能。';
 
 /** UI 生成接口返回类型（generateUIFromText / generateUIFromImage） */
 export type UIGenerationResponse =
@@ -23,13 +31,86 @@ export type UIGenerationResponse =
 
 // ==================== 直接调用的函数（用于 NodeDetailPanel）====================
 
-/** 默认美化说明：仅视觉增强，不改变结构或内容 */
-const DEFAULT_REFINE_PROMPT = `在保持布局与功能完全不变的前提下，仅做视觉美化：
-- 统一圆角（rounded-lg/rounded-xl）与阴影（shadow-md/shadow-lg）
-- 加强字体层级（标题 font-semibold/text-lg 以上，正文 text-gray-600）
-- 优化间距（p-4/p-6、gap-4）与对比度，使界面更精致
-- 主按钮使用 bg-cyan-500 或 bg-teal-500，卡片有明确边框或阴影
-不要删除已有样式，不要改 HTML 结构，不要简化或合并组件。`;
+/**
+ * 为当前页面 React 代码增加交互逻辑（日期选择、下拉、弹窗、页面跳转等）。
+ * 不修改视觉样式，仅增加 useState 与事件处理。
+ */
+export async function addInteractionsToReact(
+  code: string,
+  nodeList: Array<{ id: string; label: string }>
+): Promise<AIResult<{ code: string }>> {
+  try {
+    if (!getOpenAIKey()) {
+      return {
+        ok: false,
+        type: 'PROVIDER',
+        message: 'OPENAI_API_KEY 未配置',
+        metrics: { queuedMs: 0, dedupHit: false, totalMs: 0 },
+      };
+    }
+    const textModel = getModelForTier('quality' as GenerationTier, 'text', {});
+    const pageNames = nodeList.map((n) => n.label).filter(Boolean);
+    const navList =
+      pageNames.length > 0
+        ? `可跳转的页面节点（用于按钮点击跳转）：${pageNames.join('、')}。跳转时调用 window.__NAV_TO_NODE__('页面名称')，例如 window.__NAV_TO_NODE__('商品详情')。`
+        : '';
+
+    const systemPrompt = `You are a senior React engineer. Your ONLY job is to ADD real interaction logic to the existing React/TSX code. Do NOT change visual styles, layout, or remove any content.
+
+STRICT RULES:
+1. PRESERVE: Keep the exact same JSX structure and all className. Only ADD state and event handlers.
+2. ADD INTERACTIONS:
+   - Date inputs: Use <input type="date" /> or type="datetime-local" with value and onChange bound to useState (e.g. const [date, setDate] = useState(''); <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />).
+   - Select/dropdown: Use useState for selected value, onChange to setState.
+   - Tabs: Use useState for active tab, TabsTrigger onClick to set active, TabsContent to show only when active.
+   - Modals/dialogs: Use useState for open (e.g. const [open, setOpen] = useState(false)); button onClick={() => setOpen(true)}; overlay onClick={() => setOpen(false)}.
+   - Buttons that should navigate to another page: Add onClick that calls window.__NAV_TO_NODE__?.('TargetPageLabel'). Map button text or intent to the given page list. Example: "查看商品详情" or "商品详情" button -> window.__NAV_TO_NODE__?.('商品详情'); "返回" -> window.__NAV_TO_NODE__?.('首页') or the previous page name.
+3. Use only React (useState). No import. All components (Button, Input, etc.) are already in scope. Use the same component names (Page or App as root).
+4. OUTPUT: Return ONLY the complete .tsx code. No markdown fences, no explanations. Root must remain export default function Page() or export default function App().`;
+
+    const userPrompt = `Add real click/input interactions to the following code.
+
+${navList}
+
+Current code (add interactions only, return full code):
+\`\`\`tsx
+${code}
+\`\`\`
+
+Return ONLY the full .tsx code with added useState and event handlers.`;
+
+    const result = await callText({
+      model: textModel,
+      prompt: `${systemPrompt}\n\n${userPrompt}`,
+      temperature: 0.3,
+      maxOutputTokens: 16000,
+      actionName: 'addInteractionsToReact',
+      aiConfig: {},
+    });
+
+    if (!result.ok) return result;
+
+    const cleanedCode = result.data
+      .trim()
+      .replace(/^```(?:tsx|jsx|ts|js)?\n?/gm, '')
+      .replace(/\n?```$/gm, '')
+      .trim();
+
+    return {
+      ok: true,
+      data: { code: cleanedCode },
+      metrics: result.metrics,
+    };
+  } catch (error) {
+    logError('❌ [addInteractionsToReact] Error:', error);
+    return {
+      ok: false,
+      type: 'PROVIDER',
+      message: error instanceof Error ? error.message : '增加交互失败',
+      metrics: { queuedMs: 0, dedupHit: false, totalMs: 0 },
+    };
+  }
+}
 
 export async function refineUI(
   htmlCode: string,
@@ -621,12 +702,13 @@ Generate production-ready **React + Tailwind CSS** code based on the uploaded im
   - ✅ 标签文字："进行中"、"已完成"、"待处理"
   - ❌ 禁止："Submit"、"Cancel"、"Search"、"In Progress"、"Completed"
 
-## 7. 技术要求
-- 使用 React Hooks（useState, useEffect）
-- 使用 Tailwind CSS 实现所有样式，禁止内联样式
-- 使用 Lucide React 图标库（从 'lucide-react' 导入）
-- 组件名称：App（function App() 或 const App = ()）
-- 代码可直接运行，包含完整交互逻辑
+## 7. 技术要求（必须满足才能在预览中正常显示）
+- 使用 React Hooks（useState, useEffect），由预览环境注入，不要写 import。
+- 使用 Tailwind CSS 实现所有样式，禁止内联样式。
+- **根组件命名（必须）**：必须且仅能使用 \`export default function Page() { ... }\` 或 \`export default function App() { ... }\`，不要使用其他名称（如 ProductDetail、RoleManagement），否则预览无法识别根组件。
+- **禁止写任何 import 语句**：所有 import 在预览中会被移除，会导致白屏。图标直接写组件名如 \`<Search />\`、\`<User />\`、\`<Mic />\`（Lucide 已注入），或使用内联 SVG/Emoji，禁止使用 \`Icon\` 或未在 lucide-react 中存在的名称。
+- **根布局（必须）**：根节点使用 \`className={cn("flex flex-col h-full min-h-full ...")}\`，主内容区必须含 \`flex-1 min-h-0 overflow-y-auto\`，否则预览中主内容区会被压扁仅显示底部。
+- 代码可直接运行，包含完整交互逻辑。
 ${designSystemEnforcement}
 
 # Output
@@ -657,9 +739,11 @@ ${designSystemEnforcement}
 - Look for indicator bars (colored side strips) and implement them with \`absolute\` positioning.
 
 **Step 3: Generate Code**
-- Use React Hooks (useState, useEffect) for interactivity.
+- Use React Hooks (useState, useEffect) for interactivity. Do NOT write any \`import\` statements (React and icons are injected in preview).
 - Use Tailwind CSS for all styling (NO inline styles).
-- Import icons from \`lucide-react\`.
+- Icons: use Lucide component names directly in JSX (e.g. \`<Search />\`, \`<User />\`, \`<Mic />\`) or inline SVG/Emoji; do NOT \`import from 'lucide-react'\`.
+- Root component: output only \`export default function Page() { ... }\` or \`export default function App() { ... }\`.
+- Root layout: \`flex flex-col h-full min-h-full\`, main content area must include \`flex-1 min-h-0 overflow-y-auto\`.
 - Ignore phone system status bar elements.
 - Ensure all buttons, inputs, and tabs are interactive.
 
@@ -863,6 +947,8 @@ const GenerateUIFromTextInputSchema = z.object({
   }).optional().describe('AI模型配置'),
   /** 意图加工层产出的可选系统提示词后缀（按领域注入布局/组件约定） */
   systemPromptSuffix: z.string().optional().describe('领域系统提示词片段'),
+  /** 当前节点已有 UI 代码；若提供且有效，则按「在现有基础上修改」生成，避免整页重写 */
+  existingCode: z.string().optional().describe('当前页面的 view.code，用于增量编辑'),
 });
 
 export const generateUIFromText = createServerAction()
@@ -884,6 +970,7 @@ export const generateUIFromText = createServerAction()
       nodeLabel: input.nodeLabel,
       viewportPreset,
       hasPrompt: !!input.prompt,
+      hasExistingCode: !!(input.existingCode && input.existingCode.trim().length >= 200),
       timestamp: new Date().toISOString(),
     });
     try {
@@ -901,12 +988,23 @@ export const generateUIFromText = createServerAction()
       ensureOpenAIKey();
 
       const systemPrompt = buildUIGenerationSystemPrompt(viewportPreset, input.projectMeta ?? undefined);
-      const userPromptFinal = buildUIGenerationUserPrompt(
-        input.nodeLabel || '页面',
-        input.prompt ?? '',
-        viewportPreset,
-        input.pageDescription
-      );
+      const useEdit = shouldUseEditMode(input.existingCode, input.prompt ?? '');
+      const userPromptFinal = useEdit && input.existingCode
+        ? buildUIEditUserPrompt(
+            input.nodeLabel || '页面',
+            input.prompt ?? '',
+            viewportPreset,
+            input.existingCode
+          )
+        : buildUIGenerationUserPrompt(
+            input.nodeLabel || '页面',
+            input.prompt ?? '',
+            viewportPreset,
+            input.pageDescription
+          );
+      if (useEdit) {
+        log(`📝 [generateUIFromText] 使用「在现有代码基础上修改」模式，existingCode 长度: ${input.existingCode?.length ?? 0}`);
+      }
 
       // 调试：确认实际发给大模型的内容，便于排查空白/短输出
       log(`📤 [generateUIFromText] 实际发给模型的 system 长度: ${systemPrompt.length} 字符`, {
@@ -1213,17 +1311,21 @@ Product Manager (Client-Facing)
 - **禁止**写"无交互"、"None"，必须定义其目的
 
 ## 展示规范 (Column 5)
-- **视觉样式**：使用Emoji表示颜色（🟢成功、🔴警示、🔵信息、🟣强调、⚪️次要）
-- **数据格式**：时间"YYYY-MM-DD HH:mm"，货币"¥0.00"，日期"YYYY年MM月DD日"
-- **默认状态**：说明默认值、占位文本、空状态等
+- **禁止**使用无意义的纯色块（如单独写 🔵🟢🔴 等），色块本身不提供信息。
+- **颜色与样式**：用「语义 + 色号」描述。例如：
+  - 按钮：主按钮背景色 #3B82F6（蓝色）；次要按钮描边 #6B7280。
+  - 状态/标签：任务执行中显示「执行中」，文字蓝色，色号 #2563EB；执行完毕显示「执行完毕」，文字绿色，色号 #16A34A。
+  - 带颜色的字体：写明文案与对应色号（如：链接 #2563EB、成功 #16A34A、警示 #DC2626）。
+- **数据格式**：时间"YYYY-MM-DD HH:mm"，货币"¥0.00"，日期"YYYY年MM月DD日"。
+- **默认状态**：说明默认值、占位文本、空状态等。
 
 # Extraction Rules
 - **UI区域**：根据DOM结构识别（Header->顶部导航，.map()->列表区）
 - **元素名称**：将组件名转为业务术语（Input->搜索框）
 
 # Examples
-| ZLL001 | 顶部导航 | 返回按钮 | 点击后返回上一级页面。 | ⬅️ 黑色图标；位于左上角。 |
-| ZLL002 | 列表区 | 状态标签 | 用于标识指令处理进度。 | 🟢 进行中 / ⚪️ 已结束 |
+| ZLL001 | 顶部导航 | 返回按钮 | 点击后返回上一级页面。 | 黑色图标 #1F2937；位于左上角。 |
+| ZLL002 | 列表区 | 状态标签 | 用于标识指令处理进度。 | 执行中：文案「执行中」，蓝色 #2563EB；执行完毕：文案「执行完毕」，绿色 #16A34A。 |
 
 # Feature ID
 ${functionIdPrefixInstruction}
@@ -1234,12 +1336,18 @@ ${functionIdPrefixInstruction}
 - 展示规范说明视觉样式、默认状态、占位文本
 - 分析所有UI元素、交互逻辑、状态管理
 - 识别可交互组件（按钮、输入框、卡片、菜单）和只读元素（标题、标签、状态指示器）
-- 如果提供了现有需求，必须保留原有内容并补充新增需求`;
+- 如果提供了现有需求表格，必须保留原有内容并补充新增需求
 
-      // 构建用户提示词
-      const hasExistingRequirements = input.existingRequirements && input.existingRequirements.length > 0;
-      const existingRequirementsText = hasExistingRequirements 
-        ? `\n\n**现有需求文档（必须完全保留，不要修改或删除）：**\n${input.existingRequirements.join('\n')}\n\n**更新要求：**\n1. 必须完全保留上述现有需求表格的所有行和内容\n2. 在此基础上，分析代码并补充新增的功能点到表格中\n3. 如果现有需求使用表格格式，新增需求也必须使用相同的表格格式和列结构\n4. 新增行的功能ID要延续现有编号规则：${pageTitle ? `如果现有表格中最后一行功能ID是某个前缀（如ZLL005），新增的从该前缀的下一号开始（如ZLL006）` : '如果现有表格中最后一行功能ID是F005，新增的从F006开始'}\n5. 如果现有需求是表格格式，保持表格格式；如果是列表格式，也保持列表格式\n6. 只返回完整的需求文档（包含原有内容和新增内容），不要包含其他说明文字`
+# Critical: Direct Output Only
+- **禁止**向用户提问、让用户选择输出方式（如「请选择1-4」「一次性输出还是按模块」「按区域逐步生成」等）。**禁止**输出任何说明、选项列表或澄清文字。
+- 必须**直接输出**且**仅输出** Markdown 表格（表头 + 数据行）。若功能点很多，可归纳为各 UI 区域/模块的代表性功能点，总行数建议 40–80 行，确保能完整输出；仍须直接给出表格，不要前置任何解释或让用户选择的内容。`;
+
+      // 仅当「现有内容」为真实的功能表格时才走「保留并更新」；仅有页面描述/无表格时按「全新生成」避免模型返回澄清弹窗
+      const existingRaw = (input.existingRequirements || []).filter((s: unknown): s is string => typeof s === 'string').join('\n').trim();
+      const hasTable = existingRaw.length > 0 && /功能ID\s*\|/i.test(existingRaw) && /\|[^\n]+\|/.test(existingRaw);
+      const hasExistingRequirements = hasTable;
+      const existingRequirementsText = hasExistingRequirements
+        ? `\n\n**现有需求文档（必须完全保留，不要修改或删除）：**\n${existingRaw}\n\n**更新要求：**\n1. 必须完全保留上述现有需求表格的所有行和内容\n2. 在此基础上，分析代码并补充新增的功能点到表格中\n3. 如果现有需求使用表格格式，新增需求也必须使用相同的表格格式和列结构\n4. 新增行的功能ID要延续现有编号规则：${pageTitle ? `如果现有表格中最后一行功能ID是某个前缀（如ZLL005），新增的从该前缀的下一号开始（如ZLL006）` : '如果现有表格中最后一行功能ID是F005，新增的从F006开始'}\n5. 如果现有需求是表格格式，保持表格格式；如果是列表格式，也保持列表格式\n6. 只返回完整的需求文档（包含原有内容和新增内容），不要包含其他说明文字`
         : '';
 
       const userPrompt = `请分析以下React组件代码，${hasExistingRequirements ? '更新（保留原有内容并补充新内容）' : '生成'}产品需求文档：
@@ -1266,26 +1374,21 @@ ${!hasExistingRequirements ? `**输出要求：**
      - 示例："用于展示当前指令的流转状态。"、"标识该指令的来源渠道。"
      - **禁止**说"无交互"、"No interaction"、"None"
 
-6. **展示规范列（Column 5）**要说明：
-   - **视觉样式（使用Emoji）**：
-     - 颜色：🟢 成功/进行中、🔴 警示/高亮、🔵 信息/链接、🟣 品牌色/强调色、⚪️ 次要信息/置灰
-     - 样式：💊 胶囊样式、📦 圆角卡片
-     - 图标：🔍 搜索图标、⬅️ 返回箭头、🌍 地球图标等
-   - **数据格式**：
-     - 时间："YYYY-MM-DD HH:mm" 或 "YYYY-MM-DD HH:mm:ss"
-     - 货币："¥0.00"
-     - 日期："YYYY年MM月DD日"
-   - **默认状态和规则**：
-     - "默认为空"、"超出一行显示省略号(...)"、"默认占位文本：xxx"
-     - 展示规则（如：最多显示10条记录、空数据时显示"暂无数据"等）
-   - **注意**：不要写技术术语如"字符串类型"、"数组类型"、"API"、"useState"等
+6. **展示规范列（Column 5）**要说明（禁止无意义的纯色块，必须写清语义+色号）：
+   - **按钮**：主按钮背景色号（如 #3B82F6）、次要按钮描边/文字色号。
+   - **状态/标签**：每种状态的文案与对应颜色、色号。例如：执行中显示「执行中」，蓝色 #2563EB；执行完毕显示「执行完毕」，绿色 #16A34A；已取消显示灰色 #6B7280。
+   - **带颜色的文字**：写明用途与色号（如：链接 #2563EB、成功 #16A34A、警示 #DC2626）。
+   - **数据格式**：时间 "YYYY-MM-DD HH:mm"，货币 "¥0.00"，日期 "YYYY年MM月DD日"。
+   - **默认状态和规则**：默认为空、占位文本、空数据提示、省略号规则等。
+   - **注意**：不要单独使用 🟢🔴🔵 等色块；不要写技术术语如 "API"、"useState"。
 
 7. **示例行格式**：
-| ZLL001 | 顶部导航 | 返回按钮 | 点击后返回上一级页面。 | ⬅️ 黑色图标；位于左上角。 |
-| ZLL002 | 列表区 | 状态标签 | 用于标识指令处理进度。 | 1. 样式规则：<br>   - 🟢 进行中 (绿色)<br>   - ⚪️ 已结束 (灰色)<br>2. 默认显示：进行中 |
-| ZLL003 | 列表卡片 | 发布时间 | 展示指令的创建或发布时间，辅助用户判断时效性。 | 格式：YYYY-MM-DD HH:mm:ss |
+| ZLL001 | 顶部导航 | 返回按钮 | 点击后返回上一级页面。 | 黑色图标 #1F2937；位于左上角。 |
+| ZLL002 | 列表区 | 状态标签 | 用于标识指令处理进度。 | 执行中：文案「执行中」，蓝色 #2563EB；执行完毕：文案「执行完毕」，绿色 #16A34A。 |
+| ZLL003 | 列表卡片 | 发布时间 | 展示指令的创建或发布时间。 | 格式：YYYY-MM-DD HH:mm:ss；文字色 #6B7280。 |
 
-8. 只返回Markdown表格，不要包含标题、说明文字或其他内容` : ''}`;
+8. 只返回Markdown表格，不要包含标题、说明文字或其他内容
+9. **禁止**输出「请选择1-4」「按模块拆分」「一次性输出」等让用户选择的文字；禁止输出任何澄清、选项或解释。必须直接输出表格。若元素很多，可归纳为每区域 5–15 条代表性行（总行数约 40–80），直接输出表格即可。` : ''}`;
 
       // 获取模型配置
       const textModel = getTextModel(input.aiConfig);
@@ -1314,6 +1417,17 @@ ${!hasExistingRequirements ? `**输出要求：**
         .replace(/^```(?:markdown)?\n?/gm, '')
         .replace(/\n?```$/gm, '')
         .trim();
+
+      // 拒绝「让用户选择输出方式」等澄清类回复，要求直接输出表格
+      const clarificationPatterns = [
+        /请选择\s*[1-4一二三四]/,
+        /一次性输出|按模块拆分|按.*区域.*逐步|结构树/,
+        /由于代码量巨大|超出.*上下文.*限制/,
+      ];
+      if (clarificationPatterns.some((p) => p.test(markdown)) && !/^\s*\|?\s*功能ID\s*\|/m.test(markdown)) {
+        logError('❌ [generateAnalysisFromCode] 模型返回了澄清/选项而非表格', { preview: markdown.substring(0, 300) });
+        throw new Error('本次返回了说明文字而非需求表格，请直接再次点击「生成需求文档」重试；若仍出现，请稍后重试。');
+      }
 
       // 验证生成的文档是否有效
       if (!markdown || markdown.length < 20) {

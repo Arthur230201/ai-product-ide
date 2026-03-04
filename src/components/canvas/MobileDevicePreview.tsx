@@ -1,9 +1,9 @@
 'use client';
 
 import Image from 'next/image';
+import { useCallback, useMemo } from 'react';
 import { LivePreview } from './LivePreview';
 import { useCanvasStore } from '@/store/canvas-store';
-import { useMemo } from 'react';
 
 type ViewportPreset = 'mobile' | 'desktop';
 
@@ -16,26 +16,40 @@ interface MobileDevicePreviewProps {
   viewportPreset?: ViewportPreset;
 }
 
-export function MobileDevicePreview({ 
-  imageUrl, 
-  zoom = 1, 
-  width = 375, 
+export function MobileDevicePreview({
+  imageUrl,
+  zoom = 1,
+  width = 375,
   height = 812,
   viewportPreset = 'mobile',
 }: MobileDevicePreviewProps) {
   const isDeviceFrame = viewportPreset === 'mobile';
   const selectedNodeId = useCanvasStore((state) => state.selectedNodeId);
   const nodes = useCanvasStore((state) => state.nodes);
-  
+  const selectNode = useCanvasStore((state) => state.selectNode);
+  const openNodeDetail = useCanvasStore((state) => state.openNodeDetail);
+
   const selectedNode = useMemo(() => {
-    return selectedNodeId 
+    return selectedNodeId
       ? nodes.find(n => n.id === selectedNodeId)
       : null;
   }, [selectedNodeId, nodes]);
-  
+
   const code = useMemo(() => {
     return selectedNode?.data?.artifacts?.view?.code || '';
   }, [selectedNode]);
+
+  /** 预览内「跳转到某页」时调用：按 id 或 label 匹配节点并打开详情 */
+  const onNavigateToNode = useCallback((target: string) => {
+    const idOrLabel = target.trim();
+    const node = nodes.find(
+      (n) => n.id === idOrLabel || (n.data?.label && String(n.data.label).trim() === idOrLabel)
+    );
+    if (node) {
+      selectNode(node.id);
+      openNodeDetail(node.id);
+    }
+  }, [nodes, selectNode, openNodeDetail]);
 
   return (
     <div 
@@ -68,13 +82,16 @@ export function MobileDevicePreview({
           }}
         >
           {code ? (
-              <>
-              <style dangerouslySetInnerHTML={{ __html: `.preview-inner-scroll::-webkit-scrollbar { display: none; }` }} />
-              <div className="preview-inner-scroll w-full h-full overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                <LivePreview code={code} zoom={1} viewportPreset={viewportPreset} />
+              /* 有代码时不再在此层滚动，仅由 LivePreview 内 PreviewFrame 滚动，避免只看到底部 */
+              <div className="w-full h-full overflow-hidden flex flex-col min-h-0">
+                <LivePreview
+                  code={code}
+                  zoom={1}
+                  viewportPreset={viewportPreset}
+                  onNavigateToNode={onNavigateToNode}
+                />
               </div>
-            </>
-          ) : imageUrl ? (
+            ) : imageUrl ? (
             <Image 
               src={imageUrl} 
               alt="Preview" 

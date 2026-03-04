@@ -4,7 +4,7 @@ import * as React from 'react';
 import { cn } from './cn';
 
 /** PC 端顶部栏：支持 title/right（生成代码常用）或 children */
-export interface AppBarProps extends React.HTMLAttributes<HTMLElement> {
+export interface AppBarProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title'> {
   /** 主标题，与 right 同时使用时渲染在左侧 */
   title?: React.ReactNode;
   /** 副标题，可选 */

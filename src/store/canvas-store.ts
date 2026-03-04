@@ -21,7 +21,7 @@ import type {
   GlobalRules,
   AIConfig,
 } from '@/types/fractal';
-import { getLayoutedElements } from '@/lib/layout';
+import { getLayoutedElements, DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT } from '@/lib/layout';
 import type { UIThemeConfig } from '@/types/theme';
 import { defaultTheme } from '@/types/theme';
 import { preview } from '@/lib/safe/preview';
@@ -77,6 +77,16 @@ interface CanvasStore extends CanvasState {
   setViewportPreset: (preset: 'mobile' | 'desktop') => void;
 }
 
+/** 为节点补全 width/height，避免生产环境首帧 ResizeObserver 未就绪时边连接点错位（连线与节点视觉脱节） */
+function ensureNodeDimensions(node: FractalNode): FractalNode {
+  if (node.width != null && node.height != null) return node;
+  return {
+    ...node,
+    width: node.width ?? DEFAULT_NODE_WIDTH,
+    height: node.height ?? DEFAULT_NODE_HEIGHT,
+  };
+}
+
 /**
  * 生成空白节点UI代码模板
  */
@@ -120,7 +130,7 @@ const createMockNode = (): FractalNode => {
     },
   };
 
-  return {
+  return ensureNodeDimensions({
     id: 'page-1',
     type: 'page',
     position: { x: 250, y: 250 },
@@ -135,7 +145,7 @@ const createMockNode = (): FractalNode => {
         type: 'ai',
       },
     },
-  };
+  });
 };
 
 export const useCanvasStore = create<CanvasStore>()(
@@ -258,7 +268,7 @@ export const useCanvasStore = create<CanvasStore>()(
           }
           
           initialState = {
-            nodes: parsed.nodes || [],
+            nodes: (parsed.nodes || []).map(ensureNodeDimensions),
             edges: parsed.edges || [],
             selectedNodeId: parsed.selectedNodeId || null,
             currentTheme: parsed.currentTheme || defaultTheme,
@@ -314,8 +324,8 @@ export const useCanvasStore = create<CanvasStore>()(
         ? state.nodes.find((n) => n.id === selectedNodeId)
         : null;
 
-      // 2. Adjust node position if parent exists
-      let newNode = { ...node };
+      // 2. Adjust node position if parent exists，并确保有 width/height 供边连接点计算
+      let newNode = ensureNodeDimensions({ ...node });
       if (selectedNode) {
         // Place new node to the right of the parent
         newNode = {
@@ -416,11 +426,11 @@ export const useCanvasStore = create<CanvasStore>()(
           },
         };
         
-        return {
+        return ensureNodeDimensions({
           ...node,
           type: nodeType as 'page' | 'service',
           data: validatedData,
-        };
+        });
       });
 
       // 计算新节点的位置，避免与现有节点重叠
@@ -891,7 +901,7 @@ export const useCanvasStore = create<CanvasStore>()(
       }
       
       const nodeLabel = '新节点';
-      const blankNode: FractalNode = {
+      const blankNode: FractalNode = ensureNodeDimensions({
         id: `manual-${timestamp}`,
         type: 'page',
         position: nodePosition,
@@ -926,7 +936,7 @@ export const useCanvasStore = create<CanvasStore>()(
             type: 'human',
           },
         },
-      };
+      });
 
       // 3. Create edge if parent exists
       const newEdges = selectedNode
@@ -990,7 +1000,7 @@ export const useCanvasStore = create<CanvasStore>()(
       // 使用 addBlankNode 的逻辑，但不传 position，让自动布局处理
       const timestamp = Date.now();
       const nodeLabel = '新节点';
-      const blankNode: FractalNode = {
+      const blankNode: FractalNode = ensureNodeDimensions({
         id: `manual-${timestamp}`,
         type: 'page',
         position: {
@@ -1024,7 +1034,7 @@ export const useCanvasStore = create<CanvasStore>()(
             type: 'human',
           },
         },
-      };
+      });
 
       const newEdge: Edge = {
         id: `e-${selectedNode.id}-${blankNode.id}`,
@@ -1093,7 +1103,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
       const timestamp = Date.now();
       const nodeLabel = '新节点';
-      const blankNode: FractalNode = {
+      const blankNode: FractalNode = ensureNodeDimensions({
         id: `manual-${timestamp}`,
         type: 'page',
         position: {
@@ -1127,7 +1137,7 @@ export const useCanvasStore = create<CanvasStore>()(
             type: 'human',
           },
         },
-      };
+      });
 
       // 创建从父节点到新节点的边（同级节点共享同一个父节点）
       const newEdge: Edge = {
@@ -1170,7 +1180,7 @@ export const useCanvasStore = create<CanvasStore>()(
 
   loadProject: (data: { nodes: FractalNode[]; edges: Edge[] }) => {
     set({
-      nodes: data.nodes || [],
+      nodes: (data.nodes || []).map(ensureNodeDimensions),
       edges: data.edges || [],
       selectedNodeId: null,
       isDetailPanelOpen: false,
@@ -1290,9 +1300,13 @@ export const useCanvasStore = create<CanvasStore>()(
             // 尝试解析 JSON
             const parsed = JSON.parse(value);
             
-            // 验证数据结构
+            // 验证数据结构，并为节点补全 width/height（避免部署环境连线脱节）
             if (parsed && typeof parsed === 'object' && 'state' in parsed) {
-              return parsed;
+              const state = parsed.state as CanvasState;
+              const nodes = Array.isArray(state?.nodes)
+                ? (state.nodes as FractalNode[]).map(ensureNodeDimensions)
+                : state?.nodes ?? [];
+              return { ...parsed, state: { ...state, nodes } };
             }
             
             // 如果格式不正确，返回 null 以使用默认值
