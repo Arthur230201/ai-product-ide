@@ -6,6 +6,7 @@ import type { FractalNode } from '@/types/fractal';
 import type { Edge } from 'reactflow';
 import { extractBodyContent, extractStylesFromHtml, isHtmlCode } from './html-body-extractor';
 import { PREVIEW_UI_PRD_BUNDLE, PREVIEW_UI_PRD_BUNDLE_CALL } from '@/lib/preview-ui-prd-bundle.generated';
+import { MOBILE_VIEWPORT_WIDTH, MOBILE_VIEWPORT_HEIGHT, PC_VIEWPORT_WIDTH, PC_VIEWPORT_HEIGHT } from '@/lib/viewport-constants';
 
 /** 判断是否为占位 UI 代码（无实际界面，导出时不应显示「UI 加载中」）。可供画布侧判断「是否已生成真实 UI」以锁定视口切换。 */
 export function isPlaceholderUiCode(code: string | undefined): boolean {
@@ -419,7 +420,8 @@ export function generateFullPrdHtml(data: FullPrdData): string {
         }
         .main-content { margin-left: 280px; min-height: 100vh; background: #fff; }
         [id].prd-scroll-target { scroll-margin-top: 1.5rem; }
-        .device-sandbox { position: relative; width: 100%; min-height: 400px; height: 100%; overflow: hidden; border-radius: 1rem; border: 2px solid #e2e8f0; background: #fff; }
+        /* 与预览模式一致：固定视口宽度，避免导出后因容器宽度不同导致样式差异 */
+        .device-sandbox { position: relative; width: 100%; min-height: 400px; height: 100%; overflow: hidden; border-radius: 1rem; border: 2px solid #e2e8f0; background: #fff; box-sizing: border-box; }
         .device-sandbox > div { width: 100%; height: 100%; min-height: 100%; box-sizing: border-box; }
         .prd-ui-viewport { min-height: 100%; box-sizing: border-box; }
         
@@ -600,46 +602,50 @@ export function generateFullPrdHtml(data: FullPrdData): string {
         .phone-mockup img:hover {
             transform: scale(1.02);
         }
-        /* 移动端界面示意：保持现有视口框样式 */
+        /* 移动端界面示意：与编辑/演示预览一致，固定宽度/高度（viewport-constants） */
         .mobile-ui-viewport {
-            width: 100%;
-            max-width: 400px;
-            min-height: 480px;
+            width: ${MOBILE_VIEWPORT_WIDTH}px;
+            max-width: 100%;
+            min-height: ${MOBILE_VIEWPORT_HEIGHT}px;
             border-radius: 0.75rem;
             border: 2px solid #e2e8f0;
             overflow: hidden;
             background: #fff;
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08);
             margin: 0 auto;
+            box-sizing: border-box;
         }
-        .mobile-ui-viewport .device-sandbox { min-height: 480px; }
-        /* PC 端界面示意：Word 式排版，正常文档流比例 */
+        .mobile-ui-viewport .device-sandbox { min-height: ${MOBILE_VIEWPORT_HEIGHT}px; width: ${MOBILE_VIEWPORT_WIDTH}px; }
+        /* PC 端界面示意：与编辑/演示预览一致，固定宽度/高度，窄屏可横向滚动 */
         .pc-ui-doc-flow {
-            width: 100%;
+            width: ${PC_VIEWPORT_WIDTH}px;
             max-width: 100%;
             border: 1px solid #e2e8f0;
             border-radius: 0.5rem;
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: hidden;
             background: #fff;
             box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            box-sizing: border-box;
         }
         .pc-ui-doc-flow .device-sandbox {
-            min-height: 320px;
-            width: 100%;
+            min-height: ${PC_VIEWPORT_HEIGHT}px;
+            width: ${PC_VIEWPORT_WIDTH}px;
+            flex-shrink: 0;
         }
         /* 兼容旧类名 */
         .desktop-viewport {
-            width: 100%;
-            min-width: 320px;
+            width: ${PC_VIEWPORT_WIDTH}px;
             max-width: 100%;
             min-height: 480px;
             border-radius: 0.75rem;
             border: 2px solid #e2e8f0;
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: hidden;
             background: #fff;
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08);
         }
-        .desktop-viewport .device-sandbox { min-height: 480px; }
+        .desktop-viewport .device-sandbox { min-height: 480px; width: ${PC_VIEWPORT_WIDTH}px; }
         
         /* PRD Table Styling */
         .markdown-body table {
@@ -945,7 +951,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                                 <h3>${sec2Num} 界面示意</h3>
                                 ${hasValidUiCode ? `
                                 <div class="${uiWrapClass} bg-white">
-                                    <div id="root-${node.nodeId || `node-${nodeIdx}`}" class="device-sandbox bg-white" style="${isPcViewport ? 'min-height: 320px; width: 100%;' : 'min-height: 480px; width: 100%;'}">
+                                    <div id="root-${node.nodeId || `node-${nodeIdx}`}" class="device-sandbox bg-white" style="${isPcViewport ? `min-height: ${PC_VIEWPORT_HEIGHT}px; width: ${PC_VIEWPORT_WIDTH}px;` : `min-height: ${MOBILE_VIEWPORT_HEIGHT}px; width: ${MOBILE_VIEWPORT_WIDTH}px;`}">
                                         <div class="flex items-center justify-center h-full text-slate-400 text-sm">UI 加载中…</div>
                                     </div>
                                 </div>
@@ -956,7 +962,7 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                                 </div>
                                 <p class="text-center text-xs text-slate-500 mt-3 font-mono">图 ${sec2Num} UI 示意（点击放大）</p>
                                 ` : `
-                                <div class="${uiWrapClass} bg-slate-50 flex items-center justify-center" style="min-height: ${isPcViewport ? '320px' : '480px'};">
+                                <div class="${uiWrapClass} bg-slate-50 flex items-center justify-center" style="min-height: ${isPcViewport ? `${PC_VIEWPORT_HEIGHT}px` : `${MOBILE_VIEWPORT_HEIGHT}px`};">
                                     <div class="text-center text-slate-400">
                                         <div class="text-4xl mb-2">📱</div>
                                         <p class="text-sm">暂无 UI 预览</p>
