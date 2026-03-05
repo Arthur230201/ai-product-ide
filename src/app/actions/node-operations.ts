@@ -362,25 +362,20 @@ export async function generateTestCases(input: {
 根据提供的功能需求，生成详细的测试用例列表。
 
 # 输出要求
-1. 每个测试用例应该包含：
-   - 测试场景描述（清晰、具体）
-   - 测试步骤（可选，如果场景复杂）
-   - 预期结果
-2. 测试用例应该覆盖：
-   - 正常流程（Happy Path）
-   - 边界条件（Boundary Cases）
-   - 异常情况（Error Cases）
-   - 数据验证（Validation）
-   - UI交互（如果适用）
-3. 使用中文描述，确保清晰易懂
-4. 每个测试用例独立一行，格式简洁
-5. 测试用例数量：根据需求复杂度，生成5-15个测试用例
+1. 每个测试用例应包含：测试场景/步骤、预期结果。
+2. 覆盖：正常流程、边界条件、异常情况、数据验证、UI 交互（如适用）。
+3. 使用中文描述，清晰易懂。
+4. 测试用例数量：根据需求复杂度，生成 5–15 条。
 
-# 输出格式
-直接输出测试用例列表，每行一个测试用例，格式如下：
-- 测试用例1：描述测试场景和预期结果
-- 测试用例2：描述测试场景和预期结果
-...`;
+# 输出格式（必须）
+请**仅输出**一张 Markdown 表格，表头为三列：序号 | 测试场景 | 预期结果。示例：
+
+| 序号 | 测试场景 | 预期结果 |
+| --- | --- | --- |
+| 1 | 进入资产概览页，检查顶部导航标题 | 标题为「资产概览」，加粗且文字颜色 #1F2937，无错位或截断 |
+| 2 | 在搜索框输入资产名/ID/IP/负责人进行模糊搜索 | 列表/卡片/告警等资产相关结果实时更新，搜索图标在左、颜色 #9CA3AF |
+
+不要输出表格以外的说明、标题或列表。单元格内若有换行可用空格代替，不要使用 | 符号以免破坏表格。`;
 
     // 构建用户提示词
     const requirementsText = input.requirements
@@ -419,40 +414,53 @@ ${requirementsText}
 
     // 解析生成的测试用例
     const generatedText = result.data.trim();
-    
-    // 提取测试用例（按行分割，过滤空行和标记）
-    const cases = generatedText
-      .split('\n')
-      .map(line => {
-        // 移除列表标记（-、*、1.、1、等）和编号
-        return line
-          .replace(/^[-*\d.\s、）)]+/, '') // 移除开头的标记
-          .replace(/^测试用例\d+[：:]\s*/, '') // 移除"测试用例1："这样的前缀
-          .trim();
-      })
-      .filter(line => {
-        // 过滤空行和无效行
-        return line.length > 0 && 
-               !line.match(/^(测试用例|用例|Case)/i) && // 过滤标题行
-               line.length > 5; // 至少5个字符
-      })
-      .slice(0, 20); // 限制最多20个测试用例
+    let cases: string[] = [];
 
-    if (cases.length === 0) {
-      // 如果没有解析到测试用例，将整个文本作为单个测试用例
-      const fallbackCase = generatedText.substring(0, 500);
-      if (fallbackCase.length > 0) {
-        cases.push(fallbackCase);
-      } else {
-        // 如果还是空的，返回默认测试用例
-        cases.push('功能正常流程测试');
-        cases.push('数据验证测试');
-        cases.push('异常情况处理测试');
+    // 检测是否为 Markdown 表格（首行含 | 且为表头/分隔行）
+    const lines = generatedText.split('\n');
+    const tableStart = lines.findIndex((l) => /^\s*\|.+\|/.test(l));
+    if (tableStart !== -1) {
+      const tableLines: string[] = [];
+      for (let i = tableStart; i < lines.length; i++) {
+        if (/^\s*\|.+\|/.test(lines[i])) tableLines.push(lines[i].trim());
+        else if (tableLines.length > 0) break; // 表格结束
+      }
+      if (tableLines.length >= 2) {
+        cases = [tableLines.join('\n')];
+        log(`✅ [generateTestCases] 解析为 Markdown 表格，共 ${tableLines.length} 行`);
       }
     }
 
-    log(`✅ [generateTestCases] 成功生成 ${cases.length} 个测试用例`);
-    
+    if (cases.length === 0) {
+      // 回退：按行解析为列表
+      const listCases = generatedText
+        .split('\n')
+        .map((line) =>
+          line
+            .replace(/^[-*\d.\s、）)]+/, '')
+            .replace(/^测试用例\d+[：:]\s*/, '')
+            .trim()
+        )
+        .filter(
+          (line) =>
+            line.length > 0 &&
+            !line.match(/^(测试用例|用例|Case)/i) &&
+            line.length > 5
+        )
+        .slice(0, 20);
+      if (listCases.length > 0) {
+        cases = listCases;
+      } else {
+        const fallback = generatedText.substring(0, 500);
+        cases.push(
+          fallback.length > 0
+            ? fallback
+            : '| 序号 | 测试场景 | 预期结果 |\n| --- | --- | --- |\n| 1 | 功能正常流程测试 | 通过 |\n| 2 | 数据验证测试 | 通过 |\n| 3 | 异常情况处理测试 | 通过 |'
+        );
+      }
+    }
+
+    log(`✅ [generateTestCases] 成功生成 ${cases.length} 条（表格或列表）`);
     return {
       ok: true,
       data: { cases },
@@ -468,6 +476,46 @@ ${requirementsText}
       metrics: { queuedMs: 0, dedupHit: false, totalMs: 0 },
     };
   }
+}
+
+// ==================== 主题 → 设计系统约束（供图/文生成共用）====================
+
+/** 根据 UIThemeConfig 生成 [DESIGN SYSTEM ENFORCEMENT] 提示词片段 */
+function buildDesignSystemEnforcement(theme: {
+  colors?: { primary?: string; secondary?: string; background?: { dark?: string }; surface?: string; text?: { primary?: string; secondary?: string }; border?: string };
+  shape?: { borderRadius?: { md?: string } };
+  shadows?: { buttonShadow?: string; cardShadow?: string };
+  typography?: { density?: string };
+  vibe?: string;
+}): string {
+  const hasExplicitDarkTheme = theme.colors?.background?.dark &&
+    (theme.colors.background.dark.includes('slate-9') || theme.colors.background.dark.includes('zinc-9') ||
+     theme.colors.background.dark.includes('gray-9') || theme.colors.background.dark.includes('slate-8') ||
+     theme.colors.background.dark.includes('zinc-8') || theme.colors.background.dark.includes('gray-8'));
+  const backgroundColor = hasExplicitDarkTheme ? `bg-${theme.colors!.background!.dark}` : 'bg-white';
+  const surfaceColor = hasExplicitDarkTheme ? `bg-${theme.colors?.surface || 'slate-800'}` : 'bg-white';
+  const primaryTextColor = hasExplicitDarkTheme ? `text-${theme.colors?.text?.primary || 'slate-50'}` : 'text-gray-900';
+  const secondaryTextColor = hasExplicitDarkTheme ? `text-${theme.colors?.text?.secondary || 'slate-400'}` : 'text-gray-600';
+  const borderColor = hasExplicitDarkTheme ? `border-${theme.colors?.border || 'slate-700'}` : 'border-gray-200';
+  return `
+
+[DESIGN SYSTEM ENFORCEMENT]
+你必须严格遵循以下设计配置（优先级高于默认 Tailwind 选择）：
+- 主色调：使用 bg-${theme.colors?.primary || 'blue-500'} 和 text-${theme.colors?.primary || 'blue-500'}（用于主要操作按钮、链接、强调元素）
+- 次要色调：使用 bg-${theme.colors?.secondary || 'purple-500'} 和 text-${theme.colors?.secondary || 'purple-500'}（用于次要操作）
+- 背景色：${hasExplicitDarkTheme ? `使用 ${backgroundColor}（用户明确要求深色主题）` : '**必须使用 bg-white（白色背景，默认要求）**'}
+- 表面色：使用 ${surfaceColor}
+- 主要文本：使用 ${primaryTextColor}
+- 次要文本：使用 ${secondaryTextColor}
+- 边框色：使用 ${borderColor}
+- 圆角：所有按钮、卡片、输入框必须使用 ${theme.shape?.borderRadius?.md || 'rounded-md'}
+- 按钮阴影：使用 ${theme.shadows?.buttonShadow || 'shadow-md'}
+- 卡片阴影：使用 ${theme.shadows?.cardShadow || 'shadow-lg'}
+- 密度：${theme.typography?.density === 'compact' ? '使用紧凑间距（p-2, gap-2）' : theme.typography?.density === 'spacious' ? '使用宽松间距（p-6, gap-6）' : '使用正常间距（p-4, gap-4）'}
+${hasExplicitDarkTheme ? '- 注意：背景是深色，确保所有文本使用浅色类（text-white, text-gray-200, text-slate-50等）' : '- **重要：背景是白色，确保所有文本使用深色类（text-gray-900, text-gray-600等），禁止使用浅色文本（text-white, text-gray-100等）**'}
+- 风格描述：${theme.vibe || 'Modern Professional'}
+
+重要：这些设计令牌必须严格应用，不要使用其他颜色或样式。`;
 }
 
 // ==================== Server Actions（用于 CommandBar）====================
@@ -536,55 +584,9 @@ export const generateUIFromImage = createServerAction()
       });
 
       // 构建设计系统约束（如果提供了主题配置）
-      let designSystemEnforcement = '';
-      if (input.themeConfig) {
-        const theme = input.themeConfig;
-        // 检查用户是否明确要求深色主题（通过检查背景色是否明确设置为深色）
-        const hasExplicitDarkTheme = theme.colors?.background?.dark && 
-                                     (theme.colors.background.dark.includes('slate-9') || 
-                                      theme.colors.background.dark.includes('zinc-9') ||
-                                      theme.colors.background.dark.includes('gray-9') ||
-                                      theme.colors.background.dark.includes('slate-8') ||
-                                      theme.colors.background.dark.includes('zinc-8') ||
-                                      theme.colors.background.dark.includes('gray-8'));
-        
-        // 默认使用白色背景，除非用户明确要求深色主题
-        const backgroundColor = hasExplicitDarkTheme 
-          ? `bg-${theme.colors.background.dark}` 
-          : 'bg-white';
-        const surfaceColor = hasExplicitDarkTheme 
-          ? `bg-${theme.colors?.surface || 'slate-800'}` 
-          : 'bg-white';
-        const primaryTextColor = hasExplicitDarkTheme 
-          ? `text-${theme.colors?.text?.primary || 'slate-50'}` 
-          : 'text-gray-900';
-        const secondaryTextColor = hasExplicitDarkTheme 
-          ? `text-${theme.colors?.text?.secondary || 'slate-400'}` 
-          : 'text-gray-600';
-        const borderColor = hasExplicitDarkTheme 
-          ? `border-${theme.colors?.border || 'slate-700'}` 
-          : 'border-gray-200';
-        
-        designSystemEnforcement = `
-
-[DESIGN SYSTEM ENFORCEMENT]
-你必须严格遵循以下设计配置（优先级高于默认 Tailwind 选择）：
-- 主色调：使用 bg-${theme.colors?.primary || 'blue-500'} 和 text-${theme.colors?.primary || 'blue-500'}（用于主要操作按钮、链接、强调元素）
-- 次要色调：使用 bg-${theme.colors?.secondary || 'purple-500'} 和 text-${theme.colors?.secondary || 'purple-500'}（用于次要操作）
-- 背景色：${hasExplicitDarkTheme ? `使用 ${backgroundColor}（用户明确要求深色主题）` : '**必须使用 bg-white（白色背景，默认要求）**'}
-- 表面色：使用 ${surfaceColor}
-- 主要文本：使用 ${primaryTextColor}
-- 次要文本：使用 ${secondaryTextColor}
-- 边框色：使用 ${borderColor}
-- 圆角：所有按钮、卡片、输入框必须使用 ${theme.shape?.borderRadius?.md || 'rounded-md'}
-- 按钮阴影：使用 ${theme.shadows?.buttonShadow || 'shadow-md'}
-- 卡片阴影：使用 ${theme.shadows?.cardShadow || 'shadow-lg'}
-- 密度：${theme.typography?.density === 'compact' ? '使用紧凑间距（p-2, gap-2）' : theme.typography?.density === 'spacious' ? '使用宽松间距（p-6, gap-6）' : '使用正常间距（p-4, gap-4）'}
-${hasExplicitDarkTheme ? '- 注意：背景是深色，确保所有文本使用浅色类（text-white, text-gray-200, text-slate-50等）' : '- **重要：背景是白色，确保所有文本使用深色类（text-gray-900, text-gray-600等），禁止使用浅色文本（text-white, text-gray-100等）**'}
-- 风格描述：${theme.vibe || 'Modern Professional'}
-
-重要：这些设计令牌必须严格应用，不要使用其他颜色或样式。`;
-      }
+      const designSystemEnforcement = input.themeConfig
+        ? buildDesignSystemEnforcement(input.themeConfig)
+        : '';
 
       // 获取项目画像配置
       const projectMeta = input.projectMeta || {
@@ -987,7 +989,11 @@ export const generateUIFromText = createServerAction()
     try {
       ensureOpenAIKey();
 
-      const systemPrompt = buildUIGenerationSystemPrompt(viewportPreset, input.projectMeta ?? undefined);
+      let systemPrompt = buildUIGenerationSystemPrompt(viewportPreset, input.projectMeta ?? undefined);
+      if (input.themeConfig) {
+        systemPrompt += buildDesignSystemEnforcement(input.themeConfig);
+        log(`📐 [generateUIFromText] 已注入主题约束，vibe: ${input.themeConfig.vibe || '—'}`);
+      }
       const useEdit = shouldUseEditMode(input.existingCode, input.prompt ?? '');
       const userPromptFinal = useEdit && input.existingCode
         ? buildUIEditUserPrompt(

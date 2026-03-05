@@ -41,12 +41,17 @@ async function main() {
   const bodyText = await page.evaluate(() => document.body?.innerText || '');
   const hasLoading = bodyText.includes('UI 加载中');
   const hasError = bodyText.includes('UI 组件加载失败') || bodyText.includes('UI 未能渲染');
-  const hasContent = bodyText.includes('商品列表') && (bodyText.includes('筛选') || bodyText.includes('在售'));
+  // 通用通过条件：有 PRD 结构（第 5 章）且无错误；或包含可选预期关键词
+  const expectedKeyword = process.env.VERIFY_EXPECTED || process.argv[3];
+  const hasPrdStructure = bodyText.includes('第 5 章') || bodyText.includes('功能详述');
+  const hasContent = expectedKeyword ? bodyText.includes(expectedKeyword) : (hasPrdStructure && !hasLoading);
 
   console.log('[verify] 结果:');
   console.log('  - 仍显示「UI 加载中」:', hasLoading);
   console.log('  - 显示错误/未能渲染:', hasError);
-  console.log('  - 疑似渲染出内容（商品列表/筛选）:', hasContent);
+  console.log('  - 有 PRD 结构（第5章/功能详述）:', hasPrdStructure);
+  if (expectedKeyword) console.log('  - 包含预期关键词:', hasContent);
+  else console.log('  - 疑似渲染出内容（无加载+有结构）:', hasContent);
 
   const errors = logs.filter((l) => l.type === 'error' || l.text.includes('❌'));
   if (errors.length) {
@@ -61,11 +66,11 @@ async function main() {
     console.log('[verify] ❌ 存在错误，需修复');
     process.exit(1);
   }
-  if (hasContent && !hasLoading) {
-    console.log('[verify] ✅ UI 已正确渲染');
+  if (hasContent && !hasLoading && !hasError) {
+    console.log('[verify] ✅ 导出 PRD 与预期一致（无错误、无加载中、有内容）');
     process.exit(0);
   }
-  console.log('[verify] ⚠️ 可能仍为加载中或未渲染');
+  console.log('[verify] ⚠️ 可能仍为加载中、未渲染或缺少预期内容');
   process.exit(2);
 }
 

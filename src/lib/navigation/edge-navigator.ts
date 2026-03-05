@@ -41,7 +41,8 @@ function evaluateExpression(expr: string, context: RuntimeContext): boolean {
  */
 function checkEdgeCondition(edgeNav: EdgeNavMeta, context: RuntimeContext): boolean {
   const { conditionType, condition } = edgeNav;
-  
+  if (!condition) return true; // 未返回 condition 时视为无条件通过
+
   switch (conditionType) {
     case 'none':
       return true; // 无条件，总是通过

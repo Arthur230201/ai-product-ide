@@ -292,7 +292,11 @@ export function NodeDetailPanel() {
       }
     } catch (error) {
       console.error('Generate PRD error:', error);
-      toast.error(`生成失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      const msg = error instanceof Error ? error.message : String(error);
+      const desc = msg.includes('Failed to fetch') || msg.includes('fetch')
+        ? '网络连接失败，请确保服务器正在运行 (npm run dev) 并检查网络'
+        : msg || '未知错误';
+      toast.error('生成失败', { description: desc, duration: 8000 });
     } finally {
       setIsLoading(false);
     }
@@ -825,11 +829,17 @@ export function NodeDetailPanel() {
                       </h4>
                       <div className="prose prose-invert prose-sm max-w-none">
                         {Array.isArray(data.artifacts.test?.cases) && data.artifacts.test.cases.length > 0 ? (
-                          <ul className="list-disc list-inside space-y-2 text-zinc-300">
-                            {data.artifacts.test.cases.map((testCase: string, index: number) => (
-                              <li key={index} className="text-sm">{testCase}</li>
-                            ))}
-                          </ul>
+                          (() => {
+                            const cases = data.artifacts.test!.cases;
+                            const isTable = cases.length === 1 && cases[0].trim().includes('|');
+                            const markdown = isTable
+                              ? cases[0]
+                              : '| 序号 | 测试场景 / 预期结果 |\n| --- | --- |\n' +
+                                cases
+                                  .map((c, i) => `| ${i + 1} | ${String(c).replace(/\|/g, '｜').replace(/\n/g, ' ')} |`)
+                                  .join('\n');
+                            return <SpecViewer markdown={markdown} />;
+                          })()
                         ) : (
                           <p className="text-zinc-500">暂无测试用例</p>
                         )}

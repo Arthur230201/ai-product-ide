@@ -1290,37 +1290,50 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
     startLoadingSteps();
 
     if (isEditMode && selectedNode) {
-      // 检查是否有图片附件，如果有则使用 Model Relay 流程
-      // 放宽检测条件：只要 mimeType 是 image/ 开头，或者 type 是 media 且有 preview（且不是 PDF/视频），就认为是图片
-      const isPDF = attachment?.mimeType === 'application/pdf';
-      const isVideo = attachment?.mimeType?.startsWith('video/');
-      const isImage = (attachment?.mimeType?.startsWith('image/') || 
-                      (attachment?.type === 'media' && attachment.preview && !isPDF && !isVideo)) &&
-               !isPDF;
+      // 检查是否有图片附件，如果有则使用 Model Relay 流程（generateUIFromImage）
+      // 优先用 attachment，若无图片则从 attachments 中取第一个图片，确保「上传图片生成UI」一定走通
+      const isPdf = (a: FileAttachment | null) => a?.mimeType === 'application/pdf';
+      const isVideoType = (a: FileAttachment | null) => a?.mimeType?.startsWith('video/');
+      const isImageAttachment = (a: FileAttachment | null) =>
+        a &&
+        !isPdf(a) &&
+        (a.mimeType?.startsWith('image/') || (a.type === 'media' && a.preview && !isVideoType(a)));
+      const firstImage =
+        isImageAttachment(attachment) ? attachment : attachments.find((a) => isImageAttachment(a)) ?? null;
+      const isImage = !!firstImage;
+      const imageForUI = firstImage?.content ? firstImage : null;
 
-      if (isImage && attachment?.content) {
+      if (isImage && imageForUI?.content) {
+        // ========== 意图区分：按图复刻 vs 按图中信息生成 ==========
+        // 仅当用户明确说明「按图片中的内容生成UI」「复刻」「设计稿」等时，才按设计稿复刻；否则默认视为「信息在图片中」，按信息生成 UI。
+        const promptLower = (prompt.trim() || '').toLowerCase();
+        const isReplicateDesignIntent =
+          /按图片中的内容生成\s*ui|按图片(中的内容)?生成\s*ui|按图(片)?生成\s*ui|复刻|设计稿|照着做|按图做|根据(图片|设计稿)生成/i.test(promptLower) ||
+          /按.*图.*生成\s*ui|根据.*图.*生成/i.test(promptLower);
+        log('🔍 [CommandBar] 上传图片时的意图:', {
+          isReplicateDesignIntent,
+          promptPreview: prompt.trim().slice(0, 80),
+        });
+
         // ========== Model Relay 流程：UI 优先，PRD 由用户手动生成 ==========
-        
-        // 🚨 保存目标节点ID和标签（防止用户在生成过程中切换节点）
         const targetNodeId = selectedNode.id;
         const targetNodeLabel = selectedNode.data.label || selectedNode.id;
-        
-        // 在 try 块外部声明变量，以便在 catch 块中访问
         let accumulatedCode: string = '';
         let fullCode: string = '';
-        
+
         try {
-          // ========== Step 1: 生成 UI 代码（使用高智能视觉模型）==========
-          setLoadingStep('🎨 正在生成 UI 代码...');
+          setLoadingStep(isReplicateDesignIntent ? '🎨 正在按设计稿生成 UI...' : '🎨 正在根据图片中的信息生成 UI...');
           setProgress(10);
-          toast.info('正在生成完整页面（质量优先），请稍候…', { duration: 4000 });
-          
-          // 初始化 UI 代码状态（用于实时更新）
+          toast.info(
+            isReplicateDesignIntent ? '正在按设计稿复刻 UI，请稍候…' : '正在识别图片中的信息并生成 UI…',
+            { duration: 4000 }
+          );
           accumulatedCode = '';
           fullCode = '';
 
-          // 新版本提示词：结构化提示词
-          const optimizedPrompt = prompt.trim() || `Analyze the uploaded image and generate production-ready React + Tailwind CSS code.
+          const optimizedPrompt = (() => {
+            if (isReplicateDesignIntent) {
+              return prompt.trim() || `Analyze the uploaded image and generate production-ready React + Tailwind CSS code.
 
 **Step 1: Classify the Image**
 - Is this a high-fidelity design mockup? -> Use "Pixel-Perfect Clone" strategy.
@@ -1341,11 +1354,19 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
 - Ensure all buttons, inputs, and tabs are interactive.
 
 Generate the complete .tsx code now.`;
+            }
+            // 默认：图片中是需求/描述信息，先识别再按信息生成 UI，不复刻版式
+            return prompt.trim() || `请识别图片中的文字与需求信息（可能是需求文档截图、列表、说明等），根据识别到的信息生成一页符合需求的 React + Tailwind CSS 页面。
+
+要求：
+- 不要复刻图片的版式、布局或视觉样式；按「需求内容」实现功能与信息结构即可。
+- 使用 React Hooks、Tailwind CSS、lucide-react 图标。
+- 输出完整 .tsx 代码。`;
+          })();
           
           // 确保图片数据格式正确（移除 data: URL 前缀，只保留 base64 数据）
-          let imageBase64Data = attachment?.content || '';
+          let imageBase64Data = imageForUI.content || '';
           if (imageBase64Data.includes('data:')) {
-            // 如果包含 data: URL 前缀，提取 base64 部分
             const parts = imageBase64Data.split(',');
             if (parts.length > 1) {
               imageBase64Data = parts[1];
@@ -1374,7 +1395,7 @@ Generate the complete .tsx code now.`;
               executeUI({
                 prompt: optimizedPrompt,
                 imageBase64: imageBase64Data,
-                themeConfig: undefined,
+                themeConfig: currentTheme ?? undefined,
                 tier: uiGenerationTier,
                 aiConfig: aiConfig,
               }),
@@ -1592,7 +1613,7 @@ Generate the complete .tsx code now.`;
             nodeLabel: targetNodeLabel,
             codeLength: accumulatedCode.length,
             codePreview: accumulatedCode.substring(0, 100),
-            hasPreviewUrl: !!attachment?.preview,
+            hasPreviewUrl: !!imageForUI?.preview,
           });
           
           // 从store获取最新的节点数据，确保使用最新的artifacts
@@ -1611,7 +1632,7 @@ Generate the complete .tsx code now.`;
               ...latestNode.data.artifacts,
               view: {
                 code: accumulatedCode,
-                previewUrl: attachment?.preview,
+                previewUrl: imageForUI?.preview,
               },
             },
           });
@@ -2064,7 +2085,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                 prompt: htmlReferencePrompt,
                 nodeLabel: targetNodeLabel,
                 projectMeta: useCanvasStore.getState().projectMeta,
-                themeConfig: undefined,
+                themeConfig: currentTheme ?? undefined,
                 viewportPreset: viewportPresetForCall,
                 tier: uiGenerationTier,
                 aiConfig: aiConfig,
@@ -2353,7 +2374,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
             nodeLabel: targetNodeLabel,
             pageDescription: pageDescription || undefined,
             projectMeta: useCanvasStore.getState().projectMeta,
-            themeConfig: undefined,
+            themeConfig: currentTheme ?? undefined,
             viewportPreset: viewportPresetForCall,
             tier: uiGenerationTier,
             aiConfig: aiConfig,
@@ -2560,9 +2581,13 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
           }
         } catch (error) {
           logError('❌ [CommandBar] UI代码生成失败:', error);
+          const msg = error instanceof Error ? error.message : String(error);
+          const isNetworkError = msg.includes('Failed to fetch') || msg.includes('fetch');
           toast.error('UI代码生成失败', {
-            description: error instanceof Error ? error.message : '未知错误',
-            duration: 5000,
+            description: isNetworkError
+              ? '网络连接失败。请确保服务器正在运行 (npm run dev) 并检查网络与防火墙'
+              : msg || '未知错误',
+            duration: isNetworkError ? 8000 : 5000,
           });
           // 生成失败后重置状态，允许用户重试
           // 清除UI生成专用的超时定时器
@@ -2790,7 +2815,17 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
         log('✅ [CommandBar] executeCreate completed');
       } catch (error) {
         logError('❌ [CommandBar] executeCreate error:', error);
-        throw error;
+        const msg = error instanceof Error ? error.message : String(error);
+        const isNetworkError = msg.includes('Failed to fetch') || msg.includes('fetch');
+        const description = isNetworkError
+          ? '请检查：1. 服务器是否正常运行 (npm run dev) 2. 网络连接 3. 防火墙设置'
+          : msg;
+        toast.error('生成图表失败', { description, duration: 8000 });
+        setIsProcessingVideo(false);
+        setIsTimeoutOverride(false);
+        clearLoadingTimers();
+        setProgress(0);
+        setLoadingStep('');
       }
     }
   };

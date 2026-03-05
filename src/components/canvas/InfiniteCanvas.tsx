@@ -505,6 +505,7 @@ function TopButtons({
               className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700"
               title="更多选项"
               aria-label="更多选项"
+              data-testid="canvas-more-options"
             >
               <span className="text-xs">⋯</span>
             </button>
@@ -522,6 +523,7 @@ function TopButtons({
                   }}
                   className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
                   title="提取 UI 风格"
+                  data-testid="open-style-extractor"
                 >
                   🎨 风格提取
                 </button>

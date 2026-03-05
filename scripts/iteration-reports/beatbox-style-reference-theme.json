@@ -1,0 +1,35 @@
+{
+  "colors": {
+    "primary": "teal-800",
+    "secondary": "teal-600",
+    "background": {
+      "light": "white",
+      "dark": "slate-900"
+    },
+    "surface": "white",
+    "text": {
+      "primary": "gray-900",
+      "secondary": "gray-600"
+    },
+    "border": "gray-200"
+  },
+  "shape": {
+    "borderRadius": {
+      "sm": "rounded-sm",
+      "md": "rounded-md",
+      "lg": "rounded-lg",
+      "full": "rounded-full"
+    },
+    "borderWidth": "border"
+  },
+  "typography": {
+    "fontFamily": "sans-serif",
+    "baseSize": "text-base",
+    "density": "normal"
+  },
+  "shadows": {
+    "cardShadow": "shadow-md",
+    "buttonShadow": "shadow-sm"
+  },
+  "vibe": "Modern news portal: clean white content area, teal/dark green nav and buttons, clear sans-serif hierarchy, subtle card shadows"
+}

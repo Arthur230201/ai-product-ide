@@ -253,7 +253,7 @@ export const EdgeNavMetaSchema = z.object({
     roles: z.array(z.string()).optional().describe('角色列表（conditionType=role 时必需）'),
     permissions: z.array(z.string()).optional().describe('权限列表（conditionType=permission 时必需）'),
     expr: z.string().optional().describe('表达式（conditionType=expression 时必需）'),
-  }).describe('条件配置'),
+  }).optional().describe('条件配置（conditionType=none 时可省略）'),
   sourceHint: z.object({
     elementText: z.string().optional().describe('触发元素文本（如按钮文案）'),
     elementId: z.string().optional().describe('触发元素 ID'),

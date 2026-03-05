@@ -89,7 +89,7 @@ const EdgeNavMetaSchema = z.object({
     roles: z.array(z.string()).optional().describe('角色列表（conditionType=role 时必需，如：["admin", "editor"]）'),
     permissions: z.array(z.string()).optional().describe('权限列表（conditionType=permission 时必需，如：["read:orders", "write:orders"]）'),
     expr: z.string().optional().describe('表达式（conditionType=expression 时必需，支持 role == "xx" 和 has("perm") 两种模式）'),
-  }).describe('条件配置'),
+  }).optional().describe('条件配置（conditionType=none 时可省略）'),
   sourceHint: z.object({
     elementText: z.string().optional().describe('触发元素文本（优先，如按钮文案"提交"、"进入工作台"）'),
     elementId: z.string().optional().describe('触发元素 ID（可推断时）'),

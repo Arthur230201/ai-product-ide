@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3000",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -11,7 +11,8 @@
     "journey:full": "node scripts/run-journey-export.mjs",
     "viewport:debug": "node scripts/viewport-debug-run.mjs",
     "viewport:read": "node scripts/viewport-debug-read.mjs",
-    "build:prd-bundle": "node scripts/build-preview-ui-prd-bundle.mjs"
+    "build:prd-bundle": "node scripts/build-preview-ui-prd-bundle.mjs",
+    "full-flow:verify": "node scripts/run-full-flow-and-verify.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.46",

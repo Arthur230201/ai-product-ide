@@ -1284,6 +1284,11 @@ export function generateFullPrdHtml(data: FullPrdData): string {
               
               // Step 5: 顶层已在 Step 0 替换，此处仅保留 componentName 供下方使用（safeId/componentName 已在上方定义）
 
+              // Step 5.1: 修复 LLM 常见语法错误——三元或表达式后多余的 "} |" 导致 Babel "Unexpected token, expected ':'"（用 [ \\t\\n]* 代替 \\s* 避免导出时反斜杠丢失）
+              componentCode = componentCode.replace(/\\}[ \\t\\n]*\\\|/g, '}');
+              // Step 5.2: 修复三元运算符误写为赋值——"? 30 = 199 ?" 应为 "? 30 : 199 ?"（Invalid left-hand side in assignment）
+              componentCode = componentCode.replace(/\\?[ \\t\\n]*\\(\\d+\\)[ \\t\\n]*=[ \\t\\n]*\\(\\d+\\)[ \\t\\n]*\\?/g, '? $1 : $2 ?');
+
               console.log('🔧 [mountComponents] Component name:', componentName);
               console.log('📝 [mountComponents] Cleaned code length:', componentCode.length);
               
