@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Paperclip, X, Send, Loader2, FileText, Image as ImageIcon, Video } from 'lucide-react';
+import { Paperclip, X, Send, Loader2, FileText, Image as ImageIcon, Video, Bot, User } from 'lucide-react';
 import { useServerAction } from 'zsa-react';
 import { generateGraph } from '@/app/actions/generate-graph';
 import { updateNodeArtifacts, generateUIFromImage, generateUIFromText, generateAnalysisFromCode, type UIGenerationResponse } from '@/app/actions/node-operations';
@@ -55,6 +55,17 @@ function getDefaultUIPrompt(nodeLabel: string): string {
 
 type ViewportPreset = 'mobile' | 'desktop';
 
+/** 对话区消息：用户输入与 AI 回复的展示 */
+export type ChatMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  status?: 'sending' | 'done' | 'error';
+  attachmentSummary?: string;
+};
+
+const MAX_MESSAGES = 50;
+
 export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<ViewportPreset | null> }) {
   const { viewportSubmitRef } = props;
   const [prompt, setPrompt] = useState('');
@@ -66,11 +77,15 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
   // 超时覆盖标志：当超时发生时，强制重置所有 loading 状态
   const [isTimeoutOverride, setIsTimeoutOverride] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  /** 对话区消息列表（会话级，不持久化） */
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const conversationEndRef = useRef<HTMLDivElement>(null);
+  const pendingAssistantIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const loadingTimersRef = useRef<NodeJS.Timeout[]>([]);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { nodes, selectedNodeId, selectNode, addNodes, addEdges, updateNodeData, layoutNodes, currentTheme, aiConfig, openBlueprint, updateProjectMeta } = useCanvasStore();
+  const { nodes, selectedNodeId, selectNode, addNodes, addEdges, updateNodeData, layoutNodes, currentTheme, stylePreset, aiConfig, openBlueprint, updateProjectMeta } = useCanvasStore();
   
   // 获取当前选中的节点
   const selectedNode = selectedNodeId 
@@ -100,6 +115,21 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
       textarea.style.height = `${newHeight}px`;
     }
   }, []);
+
+  /** 更新当前「进行中」的助手消息为最终内容 */
+  const updatePendingAssistantMessage = useCallback((content: string, status: 'done' | 'error') => {
+    setMessages((prev) => {
+      const id = pendingAssistantIdRef.current;
+      if (!id) return prev;
+      return prev.map((m) => (m.id === id ? { ...m, content, status } : m));
+    });
+    pendingAssistantIdRef.current = null;
+  }, []);
+
+  /** 新消息时滚到底部 */
+  useEffect(() => {
+    conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages.length]);
 
   // 创建模式的 action（必须在所有使用它的函数之前定义）
   const { execute: executeCreate, isPending: isCreating } = useServerAction(generateGraph, {
@@ -381,6 +411,7 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
       if ((!nodes || !Array.isArray(nodes) || nodes.length === 0) && 
           (!edges || !Array.isArray(edges) || edges.length === 0)) {
         log('⚠️ [CommandBar] 无法生成有效的图结构，可能是输入不够明确，打开项目画像页面');
+        updatePendingAssistantMessage('输入信息不够明确，请在项目画像页面补充详细信息。', 'done');
         openBlueprint('profile', {
           description: prompt.trim(),
         });
@@ -414,7 +445,7 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
       const finalNodesCount = useCanvasStore.getState().nodes.length;
       if (finalNodesCount > nodesBeforeAdd) {
         log('🔄 [CommandBar] 节点已成功添加，重置状态');
-        
+        updatePendingAssistantMessage(`已根据描述生成画布并添加 ${nodes?.length ?? 0} 个节点。`, 'done');
         // 移除自动生成UI的逻辑，用户需要手动在节点详情面板中生成UI
         
         setPrompt('');
@@ -433,6 +464,7 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
         }
       } else {
         logError('❌ [CommandBar] 节点添加失败，不重置状态，保留用户输入以便重试');
+        updatePendingAssistantMessage('节点添加失败，请重试。', 'error');
         // 不清空 prompt 和 attachment，让用户可以重试
         setIsProcessingVideo(false);
         setIsTimeoutOverride(false);
@@ -486,6 +518,7 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
         description: errorMessage,
         duration: 5000,
       });
+      updatePendingAssistantMessage(errorMessage, 'error');
       setIsProcessingVideo(false);
       setIsTimeoutOverride(false); // 重置超时覆盖标志
       clearLoadingTimers();
@@ -1286,6 +1319,25 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
       return;
     }
 
+    // 对话区：追加用户消息与助手「进行中」占位
+    const userContent = prompt.trim() || '(无文字)';
+    const attachmentSummary = attachments.length > 0 ? `附：${attachments.length} 个文件` : undefined;
+    setMessages((prev) => {
+      const next = [
+        ...prev.slice(-(MAX_MESSAGES - 2)),
+        { id: `user-${Date.now()}`, role: 'user', content: userContent, attachmentSummary },
+      ];
+      const astId = `ast-${Date.now()}`;
+      pendingAssistantIdRef.current = astId;
+      next.push({
+        id: astId,
+        role: 'assistant',
+        content: isEditMode ? '正在生成或更新 UI…' : '正在生成画布…',
+        status: 'sending',
+      });
+      return next;
+    });
+
     // 启动加载步骤动画
     startLoadingSteps();
 
@@ -1654,6 +1706,7 @@ Generate the complete .tsx code now.`;
 
           setLoadingStep('✅ UI 代码已生成');
           setProgress(100);
+          updatePendingAssistantMessage(`已为「${targetNodeLabel}」更新 UI 代码。`, 'done');
 
           // UI生成成功，提示用户可以手动生成PRD
           toast.success('UI 代码已生成', {
@@ -1730,6 +1783,7 @@ Generate the complete .tsx code now.`;
             log('❌ [CommandBar] UI生成失败（从图片），已清除超时定时器');
           }
           
+          updatePendingAssistantMessage(errorMessage, 'error');
           if (currentCode && currentCode.length > 0 && currentCode !== '// PLACEHOLDER') {
             toast.warning('UI 生成失败', {
               description: errorMessage,
@@ -2086,6 +2140,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                 nodeLabel: targetNodeLabel,
                 projectMeta: useCanvasStore.getState().projectMeta,
                 themeConfig: currentTheme ?? undefined,
+                stylePreset: stylePreset ?? undefined,
                 viewportPreset: viewportPresetForCall,
                 tier: uiGenerationTier,
                 aiConfig: aiConfig,
@@ -2375,6 +2430,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
             pageDescription: pageDescription || undefined,
             projectMeta: useCanvasStore.getState().projectMeta,
             themeConfig: currentTheme ?? undefined,
+            stylePreset: stylePreset ?? undefined,
             viewportPreset: viewportPresetForCall,
             tier: uiGenerationTier,
             aiConfig: aiConfig,
@@ -2520,6 +2576,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
             log('✅ [CommandBar] UI代码生成成功');
             setLoadingStep('✅ UI代码生成完成');
             setProgress(100);
+            updatePendingAssistantMessage(`已为「${selectedNode.data.label}」生成 UI 代码。`, 'done');
             const vLabel = vUsed === 'desktop' ? '桌面' : vUsed === 'mobile' ? '移动' : '';
             toast.success('UI代码生成成功', {
               description: `已为"${selectedNode.data.label}"生成UI代码${vLabel ? `（服务端已按${vLabel}视口）` : ''}`,
@@ -2549,6 +2606,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                 return; // 成功生成UI，直接返回
               } else {
                 logWarn('⚠️ [CommandBar] UI代码生成失败或为空');
+                updatePendingAssistantMessage('生成的代码为空，请重试。', 'error');
                 toast.warning('UI代码生成失败', {
                   description: '生成的代码为空，请重试',
                   duration: 3000,
@@ -2583,10 +2641,12 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
           logError('❌ [CommandBar] UI代码生成失败:', error);
           const msg = error instanceof Error ? error.message : String(error);
           const isNetworkError = msg.includes('Failed to fetch') || msg.includes('fetch');
+          const displayMsg = isNetworkError
+            ? '网络连接失败。请确保服务器正在运行 (npm run dev) 并检查网络与防火墙'
+            : msg || '未知错误';
+          updatePendingAssistantMessage(displayMsg, 'error');
           toast.error('UI代码生成失败', {
-            description: isNetworkError
-              ? '网络连接失败。请确保服务器正在运行 (npm run dev) 并检查网络与防火墙'
-              : msg || '未知错误',
+            description: displayMsg,
             duration: isNetworkError ? 8000 : 5000,
           });
           // 生成失败后重置状态，允许用户重试
@@ -2888,10 +2948,58 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
   return (
     <div 
       data-command-bar
-      className="w-full pointer-events-auto"
+      className="w-full pointer-events-auto flex flex-col max-h-[50vh]"
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
+
+      {/* 对话区：用户消息 + AI 回复 */}
+      <div
+        className="flex-shrink-0 border-b border-zinc-800 bg-zinc-900/50 py-3 px-4 max-h-[280px] overflow-y-auto overscroll-contain"
+        role="log"
+        aria-live="polite"
+        aria-label="对话记录"
+      >
+        {messages.length === 0 ? (
+          <p className="text-zinc-500 text-sm">在这里会显示你的输入与 AI 的回复</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {messages.map((m) => (
+              <div
+                key={m.id}
+                className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`flex items-start gap-2 max-w-[85%] ${
+                    m.role === 'user'
+                      ? 'bg-cyan-500/20 border border-cyan-500/30 rounded-lg px-3 py-2'
+                      : 'bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2'
+                  } ${m.status === 'error' ? 'border-red-500/50 text-red-300' : ''}`}
+                  aria-busy={m.status === 'sending'}
+                >
+                  {m.role === 'assistant' && (
+                    m.status === 'sending' ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-cyan-400 flex-shrink-0 mt-0.5" aria-hidden />
+                    ) : (
+                      <Bot className="w-4 h-4 text-zinc-400 flex-shrink-0 mt-0.5" aria-hidden />
+                    )
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-sm text-zinc-100 break-words whitespace-pre-wrap">{m.content}</p>
+                    {m.role === 'user' && m.attachmentSummary && (
+                      <p className="text-xs text-zinc-500 mt-1">{m.attachmentSummary}</p>
+                    )}
+                  </div>
+                  {m.role === 'user' && (
+                    <User className="w-4 h-4 text-cyan-400 flex-shrink-0 mt-0.5" aria-hidden />
+                  )}
+                </div>
+              </div>
+            ))}
+            <div ref={conversationEndRef} />
+          </div>
+        )}
+      </div>
 
       {/* 附件预览（如果有） */}
       {attachments.length > 0 && (
