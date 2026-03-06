@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { Upload, Palette, Check, Loader2, X } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvas-store';
 import type { UIThemeConfig } from '@/types/theme';
-import { defaultTheme } from '@/types/theme';
+import { NAMED_STYLES, STYLE_PREVIEW } from '@/types/theme';
 import { toast } from 'sonner';
 import { log, logError } from '@/lib/logger';
 
@@ -13,7 +13,7 @@ interface StyleExtractorProps {
 }
 
 export function StyleExtractor({ onClose }: StyleExtractorProps) {
-  const { currentTheme, setTheme, aiConfig } = useCanvasStore();
+  const { currentTheme, setTheme, stylePreset, setStylePreset, aiConfig } = useCanvasStore();
   const [previewTheme, setPreviewTheme] = useState<UIThemeConfig | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -109,18 +109,30 @@ export function StyleExtractor({ onClose }: StyleExtractorProps) {
     }
   }, [handleFileSelect]);
 
-  // 应用风格
+  // 应用风格（从图片提取 → 设为 custom）
   const handleApplyTheme = useCallback(() => {
     if (!previewTheme) return;
     
     setTheme(previewTheme);
+    setStylePreset('custom');
     toast.success('风格已应用！后续生成的UI将使用此风格');
     log('🎨 [StyleExtractor] 风格已应用到全局状态');
     
     if (onClose) {
       onClose();
     }
-  }, [previewTheme, setTheme, onClose]);
+  }, [previewTheme, setTheme, setStylePreset, onClose]);
+
+  // 选择内置风格（苹果 / Material / Fluent / 极简中性）
+  const handleSelectNamedStyle = useCallback(
+    (theme: UIThemeConfig, presetId: (typeof NAMED_STYLES)[number]['id']) => {
+      setTheme(theme);
+      setStylePreset(presetId);
+      toast.success(`已切换为「${NAMED_STYLES.find((s) => s.id === presetId)?.label ?? presetId}」`);
+      if (onClose) onClose();
+    },
+    [setTheme, setStylePreset, onClose]
+  );
 
   // 获取颜色类名对应的实际颜色（用于预览）
   const getColorPreview = (colorClass: string): string => {
@@ -140,12 +152,17 @@ export function StyleExtractor({ onClose }: StyleExtractorProps) {
   };
 
   return (
-    <div className="w-full h-full bg-zinc-900 text-zinc-100 flex flex-col">
+    <div
+      className="w-full h-full bg-zinc-900 text-zinc-100 flex flex-col"
+      data-no-ai-trigger
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-zinc-800">
         <div className="flex items-center gap-2">
           <Palette className="w-5 h-5 text-purple-400" />
-          <h2 className="text-lg font-semibold">UI 风格提取器</h2>
+          <h2 className="text-lg font-semibold">UI 风格选择</h2>
         </div>
         {onClose && (
           <button
@@ -160,7 +177,93 @@ export function StyleExtractor({ onClose }: StyleExtractorProps) {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6">
-        {/* 上传区域 */}
+        {/* 选择内置风格（多内容预览：卡片、标题、标签、按钮） */}
+        <div className="mb-6">
+          <h3 className="text-sm font-medium text-zinc-400 mb-3">选择风格</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {NAMED_STYLES.filter((s) => s.id !== 'custom').map(({ id, label, theme: styleTheme }) => {
+              const p = STYLE_PREVIEW[id];
+              const isSelected = stylePreset === id;
+              const accent = p.secondary ?? p.primary;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => handleSelectNamedStyle(styleTheme, id)}
+                  className={`
+                    rounded-xl text-left transition-all border-2 overflow-hidden
+                    ${isSelected ? 'border-purple-500 bg-zinc-800/80' : 'border-transparent bg-zinc-800 hover:bg-zinc-700'}
+                  `}
+                >
+                  {/* 风格预览：整块模拟该风格的迷你卡片（glass 用 background 支持渐变） */}
+                  <div
+                    className="p-2 min-h-[100px] flex flex-col gap-1.5"
+                    style={p.bg.startsWith('linear') ? { background: p.bg } : { backgroundColor: p.bg }}
+                  >
+                    <div
+                      className="flex-1 rounded p-2 flex flex-col gap-1"
+                      style={{
+                        backgroundColor: p.cardBg,
+                        borderRadius: p.cardRadius,
+                        boxShadow: p.shadow,
+                      }}
+                    >
+                      <div
+                        className="text-[10px] font-semibold leading-tight truncate"
+                        style={{ color: p.text }}
+                      >
+                        卡片标题
+                      </div>
+                      <div
+                        className="text-[9px] leading-tight truncate"
+                        style={{ color: p.textSecondary }}
+                      >
+                        辅助说明文字
+                      </div>
+                      <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                        <span
+                          className="text-[8px] px-1.5 py-0.5 rounded font-medium"
+                          style={{
+                            backgroundColor: accent + '22',
+                            color: p.isDark || id === 'glass' ? '#fff' : accent,
+                            borderRadius: p.radius,
+                          }}
+                        >
+                          标签
+                        </span>
+                        <span
+                          className="text-[8px] px-1.5 py-0.5 rounded font-medium"
+                          style={{
+                            backgroundColor: p.primary + '22',
+                            color: p.isDark || id === 'glass' ? '#fff' : p.primary,
+                            borderRadius: p.radius,
+                          }}
+                        >
+                          芯片
+                        </span>
+                      </div>
+                      <div
+                        className="mt-1 text-[9px] font-medium text-white text-center py-1 rounded w-full max-w-[64px]"
+                        style={{
+                          backgroundColor: p.primary,
+                          borderRadius: p.radius,
+                        }}
+                      >
+                        确定
+                      </div>
+                    </div>
+                  </div>
+                  <div className="px-2.5 py-2 border-t border-zinc-700/50">
+                    <span className="text-sm font-medium text-zinc-200">{label}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 从图片提取 */}
+        <h3 className="text-sm font-medium text-zinc-400 mb-3">从图片提取风格</h3>
         <div
           className={`
             border-2 border-dashed rounded-lg p-8 text-center transition-all

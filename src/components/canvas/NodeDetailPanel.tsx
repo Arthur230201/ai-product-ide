@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
-import { X, Download, Wand2, RefreshCw, FileText, Database, Bug, Play, ZoomIn, ZoomOut, Edit, Eye, FileCheck, Smartphone, Monitor } from 'lucide-react';
+import { CONVERSATION_PANEL_WIDTH_PX } from '@/lib/layout-constants';
+import { X, ArrowLeft, Download, Wand2, RefreshCw, FileText, Database, Bug, Play, Edit, Eye, FileCheck, Smartphone, Monitor, Check } from 'lucide-react';
 import { LivePreview } from './LivePreview'; 
 import { SpecViewer } from './SpecViewer';
-import { CommandBar } from './CommandBar';
 import { NodeTree } from './NodeTree';
 import { MobileDevicePreview } from './MobileDevicePreview';
 import { PrdConfigDialog } from './PrdConfigDialog';
 import { generateImplementation, generateTestCases, reverseGenerateSpec, addInteractionsToReact, generateAnalysisFromCode } from '@/app/actions/node-operations';
 import { useServerAction } from 'zsa-react';
-import { generatePageLevelPrd, inferPrdOptions, PrdOptions } from '@/utils/codeToPrdTable';
+import { generatePageLevelPrd, inferPrdOptions, PrdOptions, extractFunctionTableFromRequirements } from '@/utils/codeToPrdTable';
 import { getViewportSize } from '@/lib/viewport-constants';
 import { toast } from 'sonner';
 import { clsx } from 'clsx';
@@ -31,8 +31,7 @@ const EditorSection = ({ value, onChange, onBlur, placeholder }: { value: string
 export function NodeDetailPanel() {
   const { selectedNodeId, nodes, isDetailPanelOpen, closeNodeDetail, updateNodeData, projectMeta, aiConfig, viewportPreset, setViewportPreset } = useCanvasStore();
   const { execute: executeAnalysis, isPending: isGeneratingPrd } = useServerAction(generateAnalysisFromCode);
-  const [activeTab, setActiveTab] = useState<'spec' | 'impl' | 'test'>('spec');
-  const [zoom, setZoom] = useState(0.7); // 默认缩放为70%，适应更窄的预览区域
+  const [activeTab, setActiveTab] = useState<'view' | 'spec' | 'impl' | 'test'>('view');
   const [isLoading, setIsLoading] = useState(false);
   const [isEditingSpec, setIsEditingSpec] = useState(false);
   // 使用本地状态管理编辑中的文本，避免每次输入都更新 store
@@ -41,8 +40,6 @@ export function NodeDetailPanel() {
   const [title, setTitle] = useState<string>('');
   // PRD 配置对话框状态
   const [showPrdConfig, setShowPrdConfig] = useState(false);
-  const [docDrawerOpen, setDocDrawerOpen] = useState(false);
-  const [docDrawerTab, setDocDrawerTab] = useState<'spec' | 'test'>('spec');
   const previewContainerRef = useRef<HTMLDivElement>(null);
   /** 与视口按钮同步的 ref，提交时优先读取，避免 store 未刷新的边界情况 */
   const viewportSubmitRef = useRef<'mobile' | 'desktop'>(viewportPreset);
@@ -51,8 +48,9 @@ export function NodeDetailPanel() {
   }, [viewportPreset]);
   const [previewContainerSize, setPreviewContainerSize] = useState({ w: 0, h: 0 });
 
-  // 测量预览容器尺寸，用于计算「适应容器」缩放，保证桌面时 UI 完整呈现
+  // 测量预览容器尺寸；切回「界面」Tab 时需重新测量，否则容器被卸载后尺寸会失效导致预览超出范围
   useLayoutEffect(() => {
+    if (activeTab !== 'view') return;
     const el = previewContainerRef.current;
     if (!el) return;
     const update = () => {
@@ -63,7 +61,7 @@ export function NodeDetailPanel() {
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [viewportPreset, zoom]);
+  }, [viewportPreset, activeTab]);
 
   // 获取选中的节点（使用 useMemo 稳定引用，避免无限循环）
   const selectedNode = useMemo(() => {
@@ -131,11 +129,6 @@ export function NodeDetailPanel() {
       window.removeEventListener('keydown', handleEscape);
     };
   }, [isDetailPanelOpen, closeNodeDetail]);
-
-  // 隐藏「数据结构」时若当前在 impl 则切回需求文档
-  useEffect(() => {
-    if (activeTab === 'impl') setActiveTab('spec');
-  }, [activeTab]);
 
   // 如果面板未打开或没有选中节点，不渲染（必须在所有 hooks 之后）
   if (!isDetailPanelOpen || !selectedNodeId || !selectedNode || !selectedNode.data) return null;
@@ -372,6 +365,20 @@ export function NodeDetailPanel() {
   const isTestEmpty = !artifacts.test || 
     (!artifacts.test.cases || artifacts.test.cases.length === 0);
 
+  // 进度步骤：仅前一步有内容才可进入下一步（界面 → 需求 → 实现 → 测试用例）
+  const viewCode = data.artifacts?.view?.code;
+  const hasViewContent = !!viewCode?.trim() && !isPlaceholderUiCode(viewCode);
+  const specRequirementsList = Array.isArray(artifacts.spec?.requirements) ? artifacts.spec.requirements : [];
+  // 「需求已完成」仅当存在功能表格（含「功能ID」列的表）；无功能表格一律视为未完成
+  const hasSpecContent = extractFunctionTableFromRequirements(specRequirementsList) !== null;
+  const stepUnlock = {
+    view: true,
+    spec: hasViewContent,
+    impl: hasSpecContent,
+    test: !isImplEmpty,
+  };
+  const stepDone = { view: hasViewContent, spec: hasSpecContent, impl: !isImplEmpty, test: !isTestEmpty };
+
   // 生成技术架构
   const handleGenerateImpl = async () => {
     setIsLoading(true);
@@ -518,11 +525,30 @@ export function NodeDetailPanel() {
     }
   };
 
+  // 右侧对话区固定宽度，不收进
+  const conversationWidthPx = CONVERSATION_PANEL_WIDTH_PX;
+
   return (
-    <div className="fixed inset-0 h-screen w-screen bg-zinc-950 z-40 flex flex-col animate-in fade-in duration-200">
+    <div
+      className="fixed left-0 top-0 bottom-0 h-screen bg-zinc-950 z-40 flex flex-col animate-in fade-in duration-200"
+      style={{ width: `calc(100vw - ${conversationWidthPx}px)` }}
+    >
       
-      {/* 1. Header (Top Bar) */}
-      <div className="h-14 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900/50 shrink-0">
+      {/* 1. Header（P3 编辑模式：返回画布 + 节点标题 + 关闭） */}
+      <div className="h-14 border-b border-zinc-800 flex items-center gap-3 px-4 bg-zinc-900/50 shrink-0">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            closeNodeDetail();
+          }}
+          className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors shrink-0"
+          title="返回画布 (ESC)"
+          aria-label="返回画布"
+        >
+          <ArrowLeft size={18} />
+          <span className="text-sm font-medium">返回画布</span>
+        </button>
         <div className="font-semibold text-zinc-100 flex items-center gap-2 flex-1 min-w-0">
           <input
             type="text"
@@ -530,328 +556,322 @@ export function NodeDetailPanel() {
             onChange={(e) => setTitle(e.target.value)}
             onBlur={handleTitleUpdate}
             onKeyDown={handleTitleKeyDown}
-            className="bg-transparent text-zinc-100 font-semibold focus:outline-none focus:bg-zinc-800/50 rounded px-2 -ml-2 w-full max-w-[300px] truncate transition-colors"
+            className="bg-transparent text-zinc-100 font-semibold focus:outline-none focus:bg-zinc-800/50 rounded px-2 w-full max-w-[280px] truncate transition-colors"
             placeholder="未命名节点"
           />
           {isLoading && (
             <span className="text-xs text-blue-400 shrink-0 flex items-center gap-2">
-              <span className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span>
+              <span className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" aria-hidden />
               处理中...
             </span>
           )}
         </div>
-        <button 
+        <button
+          type="button"
           onClick={(e) => {
-            e.stopPropagation(); // Stop bubbling
+            e.stopPropagation();
             closeNodeDetail();
-          }} 
-          title="关闭详情面板 (ESC)"
-          className="p-2 hover:bg-red-500/20 rounded text-zinc-400 hover:text-red-400 z-50 transition-colors"
-          style={{ zIndex: 50 }}
-          aria-label="关闭详情面板"
+          }}
+          title="关闭 (ESC)"
+          className="p-2 hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-100 transition-colors shrink-0"
+          aria-label="关闭"
         >
           <X size={18} />
         </button>
       </div>
 
-      {/* 2. Main Body (两栏) - 左侧节点树 + 文档入口，右侧全部为 UI 预览 */}
-      <div className="flex-1 grid grid-cols-[minmax(200px,18%)_1fr] overflow-hidden h-full">
-        {/* LEFT COLUMN: Node Tree + 需求文档/测试用例入口 */}
+      {/* 2. Main Body（P3：左侧四维 Tab + 节点树 + 入口，右侧预览） */}
+      <div className="flex-1 grid grid-cols-[minmax(96px,10%)_1fr] overflow-hidden h-full">
+        {/* LEFT COLUMN: 仅节点列表 */}
         <div className="flex flex-col h-full overflow-hidden border-r border-zinc-800">
           <NodeTree />
-          <div className="p-2 border-t border-zinc-800 flex flex-col gap-1.5 shrink-0">
-            <button
-              type="button"
-              onClick={() => { setActiveTab('spec'); setDocDrawerTab('spec'); setDocDrawerOpen(true); }}
-              className="flex items-center gap-2 w-full px-3 py-2 text-left text-xs font-medium text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors"
-            >
-              <FileText size={14} /> 需求文档
-            </button>
-            <button
-              type="button"
-              onClick={() => { setActiveTab('test'); setDocDrawerTab('test'); setDocDrawerOpen(true); }}
-              className="flex items-center gap-2 w-full px-3 py-2 text-left text-xs font-medium text-zinc-300 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors"
-            >
-              <Bug size={14} /> 测试用例
-            </button>
-          </div>
         </div>
 
-        {/* RIGHT COLUMN: 全区域 UI 预览 + 底部 CommandBar */}
-        <div className="flex flex-col bg-black/20 relative overflow-hidden min-w-0">
-          <div className="h-10 border-b border-zinc-800 flex items-center justify-between px-4 bg-zinc-900/30">
-            <span className="text-xs text-zinc-400 font-mono">实时预览</span>
-            <div className="flex items-center gap-2">
+        {/* 中间主内容区：单行（进度步骤 + 当前 Tab 操作）+ 下方全为关键内容区 */}
+        <div className="flex flex-col flex-1 min-h-0 bg-zinc-950 relative overflow-hidden min-w-0">
+          {/* 单行：左侧进度步骤（界面→需求→实现→测试用例）+ 右侧当前步骤操作，尽量压缩高度 */}
+          <div className="shrink-0 h-10 border-b border-zinc-800 flex items-center justify-between gap-3 px-3 bg-zinc-900/40">
+            <nav className="flex items-center gap-0 min-w-0" aria-label="节点进度">
               {(() => {
-                const viewCode = selectedNode?.data?.artifacts?.view?.code;
-                const hasGeneratedUi = !!viewCode?.trim() && !isPlaceholderUiCode(viewCode);
-                return (
-                  <div className="flex rounded-lg border border-zinc-700 overflow-hidden" role="group" aria-label="视口预设">
+                const steps = [
+                  { id: 'view' as const, label: '界面', icon: Eye },
+                  { id: 'spec' as const, label: '需求', icon: FileText },
+                  { id: 'impl' as const, label: '实现', icon: Database },
+                  { id: 'test' as const, label: '测试', icon: Bug },
+                ];
+                const lockTips = ['', '请先完成界面', '请先完成需求', '请先完成实现'];
+                return steps.map((step, index) => {
+                  const unlocked = stepUnlock[step.id];
+                  const done = stepDone[step.id];
+                  const current = activeTab === step.id;
+                  const prevDone = index > 0 ? stepDone[steps[index - 1].id] : true;
+                  return (
+                    <React.Fragment key={step.id}>
+                      {index > 0 && (
+                        <div className={clsx('w-4 h-px shrink-0', prevDone ? 'bg-zinc-500' : 'bg-zinc-700')} aria-hidden />
+                      )}
+                      <button
+                        type="button"
+                        disabled={!unlocked && !done}
+                        onClick={() => (unlocked || done) && setActiveTab(step.id)}
+                        title={!unlocked && !done ? lockTips[index] : undefined}
+                        aria-current={current ? 'step' : undefined}
+                        className={clsx(
+                          'flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors min-w-0',
+                          !unlocked && !done && 'cursor-not-allowed opacity-50',
+                          current && 'bg-zinc-700 text-white',
+                          unlocked && !current && 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
+                        )}
+                      >
+                        {done ? (
+                          <Check size={10} strokeWidth={2.5} className="text-emerald-400 shrink-0" />
+                        ) : (
+                          <span className={clsx('flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px]', current ? 'bg-cyan-600 text-white' : 'bg-zinc-700 text-zinc-400')}>
+                            {index + 1}
+                          </span>
+                        )}
+                        <span className="truncate">{step.label}</span>
+                      </button>
+                    </React.Fragment>
+                  );
+                });
+              })()}
+            </nav>
+            {/* 右侧：当前 Tab 操作（界面=视口+增加交互；需求/实现/测试=对应生成按钮） */}
+            <div className="flex items-center gap-2 shrink-0">
+              {activeTab === 'view' && (
+                <>
+                  <div className="flex rounded border border-zinc-700 overflow-hidden" role="group" aria-label="视口预设">
                     {[
                       { id: 'mobile', label: '移动', icon: Smartphone, title: '移动端 375px' },
                       { id: 'desktop', label: '桌面', icon: Monitor, title: '桌面 1280px' },
-                    ].map(({ id, label, icon: Icon, title }) => (
-                      <button
-                        key={id}
-                        type="button"
-                        data-testid={id === 'desktop' ? 'viewport-desktop' : 'viewport-mobile'}
-                        aria-label={hasGeneratedUi ? `视口已锁定: ${label}` : `视口: ${label}${id === 'desktop' ? ' (PC)' : ''}`}
-                        disabled={hasGeneratedUi}
-                        onClick={() => {
-                          if (hasGeneratedUi) return;
-                          const preset = id as 'mobile' | 'desktop';
-                          setViewportPreset(preset);
-                          viewportSubmitRef.current = preset;
-                        }}
-                        title={hasGeneratedUi ? '已生成 UI，不可再切换移动端/PC 端' : title}
-                        className={clsx(
-                          'px-2.5 py-1.5 text-xs font-medium flex items-center gap-1.5 transition-colors',
-                          hasGeneratedUi && 'cursor-not-allowed opacity-70',
-                          viewportPreset === id
-                            ? 'bg-cyan-600 text-white'
-                            : 'text-zinc-400 hover:text-zinc-300 hover:bg-zinc-800'
-                        )}
-                      >
-                        <Icon size={14} />
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                );
-              })()}
-              <button
-                onClick={() => setZoom(Math.max(0.5, zoom - 0.1))}
-                title="缩小预览"
-                className="p-1.5 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-300 transition-colors"
-              >
-                <ZoomOut size={14} />
-              </button>
-              <span className="text-xs text-zinc-500 w-8 text-center">{Math.round(zoom * 100)}%</span>
-              <button
-                onClick={() => setZoom(Math.min(1.5, zoom + 0.1))}
-                title="放大预览"
-                className="p-1.5 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-zinc-300 transition-colors"
-              >
-                <ZoomIn size={14} />
-              </button>
-              <button
-                onClick={handleAddInteractions}
-                disabled={isLoading}
-                title="为当前页增加交互逻辑（日期选择、下拉、按钮跳转等）"
-                className={clsx(
-                  'ml-2 text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors',
-                  isLoading ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-cyan-500 hover:bg-cyan-400 text-white'
-                )}
-              >
-                <Wand2 size={10} /> 增加交互
-              </button>
-            </div>
-          </div>
-
-          {/* Preview Canvas - 根据容器尺寸自动缩放，保证移动/桌面时 UI 完整呈现在框内 */}
-          <div
-            ref={previewContainerRef}
-            className="flex-1 min-w-0 w-full overflow-hidden flex justify-center items-start pt-2 pb-2 px-2 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] relative"
-          >
-            {(() => {
-              const presetSize = getViewportSize(viewportPreset);
-              const { w: cw, h: ch } = previewContainerSize;
-              const fitScale = cw > 0 && ch > 0
-                ? Math.min(1, cw / presetSize.w, ch / presetSize.h)
-                : 1;
-              const totalScale = fitScale * zoom;
-              return (
-                <div
-                  style={{
-                    width: presetSize.w,
-                    height: presetSize.h,
-                    transform: `scale(${totalScale})`,
-                    transformOrigin: 'top center',
-                    transition: 'transform 0.2s ease',
-                    flexShrink: 0,
-                  }}
-                >
-                  <MobileDevicePreview
-                    imageUrl={data.artifacts.view.previewUrl}
-                    zoom={1}
-                    width={presetSize.w}
-                    height={presetSize.h}
-                    viewportPreset={viewportPreset}
-                  />
-                </div>
-              );
-            })()}
-          </div>
-
-          {/* CommandBar 固定在预览区底部；传入 viewportSubmitRef 保证提交时使用当前视口 */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-[95%] sm:w-[90%] max-w-2xl z-50 pointer-events-none" style={{ maxWidth: 'min(90vw, 42rem)' }}>
-            <div className="pointer-events-auto">
-              <CommandBar viewportSubmitRef={viewportSubmitRef} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 需求文档/测试用例抽屉：从右侧滑出，遮盖层需高于底部 CommandBar(z-50) */}
-      {docDrawerOpen && (
-        <>
-          <div
-            className="fixed inset-0 top-0 left-0 right-0 bottom-0 bg-black/70 z-[9998] pointer-events-auto"
-            style={{ zIndex: 9998 }}
-            aria-hidden
-            onClick={() => setDocDrawerOpen(false)}
-          />
-          <div
-            className="fixed top-0 right-0 bottom-0 w-full max-w-lg bg-zinc-900 border-l border-zinc-800 shadow-xl z-[9999] flex flex-col overflow-hidden animate-in slide-in-from-right duration-200 pointer-events-auto"
-            style={{ zIndex: 9999 }}
-            role="dialog"
-            aria-label={docDrawerTab === 'spec' ? '需求文档' : '测试用例'}
-          >
-            <div className="h-12 border-b border-zinc-800 flex items-center justify-between px-4 shrink-0">
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => { setDocDrawerTab('spec'); setActiveTab('spec'); }}
-                  className={clsx(
-                    'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors',
-                    docDrawerTab === 'spec' ? 'bg-cyan-600 text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-                  )}
-                >
-                  需求文档
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setDocDrawerTab('test'); setActiveTab('test'); }}
-                  className={clsx(
-                    'px-3 py-1.5 text-sm font-medium rounded-lg transition-colors',
-                    docDrawerTab === 'test' ? 'bg-cyan-600 text-white' : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-                  )}
-                >
-                  测试用例
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDocDrawerOpen(false)}
-                className="p-2 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-                aria-label="关闭"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 pb-24">
-              {docDrawerTab === 'spec' && (
-                <div className="h-full flex flex-col gap-2">
-                  <div className="flex flex-wrap justify-between items-center gap-2 mb-2 shrink-0">
-                    <span className="text-xs text-zinc-500">支持 Markdown 编辑</span>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <button
-                        onClick={handleGeneratePrdFromCode}
-                        disabled={isGeneratingPrd || isLoading}
-                        title="基于UI代码生成需求文档"
-                        className="text-xs flex items-center gap-1 bg-green-600 hover:bg-green-700 disabled:bg-zinc-700 disabled:cursor-not-allowed px-2 py-1 rounded text-white transition-colors"
-                      >
-                        <Wand2 size={12} /> {isGeneratingPrd ? '生成中...' : '生成需求文档'}
-                      </button>
-                      <button
-                        onClick={handleGenerateFullPrd}
-                        title="生成完整的页面级 PRD 文档（包含5个部分）"
-                        className="text-xs flex items-center gap-1 bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-white transition-colors"
-                      >
-                        <FileCheck size={12} /> 生成完整 PRD
-                      </button>
-                      <button
-                        onClick={() => setIsEditingSpec(!isEditingSpec)}
-                        className="text-xs flex items-center gap-1 bg-zinc-800 px-2 py-1 rounded hover:bg-zinc-700 text-zinc-300"
-                      >
-                        {isEditingSpec ? <><Eye size={12} /> 预览</> : <><Edit size={12} /> 编辑</>}
-                      </button>
-                      <button
-                        onClick={handleSyncSpec}
-                        title="从 UI 代码反向生成需求文档"
-                        className="text-xs flex items-center gap-1 bg-zinc-800 px-2 py-1 rounded hover:bg-zinc-700 transition-colors"
-                      >
-                        <RefreshCw size={10} /> 反推文档
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex-1 min-h-0">
-                    {isEditingSpec ? (
-                      <EditorSection
-                        value={specText}
-                        onChange={handleSpecChange}
-                        onBlur={handleSpecBlur}
-                        placeholder="在此输入 PRD 文档，支持 Markdown 表格..."
-                      />
-                    ) : (
-                      <SpecViewer markdown={specText || '*暂无内容*'} />
-                    )}
-                  </div>
-                </div>
-              )}
-              {docDrawerTab === 'test' && (
-                <div className="h-full flex flex-col overflow-y-auto bg-zinc-900 rounded-lg">
-                  {isTestEmpty ? (
-                    <div className="flex flex-col items-center justify-center gap-4 text-center p-8">
-                      <Bug className="w-16 h-16 text-zinc-600" />
-                      <div>
-                        <h3 className="text-zinc-300 font-medium mb-1">测试用例未生成</h3>
-                        <p className="text-zinc-500 text-sm">点击下方按钮基于需求文档生成测试用例</p>
-                      </div>
-                      <button
-                        onClick={handleGenerateTests}
-                        disabled={isLoading}
-                        className={clsx(
-                          'px-6 py-3 rounded-lg font-medium transition-all flex items-center gap-2',
-                          isLoading ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700 text-white'
-                        )}
-                      >
-                        {isLoading ? <><RefreshCw size={16} className="animate-spin" /> 生成中...</> : <><Bug size={16} /> 🐞 生成测试用例</>}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="w-full flex flex-col p-4">
-                      <div className="flex justify-end mb-4">
+                    ].map(({ id, label, icon: Icon, title }) => {
+                      const viewCode = selectedNode?.data?.artifacts?.view?.code;
+                      const hasGeneratedUi = !!viewCode?.trim() && !isPlaceholderUiCode(viewCode);
+                      return (
                         <button
-                          onClick={handleGenerateTests}
-                          disabled={isLoading}
-                          title="重新生成测试用例"
+                          key={id}
+                          type="button"
+                          data-testid={id === 'desktop' ? 'viewport-desktop' : 'viewport-mobile'}
+                          disabled={hasGeneratedUi}
+                          onClick={() => {
+                            if (hasGeneratedUi) return;
+                            setViewportPreset(id as 'mobile' | 'desktop');
+                            viewportSubmitRef.current = id as 'mobile' | 'desktop';
+                          }}
+                          title={hasGeneratedUi ? '已锁定' : title}
                           className={clsx(
-                            'px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2',
-                            isLoading ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-700 text-white'
+                            'inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium transition-colors whitespace-nowrap shrink-0',
+                            hasGeneratedUi && 'cursor-not-allowed opacity-70',
+                            viewportPreset === id ? 'bg-cyan-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'
                           )}
                         >
-                          {isLoading ? <><RefreshCw size={14} className="animate-spin" /> 生成中...</> : <><RefreshCw size={14} /> 重新生成</>}
+                          <Icon size={12} className="shrink-0" />
+                          <span>{label}</span>
                         </button>
-                      </div>
-                      <h4 className="text-zinc-300 font-medium mb-2 flex items-center gap-2">
-                        <Bug size={16} /> 测试用例列表
-                      </h4>
-                      <div className="prose prose-invert prose-sm max-w-none">
-                        {Array.isArray(data.artifacts.test?.cases) && data.artifacts.test.cases.length > 0 ? (
-                          (() => {
-                            const cases = data.artifacts.test!.cases;
-                            const isTable = cases.length === 1 && cases[0].trim().includes('|');
-                            const markdown = isTable
-                              ? cases[0]
-                              : '| 序号 | 测试场景 / 预期结果 |\n| --- | --- |\n' +
-                                cases
-                                  .map((c, i) => `| ${i + 1} | ${String(c).replace(/\|/g, '｜').replace(/\n/g, ' ')} |`)
-                                  .join('\n');
-                            return <SpecViewer markdown={markdown} />;
-                          })()
-                        ) : (
-                          <p className="text-zinc-500">暂无测试用例</p>
-                        )}
-                      </div>
-                    </div>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={handleAddInteractions}
+                    disabled={isLoading}
+                    title="增加交互逻辑"
+                    className={clsx(
+                      'text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors',
+                      isLoading ? 'bg-zinc-700 text-zinc-500 cursor-not-allowed' : 'bg-cyan-600 hover:bg-cyan-500 text-white'
+                    )}
+                  >
+                    <Wand2 size={10} /> 增加交互
+                  </button>
+                </>
+              )}
+              {activeTab === 'spec' && (
+                <>
+                  <button
+                    onClick={handleGeneratePrdFromCode}
+                    disabled={isGeneratingPrd || isLoading}
+                    title="基于UI代码生成需求文档"
+                    className="text-xs flex items-center gap-1 bg-green-600 hover:bg-green-700 disabled:bg-zinc-700 disabled:cursor-not-allowed px-2 py-1 rounded text-white"
+                  >
+                    <Wand2 size={10} /> {isGeneratingPrd ? '生成中...' : '生成需求'}
+                  </button>
+                  <button onClick={handleGenerateFullPrd} title="生成完整 PRD" className="text-xs flex items-center gap-1 bg-blue-600 hover:bg-blue-700 px-2 py-1 rounded text-white">
+                    <FileCheck size={10} /> 完整 PRD
+                  </button>
+                  <button onClick={() => setIsEditingSpec(!isEditingSpec)} className="text-xs flex items-center gap-1 bg-zinc-700 px-2 py-1 rounded hover:bg-zinc-600 text-zinc-300">
+                    {isEditingSpec ? <Eye size={10} /> : <Edit size={10} />} {isEditingSpec ? '预览' : '编辑'}
+                  </button>
+                  <button onClick={handleSyncSpec} title="从 UI 反推文档" className="text-xs flex items-center gap-1 bg-zinc-700 px-2 py-1 rounded hover:bg-zinc-600 text-zinc-300">
+                    <RefreshCw size={10} /> 反推
+                  </button>
+                </>
+              )}
+              {activeTab === 'impl' && (
+                <button
+                  onClick={handleGenerateImpl}
+                  disabled={isLoading}
+                  className={clsx(
+                    'text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors',
+                    isLoading ? 'bg-zinc-700 text-zinc-500 cursor-not-allowed' : 'bg-cyan-600 hover:bg-cyan-500 text-white'
                   )}
-                </div>
+                >
+                  {isLoading ? <RefreshCw size={10} className="animate-spin" /> : <Database size={10} />}
+                  {isLoading ? '生成中...' : '生成技术架构'}
+                </button>
+              )}
+              {activeTab === 'test' && (
+                <button
+                  onClick={handleGenerateTests}
+                  disabled={isLoading}
+                  title={isTestEmpty ? '生成测试用例' : '重新生成'}
+                  className={clsx(
+                    'text-xs flex items-center gap-1 px-2 py-1 rounded transition-colors',
+                    isLoading ? 'bg-zinc-700 text-zinc-500 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-500 text-white'
+                  )}
+                >
+                  {isLoading ? <RefreshCw size={10} className="animate-spin" /> : <Bug size={10} />}
+                  {isLoading ? '生成中...' : isTestEmpty ? '生成测试' : '重新生成'}
+                </button>
               )}
             </div>
           </div>
-        </>
-      )}
+
+          {/* 界面：UI 预览（无额外工具栏，全给预览区） */}
+          {activeTab === 'view' && (
+            <div
+              ref={previewContainerRef}
+              className="flex-1 min-w-0 w-full overflow-hidden flex justify-center items-start pt-2 pb-2 px-2 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] relative"
+            >
+                {(() => {
+                  const presetSize = getViewportSize(viewportPreset);
+                  const { w: cw, h: ch } = previewContainerSize;
+                  const fitScale = cw > 0 && ch > 0 ? Math.min(1, cw / presetSize.w, ch / presetSize.h) : 1;
+                  return (
+                    <div
+                      style={{
+                        width: presetSize.w,
+                        height: presetSize.h,
+                        transform: `scale(${fitScale})`,
+                        transformOrigin: 'top center',
+                        transition: 'transform 0.2s ease',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <MobileDevicePreview
+                        imageUrl={data.artifacts.view.previewUrl}
+                        zoom={1}
+                        width={presetSize.w}
+                        height={presetSize.h}
+                        viewportPreset={viewportPreset}
+                      />
+                    </div>
+                  );
+                })()}
+              </div>
+          )}
+
+          {/* 需求：需求文档（无额外工具栏，全给内容区） */}
+          {activeTab === 'spec' && (
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col p-4">
+                {isEditingSpec ? (
+                  <EditorSection
+                    value={specText}
+                    onChange={handleSpecChange}
+                    onBlur={handleSpecBlur}
+                    placeholder="在此输入 PRD 文档，支持 Markdown 表格..."
+                  />
+                ) : (
+                  <div className="flex-1 min-h-0 overflow-y-auto">
+                    <SpecViewer markdown={specText || '*暂无内容*'} />
+                  </div>
+                )}
+            </div>
+          )}
+
+          {/* 实现：API 与数据规格（无额外工具栏） */}
+          {activeTab === 'impl' && (
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-6">
+                {isImplEmpty ? (
+                  <div className="flex flex-col items-center justify-center gap-4 text-center py-16">
+                    <Database className="w-16 h-16 text-zinc-600" />
+                    <div>
+                      <h3 className="text-zinc-300 font-medium mb-1">实现未生成</h3>
+                      <p className="text-zinc-500 text-sm">请先完善需求文档，再点击「生成技术架构」</p>
+                    </div>
+                    <button
+                      onClick={handleGenerateImpl}
+                      disabled={isLoading}
+                      className={clsx(
+                        'px-6 py-3 rounded-lg font-medium flex items-center gap-2 transition-colors',
+                        isLoading ? 'bg-zinc-700 text-zinc-500 cursor-not-allowed' : 'bg-cyan-600 hover:bg-cyan-700 text-white'
+                      )}
+                    >
+                      {isLoading ? <RefreshCw size={16} className="animate-spin" /> : <Database size={16} />}
+                      {isLoading ? '生成中...' : '生成技术架构'}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    {artifacts.impl?.apiEndpoints && artifacts.impl.apiEndpoints.length > 0 && (
+                      <section>
+                        <h4 className="text-zinc-300 font-medium mb-2">API 接口</h4>
+                        <pre className="text-xs text-zinc-400 bg-zinc-900 rounded-lg p-4 overflow-x-auto whitespace-pre-wrap font-mono">
+                          {JSON.stringify(artifacts.impl.apiEndpoints, null, 2)}
+                        </pre>
+                      </section>
+                    )}
+                    {artifacts.impl?.dbSchema && artifacts.impl.dbSchema.trim() && !['-- 将在后续阶段生成', '-- PLACEHOLDER'].includes(artifacts.impl.dbSchema.trim()) && (
+                      <section>
+                        <h4 className="text-zinc-300 font-medium mb-2">数据库 / 规格</h4>
+                        <pre className="text-xs text-zinc-400 bg-zinc-900 rounded-lg p-4 overflow-x-auto whitespace-pre-wrap font-mono">
+                          {artifacts.impl.dbSchema}
+                        </pre>
+                      </section>
+                    )}
+                  </>
+                )}
+            </div>
+          )}
+
+          {/* 测试：测试用例（无额外工具栏） */}
+          {activeTab === 'test' && (
+            <div className="flex-1 min-h-0 overflow-y-auto p-4">
+                {isTestEmpty ? (
+                  <div className="flex flex-col items-center justify-center gap-4 text-center py-16">
+                    <Bug className="w-16 h-16 text-zinc-600" />
+                    <div>
+                      <h3 className="text-zinc-300 font-medium mb-1">测试用例未生成</h3>
+                      <p className="text-zinc-500 text-sm">点击顶部「生成测试」基于需求文档生成测试用例</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full flex flex-col">
+                    <h4 className="text-zinc-300 font-medium mb-4 flex items-center gap-2">
+                      <Bug size={16} /> 测试用例列表
+                    </h4>
+                    <div className="prose prose-invert prose-sm max-w-none">
+                      {Array.isArray(data.artifacts.test?.cases) && data.artifacts.test.cases.length > 0 ? (
+                        (() => {
+                          const cases = data.artifacts.test!.cases;
+                          const isTable = cases.length === 1 && cases[0].trim().includes('|');
+                          const markdown = isTable
+                            ? cases[0]
+                            : '| 序号 | 测试场景 / 预期结果 |\n| --- | --- |\n' +
+                              cases
+                                .map((c, i) => `| ${i + 1} | ${String(c).replace(/\|/g, '｜').replace(/\n/g, ' ')} |`)
+                                .join('\n');
+                          return <SpecViewer markdown={markdown} />;
+                        })()
+                      ) : (
+                        <p className="text-zinc-500">暂无测试用例</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* PRD 配置对话框 */}
       {selectedNode && (

@@ -6,13 +6,13 @@
 
 | 项 | 值 |
 | --- | --- |
-| 生成时间 | 2026-03-04T14:45:47.397Z |
-| 节点名称 | 商品列表 |
+| 生成时间 | 2026-03-05T05:26:18.723Z |
+| 节点名称 | 个人中心 |
 | 视口 | desktop |
 | flex-1 | true |
 | <main> | true |
-| ListItem 数量 | 2 |
-| Card 数量 | 5 |
+| ListItem 数量 | 0 |
+| Card 数量 | 9 |
 | NavBar | false |
 | AppBar | true |
 | 根 flex-col | true |
@@ -20,7 +20,7 @@
 ### 发给模型的页面描述（pageDescription）
 
 
-页面：商品列表。页面描述：发现/列表页，包含搜索框、筛选（类目/价格区间/是否有货）、排序（综合/销量/价格）、分页加载；状态包含无结果/加载中/错误；点击进入详情。。作为用户，筛选与排序商品，以便更快找到合适的商品。作为用户，筛选与排序商品，以便更快找到合适的商品。验收标准：选择筛选条件后列表刷新并展示结果数；切换排序后列表按所选规则重新排列；无结果时展示空态并支持清除筛选。作为用户，从列表进入商品详情，以便了解商品信息并做购买决策。验收标准：点击任一条目进入对应详情页；返回时保留筛选、排序与滚动位置
+页面：个人中心。页面描述：展示用户资料、历史记录入口、设置等基础信息。。作为用户，查看个人基础信息，以便确认个人资料与偏好设置。作为用户，查看个人基础信息，以便确认个人资料与偏好设置。验收标准：可见用户名；可见设置入口
 
 
 ---
@@ -29,548 +29,547 @@
 
 ```tsx
 export default function App() {
-  const products = [
+  const profile = {
+    name: "林若曦",
+    role: "高级产品运营 · UO",
+    dept: "增长与用户运营中心",
+    city: "上海",
+    email: "ruoxi.lin@company.com",
+    phone: "138-****-2196",
+    joinedAt: "2023-04-18",
+    status: "在职",
+    bio: "负责增长策略、用户分层与生命周期运营，关注数据闭环与体验一致性。",
+  };
+
+  const uoMetrics = [
+    { title: "本周新增激活用户", value: "12,480", delta: "+8.6%", tone: "cyan" },
+    { title: "7 日留存率", value: "34.2%", delta: "+1.9%", tone: "emerald" },
+    { title: "转化漏斗完成率", value: "6.8%", delta: "+0.4%", tone: "cyan" },
+    { title: "NPS（近 30 天）", value: "42", delta: "+3", tone: "emerald" },
+  ];
+
+  const uoProjects = [
     {
-      id: "SKU-240318-001",
-      name: "星野极简真皮通勤托特包 13.3 英寸",
-      category: "箱包 / 通勤",
-      price: 899,
-      marketPrice: 1099,
-      stock: 42,
-      sold30d: 128,
-      rating: 4.7,
-      reviews: 326,
-      status: "在售",
-      updatedAt: "2026-03-02 14:18",
-      tags: ["爆款", "次日达", "可开发票"],
+      name: "新用户引导 2.0（A/B）",
+      owner: "林若曦",
+      status: "进行中",
+      progress: 62,
+      lastUpdate: "2026-03-03 17:20",
+      desc: "优化首登路径与关键触达点，降低跳失并提升激活率。",
+      tags: ["A/B", "新手引导", "激活"],
+      priority: "高",
     },
     {
-      id: "SKU-240521-014",
-      name: "澄川·四季恒温保温杯 480ml（磨砂黑）",
-      category: "居家 / 水具",
-      price: 129,
-      marketPrice: 169,
-      stock: 306,
-      sold30d: 986,
-      rating: 4.8,
-      reviews: 2148,
-      status: "在售",
-      updatedAt: "2026-03-01 09:40",
-      tags: ["高复购", "食品级304", "包邮"],
+      name: "会员续费唤醒策略",
+      owner: "林若曦",
+      status: "待上线",
+      progress: 86,
+      lastUpdate: "2026-03-01 10:05",
+      desc: "基于用户分层与权益偏好，制定多通道唤醒与优惠梯度。",
+      tags: ["CRM", "分层", "续费"],
+      priority: "中",
     },
     {
-      id: "SKU-241102-008",
-      name: "南风轻薄羽绒服 90% 白鸭绒（女款）",
-      category: "服饰 / 冬季",
-      price: 599,
-      marketPrice: 799,
-      stock: 0,
-      sold30d: 412,
-      rating: 4.6,
-      reviews: 892,
-      status: "缺货",
-      updatedAt: "2026-02-28 19:05",
-      tags: ["保暖", "轻量", "支持退换"],
+      name: "增长看板口径统一",
+      owner: "张启明",
+      status: "已完成",
+      progress: 100,
+      lastUpdate: "2026-02-25 19:44",
+      desc: "统一 DAU/激活/留存等指标口径与数据源，减少跨部门对齐成本。",
+      tags: ["数据治理", "指标", "看板"],
+      priority: "中",
     },
     {
-      id: "SKU-250105-021",
-      name: "澜屿海盐洗发水 500ml（控油蓬松）",
-      category: "个护 / 洗护",
-      price: 79,
-      marketPrice: 99,
-      stock: 118,
-      sold30d: 1534,
-      rating: 4.5,
-      reviews: 5312,
-      status: "在售",
-      updatedAt: "2026-03-03 11:22",
-      tags: ["新品", "无硅油", "敏感头皮适用"],
+      name: "Push 触达节奏优化",
+      owner: "许雅雯",
+      status: "进行中",
+      progress: 38,
+      lastUpdate: "2026-03-04 09:10",
+      desc: "基于频控与兴趣画像，提升打开率并降低退订率。",
+      tags: ["Push", "频控", "画像"],
+      priority: "高",
     },
     {
-      id: "SKU-240909-003",
-      name: "曜石机械键盘 98 键 热插拔（白光）",
-      category: "数码 / 外设",
-      price: 329,
-      marketPrice: 399,
-      stock: 67,
-      sold30d: 245,
-      rating: 4.4,
-      reviews: 764,
-      status: "在售",
-      updatedAt: "2026-03-01 16:10",
-      tags: ["热插拔", "静音轴", "两年质保"],
+      name: "流失预警模型联调",
+      owner: "周远航",
+      status: "阻塞",
+      progress: 21,
+      lastUpdate: "2026-03-02 14:32",
+      desc: "与数据团队联调特征与阈值策略，当前受限于埋点缺失与延迟。",
+      tags: ["模型", "预警", "埋点"],
+      priority: "高",
     },
     {
-      id: "SKU-240707-019",
-      name: "云栖记忆枕（高低可调）",
-      category: "家纺 / 寝具",
-      price: 159,
-      marketPrice: 219,
-      stock: 24,
-      sold30d: 368,
-      rating: 4.7,
-      reviews: 1421,
-      status: "在售",
-      updatedAt: "2026-02-27 10:08",
-      tags: ["舒压", "护颈", "满减"],
+      name: "渠道投放归因复盘",
+      owner: "陈思齐",
+      status: "待排期",
+      progress: 12,
+      lastUpdate: "2026-03-04 16:18",
+      desc: "补齐多触点归因与成本口径，输出可执行的投放优化建议。",
+      tags: ["归因", "投放", "ROI"],
+      priority: "低",
+    },
+  ];
+
+  const uoTasks = [
+    {
+      title: "完善新手任务链路埋点",
+      status: "处理中",
+      due: "2026-03-07",
+      owner: "数据分析-郑思远",
+      note: "补齐 step_start/step_complete，校验事件延迟 < 3min。",
     },
     {
-      id: "SKU-241225-006",
-      name: "岚光氛围台灯（无极调光 / Type-C）",
-      category: "家居 / 灯具",
-      price: 119,
-      marketPrice: 149,
-      stock: 9,
-      sold30d: 176,
-      rating: 4.6,
-      reviews: 506,
-      status: "低库存",
-      updatedAt: "2026-03-03 08:12",
-      tags: ["护眼", "无频闪", "礼品装"],
+      title: "会员续费唤醒短信模板评审",
+      status: "待评审",
+      due: "2026-03-06",
+      owner: "品牌法务-刘颖",
+      note: "重点核对权益文案与优惠期限描述。",
+    },
+    {
+      title: "Push 频控策略灰度参数确认",
+      status: "待确认",
+      due: "2026-03-05",
+      owner: "客户端-梁一鸣",
+      note: "按人群设置 1/3/7 天窗口，支持紧急消息白名单。",
+    },
+    {
+      title: "增长看板指标口径对齐会",
+      status: "已完成",
+      due: "2026-03-01",
+      owner: "数据平台-杨澈",
+      note: "对齐 DAU、激活、留存口径与数据源，形成 PRD 附录。",
+    },
+    {
+      title: "流失预警模型特征清单补充",
+      status: "阻塞",
+      due: "2026-03-08",
+      owner: "算法-韩亦辰",
+      note: "缺少支付失败与客服接触特征，等待数据侧补表。",
     },
   ];
 
   const statusBadge = (status: string) => {
-    if (status === "在售") return <Badge className="bg-emerald-600 text-white">在售</Badge>;
-    if (status === "缺货") return <Badge className="bg-rose-600 text-white">缺货</Badge>;
-    if (status === "低库存") return <Badge className="bg-amber-500 text-white">低库存</Badge>;
-    return <Badge className="bg-slate-600 text-white">{status}</Badge>;
-  };
-
-  const Stars = ({ value }: { value: number }) => {
-    const full = Math.floor(value);
-    const half = value - full >= 0.5;
-    const empty = 5 - full - (half ? 1 : 0);
+    const base = "border rounded px-2 py-0.5 text-xs";
+    if (status === "进行中")
+      return (
+        <Badge className={cn(base, "bg-cyan-500/15 text-cyan-300 border-cyan-500/30")}>
+          {status}
+        </Badge>
+      );
+    if (status === "待上线" || status === "待排期" || status === "待评审" || status === "待确认")
+      return (
+        <Badge className={cn(base, "bg-emerald-500/15 text-emerald-300 border-emerald-500/30")}>
+          {status}
+        </Badge>
+      );
+    if (status === "已完成")
+      return (
+        <Badge className={cn(base, "bg-slate-700/40 text-slate-200 border-slate-600")}>
+          {status}
+        </Badge>
+      );
+    if (status === "阻塞")
+      return (
+        <Badge className={cn(base, "bg-slate-950 text-slate-100 border-cyan-500/40")}>
+          {status}
+        </Badge>
+      );
     return (
-      <div className="flex items-center gap-1">
-        {Array.from({ length: full }).map((_, i) => (
-          <span key={`f-${i}`} className="text-amber-500">
-            ★
-          </span>
-        ))}
-        {half ? <span className="text-amber-500">☆</span> : null}
-        {Array.from({ length: empty }).map((_, i) => (
-          <span key={`e-${i}`} className="text-slate-300">
-            ★
-          </span>
-        ))}
-        <span className="ml-1 text-xs text-slate-500">{value.toFixed(1)}</span>
-      </div>
+      <Badge className={cn(base, "bg-slate-700/30 text-slate-200 border-slate-600")}>
+        {status}
+      </Badge>
     );
   };
 
-  const TopIcon = ({ type }: { type: "search" | "plus" | "export" | "filter" }) => {
-    const base = "w-4 h-4";
-    if (type === "search")
+  const priorityBadge = (p: string) => {
+    const base = "border rounded px-2 py-0.5 text-xs";
+    if (p === "高")
       return (
-        <svg viewBox="0 0 24 24" fill="none" className={base} xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M10.5 18.5a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"
-            stroke="currentColor"
-            strokeWidth="2"
-          />
-          <path d="M16.5 16.5 21 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
+        <Badge className={cn(base, "bg-cyan-500/15 text-cyan-300 border-cyan-500/30")}>P0</Badge>
       );
-    if (type === "plus")
+    if (p === "中")
       return (
-        <svg viewBox="0 0 24 24" fill="none" className={base} xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      );
-    if (type === "export")
-      return (
-        <svg viewBox="0 0 24 24" fill="none" className={base} xmlns="http://www.w3.org/2000/svg">
-          <path
-            d="M12 3v10"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M8 7l4-4 4 4"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M5 14v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-        </svg>
+        <Badge className={cn(base, "bg-emerald-500/15 text-emerald-300 border-emerald-500/30")}>P1</Badge>
       );
     return (
-      <svg viewBox="0 0 24 24" fill="none" className={base} xmlns="http://www.w3.org/2000/svg">
-        <path
-          d="M4 6h16M7 12h10M10 18h4"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-      </svg>
+      <Badge className={cn(base, "bg-slate-700/40 text-slate-200 border-slate-600")}>P2</Badge>
     );
   };
+
+  const MetricCard = ({ item }: any) => (
+    <Card className="bg-slate-800/80 border border-cyan-500/20 shadow-lg rounded">
+      <CardHeader className="p-2">
+        <CardTitle className="text-sm font-medium text-slate-200">{item.title}</CardTitle>
+      </CardHeader>
+      <CardContent className="p-2 pt-0">
+        <div className="flex items-end justify-between gap-2">
+          <div className="text-2xl font-bold text-slate-100">{item.value}</div>
+          <div
+            className={cn(
+              "text-sm font-medium",
+              item.tone === "emerald" ? "text-emerald-300" : "text-cyan-300"
+            )}
+          >
+            {item.delta}
+          </div>
+        </div>
+        <div className="mt-2">
+          <Progress value={item.tone === "emerald" ? 68 : 58} />
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   return (
-    <div className={cn("flex flex-col h-full min-h-full bg-gray-50")}>
+    <div className={cn("flex flex-col h-full min-h-full bg-slate-900")}>
       <AppBar
-        title="商品列表"
-        className="border-b bg-white"
+        title="个人中心"
+        className="bg-slate-950 border-b border-slate-700"
         right={
           <div className="flex items-center gap-2">
-            <Button variant="secondary" className="gap-2">
-              <TopIcon type="export" />
-              导出
+            <Button className="rounded shadow bg-cyan-500 text-white hover:bg-cyan-600 min-h-[36px] px-3">
+              生成 UO 报告
             </Button>
-            <Button className="gap-2">
-              <TopIcon type="plus" />
-              新增商品
+            <Button
+              variant="outline"
+              className="rounded shadow border border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800 min-h-[36px] px-3"
+            >
+              设置
             </Button>
           </div>
         }
       />
 
       <div className="flex flex-1 min-h-0">
-        <Sidebar className="min-w-[240px] border-r bg-white">
-          <div className="p-4">
-            <div className="flex items-center gap-3">
-              <Avatar
-                src="https://images.unsplash.com/photo-1520975682031-a4c3ad5c3ea2?auto=format&fit=crop&w=128&q=80"
-                alt="店铺头像"
-              />
+        <Sidebar className="min-w-[240px] bg-slate-950 border-r border-slate-700">
+          <div className="p-2">
+            <div className="flex items-center gap-2 p-2 rounded border border-cyan-500/20 bg-slate-900 shadow">
+              <Avatar name={profile.name} />
               <div className="min-w-0">
-                <div className="font-semibold text-slate-900 truncate">栖木生活馆（北京）</div>
-                <div className="text-xs text-slate-500 truncate">近 7 日 GMV ¥128,460</div>
+                <div className="text-sm font-bold text-slate-100 truncate">{profile.name}</div>
+                <div className="text-xs text-slate-400 truncate">{profile.role}</div>
               </div>
             </div>
-          </div>
-          <Separator />
-          <div className="p-2">
-            <SidebarItem active>商品管理</SidebarItem>
-            <SidebarItem>订单管理</SidebarItem>
-            <SidebarItem>库存预警</SidebarItem>
-            <SidebarItem>营销活动</SidebarItem>
-            <SidebarItem>店铺设置</SidebarItem>
-          </div>
-          <Separator />
-          <div className="p-4">
-            <Alert className="bg-slate-50 border-slate-200 text-slate-700">
-              <div className="font-medium">经营提示</div>
-              <div className="text-sm mt-1 whitespace-normal">
-                低库存商品共 <span className="font-semibold">2</span> 款，建议补货以避免影响转化；缺货商品可一键下架。
-              </div>
-            </Alert>
+
+            <div className="mt-2 grid gap-2">
+              <SidebarItem active>概览</SidebarItem>
+              <SidebarItem>UO 项目</SidebarItem>
+              <SidebarItem>待办事项</SidebarItem>
+              <SidebarItem>资料与权限</SidebarItem>
+              <SidebarItem>通知与订阅</SidebarItem>
+            </div>
+
+            <Separator className="my-2 bg-slate-700" />
+
+            <Card className="bg-slate-900 border border-slate-700 shadow-lg rounded">
+              <CardHeader className="p-2">
+                <CardTitle className="text-sm text-slate-100">快速操作</CardTitle>
+              </CardHeader>
+              <CardContent className="p-2 pt-0 grid gap-2">
+                <Button className="rounded shadow bg-emerald-500 text-white hover:bg-emerald-600 min-h-[40px]">
+                  新建 UO 活动
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded shadow border border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800 min-h-[40px]"
+                >
+                  导出指标明细
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded shadow border border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800 min-h-[40px]"
+                >
+                  申请数据权限
+                </Button>
+              </CardContent>
+            </Card>
           </div>
         </Sidebar>
 
-        <main className="flex-1 min-w-0 min-h-0 overflow-y-auto">
-          <div className="max-w-7xl mx-auto p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-              <StatCard title="在售商品" value="5" desc="可正常售卖" />
-              <StatCard title="缺货商品" value="1" desc="建议补货或下架" />
-              <StatCard title="30 天销量" value="3,849" desc="全店合计" />
-              <StatCard title="平均评分" value="4.66" desc="近 90 天" />
-            </div>
-
-            <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <Card className="lg:col-span-2">
-                <CardHeader>
-                  <CardTitle>筛选与搜索</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                    <div className="md:col-span-5">
-                      <Label className="text-sm text-slate-700">关键词</Label>
-                      <div className="mt-2 flex gap-2">
-                        <div className="flex-1">
-                          <Input placeholder="输入商品名 / SKU / 类目" />
-                        </div>
-                        <Button variant="secondary" className="gap-2">
-                          <TopIcon type="search" />
-                          搜索
-                        </Button>
+        <main className="flex-1 min-w-0 flex flex-col min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto">
+            <div className="max-w-7xl mx-auto p-2 grid gap-2">
+              <Card className="bg-slate-800/80 border border-cyan-500/20 shadow-lg rounded">
+                <CardHeader className="p-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-base text-slate-100">UO 概览</CardTitle>
+                      <div className="mt-1 text-sm text-slate-400 whitespace-normal">
+                        以「用户运营（UO）」视角汇总关键指标、项目推进与待办风险，便于你每天 3 分钟完成自检。
                       </div>
                     </div>
-                    <div className="md:col-span-4">
-                      <Label className="text-sm text-slate-700">状态</Label>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <Button variant="secondary">全部</Button>
-                        <Button variant="secondary">在售</Button>
-                        <Button variant="secondary">低库存</Button>
-                        <Button variant="secondary">缺货</Button>
-                      </div>
-                    </div>
-                    <div className="md:col-span-3">
-                      <Label className="text-sm text-slate-700">快捷操作</Label>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <Button variant="secondary" className="gap-2">
-                          <TopIcon type="filter" />
-                          高级筛选
-                        </Button>
-                        <Button variant="secondary">批量上下架</Button>
-                      </div>
-                    </div>
+                    <Badge className="rounded border border-emerald-500/30 bg-emerald-500/15 text-emerald-300">
+                      {profile.status}
+                    </Badge>
                   </div>
-
-                  <Separator className="my-4" />
-
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="text-sm text-slate-600 whitespace-normal">
-                      当前共 <span className="font-semibold text-slate-900">{products.length}</span> 件商品，已按「近 30 天销量」排序。
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-slate-900 text-white">默认排序</Badge>
-                      <Badge className="bg-white text-slate-700 border border-slate-200">销量</Badge>
-                      <Badge className="bg-white text-slate-700 border border-slate-200">价格</Badge>
-                      <Badge className="bg-white text-slate-700 border border-slate-200">库存</Badge>
-                    </div>
+                </CardHeader>
+                <CardContent className="p-2 pt-0">
+                  <div className="grid grid-cols-4 gap-2">
+                    {uoMetrics.map((m, idx) => (
+                      <MetricCard key={idx} item={m} />
+                    ))}
                   </div>
                 </CardContent>
               </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>上新与风控</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5">
-                        <Badge className="bg-emerald-600 text-white">通过</Badge>
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-medium text-slate-900">资质校验</div>
-                        <div className="text-sm text-slate-600 whitespace-normal">
-                          店铺资质与类目授权有效期至 2027-01-15。
-                        </div>
+              <div className="grid grid-cols-3 gap-2">
+                <Card className="col-span-2 bg-slate-800/80 border border-cyan-500/20 shadow-lg rounded">
+                  <CardHeader className="p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <CardTitle className="text-base text-slate-100">UO 项目推进</CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          placeholder="搜索项目：如 新用户引导"
+                          className="rounded bg-slate-950 border border-slate-700 text-slate-100 placeholder:text-slate-400 min-h-[36px]"
+                        />
+                        <Button className="rounded shadow bg-cyan-500 text-white hover:bg-cyan-600 min-h-[36px] px-3">
+                          查询
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5">
-                        <Badge className="bg-amber-500 text-white">提醒</Badge>
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-medium text-slate-900">图片规范</div>
-                        <div className="text-sm text-slate-600 whitespace-normal">
-                          建议主图保持纯色背景并突出主体，点击「新增商品」可自动检测合规性。
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5">
-                        <Badge className="bg-slate-700 text-white">建议</Badge>
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-medium text-slate-900">定价策略</div>
-                        <div className="text-sm text-slate-600 whitespace-normal">
-                          近 7 日同类均价 ¥162，建议对热卖款进行 5% 促销测试。
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-                <CardFooter className="flex items-center justify-between">
-                  <div className="text-xs text-slate-500">数据更新时间：2026-03-03 12:00</div>
-                  <Button variant="secondary">查看建议</Button>
-                </CardFooter>
-              </Card>
-            </div>
-
-            <div className="mt-6">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <CardTitle>商品明细</CardTitle>
-                    <div className="text-sm text-slate-500 mt-1 whitespace-normal">
-                      支持快速编辑价格/库存与上下架管理；低库存与缺货会自动标记。
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="secondary">批量改价</Button>
-                    <Button variant="secondary">批量补货</Button>
-                    <Button variant="secondary">下载模板</Button>
-                  </div>
-                </CardHeader>
-
-                <CardContent>
-                  <div className="space-y-3">
-                    {products
-                      .slice()
-                      .sort((a, b) => b.sold30d - a.sold30d)
-                      .map((p) => (
-                        <ListItem
-                          key={p.id}
-                          title={
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-semibold text-slate-900 truncate">{p.name}</span>
-                              {statusBadge(p.status)}
-                            </div>
-                          }
-                          subtitle={
-                            <div className="mt-1 space-y-1">
-                              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-600">
-                                <span className="text-slate-500">SKU：</span>
-                                <span className="font-medium text-slate-800">{p.id}</span>
-                                <span className="text-slate-500">类目：</span>
-                                <span className="font-medium text-slate-800">{p.category}</span>
-                                <span className="text-slate-500">更新：</span>
-                                <span className="font-medium text-slate-800">{p.updatedAt}</span>
+                  </CardHeader>
+                  <CardContent className="p-2 pt-0 grid gap-2">
+                    {uoProjects.map((p, i) => (
+                      <Card
+                        key={i}
+                        className="bg-slate-900 border border-slate-700 shadow-lg rounded"
+                      >
+                        <CardContent className="p-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="text-sm font-bold text-slate-100 truncate">
+                                  {p.name}
+                                </div>
+                                {statusBadge(p.status)}
+                                {priorityBadge(p.priority)}
                               </div>
-                              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                                <div className="flex items-end gap-2">
-                                  <span className="text-lg font-bold text-slate-900">¥{p.price}</span>
-                                  <span className="text-sm text-slate-400 line-through">¥{p.marketPrice}</span>
-                                </div>
-                                <Separator className="hidden sm:block w-px h-4" />
-                                <div className="text-sm text-slate-600">
-                                  库存 <span className="font-semibold text-slate-900">{p.stock}</span>
-                                </div>
-                                <Separator className="hidden sm:block w-px h-4" />
-                                <div className="text-sm text-slate-600">
-                                  30天销量 <span className="font-semibold text-slate-900">{p.sold30d}</span>
-                                </div>
-                                <Separator className="hidden sm:block w-px h-4" />
-                                <div className="flex items-center gap-2 text-sm text-slate-600">
-                                  <Stars value={p.rating} />
-                                  <span className="text-slate-500">({p.reviews} 评价)</span>
-                                </div>
+                              <div className="mt-1 text-sm text-slate-400 whitespace-normal">
+                                {p.desc}
                               </div>
-                              <div className="flex flex-wrap gap-2">
-                                {p.tags.map((t) => (
-                                  <Badge key={t} className="bg-white text-slate-700 border border-slate-200">
+                              <div className="mt-2 flex flex-wrap items-center gap-2">
+                                {p.tags.map((t: string, ti: number) => (
+                                  <Badge
+                                    key={ti}
+                                    className="rounded border border-cyan-500/20 bg-slate-950 text-slate-200"
+                                  >
                                     {t}
                                   </Badge>
                                 ))}
+                                <span className="text-xs text-slate-400">
+                                  负责人：{p.owner}
+                                </span>
+                                <span className="text-xs text-slate-400">
+                                  更新：{p.lastUpdate}
+                                </span>
+                              </div>
+                              <div className="mt-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-slate-400">进度</span>
+                                  <span className="text-xs text-slate-200">{p.progress}%</span>
+                                </div>
+                                <div className="mt-1">
+                                  <Progress value={p.progress} />
+                                </div>
                               </div>
                             </div>
-                          }
-                          action={
-                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                              <Button variant="secondary">编辑</Button>
-                              <Button variant="secondary">上下架</Button>
-                              <Button>查看</Button>
+                            <div className="flex flex-col gap-2 shrink-0">
+                              <Button className="rounded shadow bg-emerald-500 text-white hover:bg-emerald-600 min-h-[36px] px-3">
+                                进入
+                              </Button>
+                              <Button
+                                variant="outline"
+                                className="rounded shadow border border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800 min-h-[36px] px-3"
+                              >
+                                复盘
+                              </Button>
                             </div>
-                          }
-                        />
-                      ))}
-                  </div>
-                </CardContent>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </CardContent>
+                </Card>
 
-                <CardFooter className="flex items-center justify-between">
-                  <div className="text-sm text-slate-600">
-                    本页展示 <span className="font-semibold text-slate-900">{products.length}</span> 条，更多筛选可使用「高级筛选」。
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="secondary">上一页</Button>
-                    <Button variant="secondary">下一页</Button>
-                  </div>
-                </CardFooter>
-              </Card>
-            </div>
-
-            <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>类目销量占比（近 30 天）</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {[
-                      { name: "个护 / 洗护", value: 1534, pct: 40 },
-                      { name: "居家 / 水具", value: 986, pct: 26 },
-                      { name: "服饰 / 冬季", value: 412, pct: 11 },
-                      { name: "家纺 / 寝具", value: 368, pct: 10 },
-                      { name: "数码 / 外设", value: 245, pct: 6 },
-                      { name: "箱包 / 通勤", value: 128, pct: 3 },
-                      { name: "家居 / 灯具", value: 176, pct: 4 },
-                    ].map((row) => (
-                      <div key={row.name} className="space-y-2">
-                        <div className="flex items-center justify-between gap-4">
-                          <div className="font-medium text-slate-900">{row.name}</div>
-                          <div className="text-sm text-slate-600">
-                            {row.value} 件 <span className="text-slate-400">·</span> {row.pct}%
+                <div className="grid gap-2">
+                  <Card className="bg-slate-800/80 border border-cyan-500/20 shadow-lg rounded">
+                    <CardHeader className="p-2">
+                      <CardTitle className="text-base text-slate-100">个人资料</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-2 pt-0 grid gap-2">
+                      <div className="flex items-center gap-2">
+                        <Avatar name={profile.name} />
+                        <div className="min-w-0">
+                          <div className="text-sm font-bold text-slate-100 truncate">
+                            {profile.name}
+                          </div>
+                          <div className="text-xs text-slate-400 truncate">
+                            {profile.dept} · {profile.city}
                           </div>
                         </div>
-                        <Progress value={row.pct} />
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                      <Separator className="bg-slate-700" />
+                      <div className="grid gap-2">
+                        <div>
+                          <div className="text-xs text-slate-400">邮箱</div>
+                          <div className="text-sm text-slate-100">{profile.email}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-400">手机</div>
+                          <div className="text-sm text-slate-100">{profile.phone}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-400">入职日期</div>
+                          <div className="text-sm text-slate-100">{profile.joinedAt}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-slate-400">个人简介</div>
+                          <div className="text-sm text-slate-100 whitespace-normal">
+                            {profile.bio}
+                          </div>
+                        </div>
+                      </div>
+                      <Button className="rounded shadow bg-cyan-500 text-white hover:bg-cyan-600 min-h-[40px]">
+                        编辑资料
+                      </Button>
+                    </CardContent>
+                  </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>今日待处理</CardTitle>
+                  <Card className="bg-slate-800/80 border border-cyan-500/20 shadow-lg rounded">
+                    <CardHeader className="p-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="text-base text-slate-100">UO 待办</CardTitle>
+                        <Badge className="rounded border border-slate-700 bg-slate-900 text-slate-200">
+                          {uoTasks.length} 条
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-2 pt-0 grid gap-2">
+                      {uoTasks.map((t, i) => (
+                        <Card
+                          key={i}
+                          className="bg-slate-900 border border-slate-700 shadow-lg rounded"
+                        >
+                          <CardContent className="p-2">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="text-sm font-bold text-slate-100 truncate">
+                                    {t.title}
+                                  </div>
+                                  {statusBadge(t.status)}
+                                </div>
+                                <div className="mt-1 text-xs text-slate-400 whitespace-normal">
+                                  {t.note}
+                                </div>
+                                <div className="mt-2 flex items-center gap-2">
+                                  <Badge className="rounded border border-emerald-500/30 bg-emerald-500/15 text-emerald-300">
+                                    截止 {t.due}
+                                  </Badge>
+                                  <span className="text-xs text-slate-400">经办：{t.owner}</span>
+                                </div>
+                              </div>
+                              <Button
+                                variant="outline"
+                                className="rounded shadow border border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800 min-h-[36px] px-3 shrink-0"
+                              >
+                                标记
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                      <Button className="rounded shadow bg-emerald-500 text-white hover:bg-emerald-600 min-h-[40px]">
+                        新增待办
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+
+              <Card className="bg-slate-800/80 border border-cyan-500/20 shadow-lg rounded">
+                <CardHeader className="p-2">
+                  <CardTitle className="text-base text-slate-100">UO 生成（草稿区）</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {[
-                      {
-                        title: "处理缺货商品下架",
-                        desc: "南风轻薄羽绒服已连续缺货 3 天，建议先下架以避免差评。",
-                        tag: "紧急",
-                      },
-                      {
-                        title: "补货：岚光氛围台灯",
-                        desc: "当前库存 9，近 7 日日均销量 8，建议补货 80。",
-                        tag: "库存",
-                      },
-                      {
-                        title: "优化主图：记忆枕",
-                        desc: "主图点击率低于类目均值 12%，建议更换对比图提升转化。",
-                        tag: "运营",
-                      },
-                      {
-                        title: "活动报名：春季焕新专场",
-                        desc: "爆款保温杯可报名满减，预计提升 18% 转化。",
-                        tag: "营销",
-                      },
-                      {
-                        title: "核对运费模板",
-                        desc: "西北地区运费略高，建议调整以减少下单流失。",
-                        tag: "设置",
-                      },
-                    ].map((t) => (
-                      <ListItem
-                        key={t.title}
-                        title={
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-slate-900">{t.title}</span>
-                            <Badge className="bg-white text-slate-700 border border-slate-200">{t.tag}</Badge>
+                <CardContent className="p-2 pt-0 grid gap-2">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="grid gap-2">
+                      <div>
+                        <Label className="text-slate-200">周报标题</Label>
+                        <Input
+                          defaultValue="用户运营（UO）周报 · 2026 W10"
+                          className="rounded bg-slate-950 border border-slate-700 text-slate-100 placeholder:text-slate-400 min-h-[40px]"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-slate-200">核心结论</Label>
+                        <Textarea
+                          defaultValue="本周激活新增 12,480（+8.6%），7 日留存 34.2%（+1.9%）。新用户引导 2.0 A/B 进入第二阶段，Push 频控灰度中，需尽快补齐埋点以降低模型联调风险。"
+                          className="rounded bg-slate-950 border border-slate-700 text-slate-100 placeholder:text-slate-400 min-h-[120px]"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-2">
+                      <div>
+                        <Label className="text-slate-200">下周计划</Label>
+                        <Textarea
+                          defaultValue="1）完成新手任务链路埋点与告警；2）续费唤醒策略上线灰度 10%；3）Push 频控策略扩大灰度至 30%；4）输出渠道归因复盘结论并落地 2 个优化动作。"
+                          className="rounded bg-slate-950 border border-slate-700 text-slate-100 placeholder:text-slate-400 min-h-[120px]"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <div className="flex items-center justify-between p-2 rounded border border-slate-700 bg-slate-900">
+                          <div>
+                            <div className="text-sm font-medium text-slate-100">自动同步项目进度</div>
+                            <div className="text-xs text-slate-400">将进行中/阻塞项目摘要自动写入报告。</div>
                           </div>
-                        }
-                        subtitle={<div className="text-sm text-slate-600 whitespace-normal mt-1">{t.desc}</div>}
-                        action={
-                          <div className="flex items-center gap-2">
-                            <Button variant="secondary">稍后</Button>
-                            <Button>去处理</Button>
+                          <Switch defaultChecked />
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded border border-slate-700 bg-slate-900">
+                          <div>
+                            <div className="text-sm font-medium text-slate-100">生成风险提示</div>
+                            <div className="text-xs text-slate-400">对阻塞项与埋点缺失自动提示关注点。</div>
                           </div>
-                        }
-                      />
-                    ))}
+                          <Switch defaultChecked />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator className="bg-slate-700" />
+
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm text-slate-400 whitespace-normal">
+                      点击「生成 UO 报告」可输出可复制的 Markdown 模版，便于同步到飞书/Confluence。
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        className="rounded shadow border border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800 min-h-[40px] px-4"
+                      >
+                        预览
+                      </Button>
+                      <Button className="rounded shadow bg-cyan-500 text-white hover:bg-cyan-600 min-h-[40px] px-4">
+                        生成 UO
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
-                <CardFooter className="flex items-center justify-between">
-                  <div className="text-xs text-slate-500">建议按「紧急」优先处理，减少售后风险。</div>
-                  <Button variant="secondary">查看全部任务</Button>
-                </CardFooter>
               </Card>
             </div>
+          </div>
 
-            <div className="mt-8">
-              <Separator />
-              <div className="py-6 flex items-center justify-between">
-                <div className="text-sm text-slate-500 whitespace-normal">
-                  © 2026 栖木生活馆 · 商品管理台（示例数据）
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="secondary">帮助中心</Button>
-                  <Button variant="secondary">联系运营</Button>
-                </div>
+          <div className="border-t border-slate-700 bg-slate-950">
+            <div className="max-w-7xl mx-auto p-2 flex items-center justify-between gap-2">
+              <div className="text-xs text-slate-400">
+                数据更新时间：2026-03-05 09:30 · 指标口径：增长看板 v3.2
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className="rounded border border-cyan-500/30 bg-cyan-500/15 text-cyan-300">
+                  UO
+                </Badge>
+                <span className="text-xs text-slate-400">个人中心 · 科技风</span>
               </div>
             </div>
           </div>

@@ -50,16 +50,16 @@
 
 ## 四、布局放在哪里
 
-### 4.1 挂载点（不变）
+### 4.1 挂载点与占位原则（不悬浮、不遮盖）
 
-CommandBar 的**页面级位置**保持现有两处，不新增挂载点：
+CommandBar 使用**占位布局**：始终在文档流中占据一块区域，**不**使用 `position: fixed/absolute` 悬浮在内容之上，避免遮盖画布或预览区。
 
 | 场景 | 挂载位置 | 当前实现 |
 |------|----------|----------|
-| **画布模式**（未打开节点详情） | 页面底部居中 | `InfiniteCanvas.tsx`：`!isDetailPanelOpen && !isPresentationMode` 时渲染，容器 `position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); width: min(95vw, 48rem); maxHeight: calc(100vh - 4rem)`。 |
-| **节点详情模式**（已打开某节点） | 右侧栏底部、预览区下方 | `NodeDetailPanel.tsx`：右侧列内 `absolute bottom-4 left-1/2 -translate-x-1/2`，宽度 `w-[95%] sm:w-[90%] max-w-2xl`（约 42rem）。 |
+| **画布模式**（未打开节点详情） | 页面底部 | `InfiniteCanvas.tsx`：根容器 `flex flex-col`，上方画布区 `flex-1 min-h-0`，CommandBar 容器 `flex-shrink-0` 在底部，`max-w-[48rem]` 居中。 |
+| **节点详情模式**（已打开某节点） | 右侧栏底部、预览区下方 | `NodeDetailPanel.tsx`：右侧列 `flex flex-col`，预览区 `flex-1 min-h-0`，CommandBar 容器 `flex-shrink-0`，`max-w-[42rem]`。 |
 
-即：**布局改动的范围仅在 CommandBar 组件内部**，不移动 CommandBar 在页面中的位置。
+即：画布/预览区在上方占满剩余空间，CommandBar 在下方占位，**不遮盖**上方内容。
 
 ### 4.2 CommandBar 内部布局（新增对话区）
 

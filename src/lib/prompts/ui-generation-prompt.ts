@@ -82,12 +82,26 @@ export function buildUIGenerationSystemPrompt(
 - **仪表盘/概览**：主内容区至少 2 个 StatCard 或 3 条 ListItem。
 禁止仅渲染顶栏和底栏而中间留白；主内容区容器必须 \`flex-1 min-h-0 overflow-y-auto\` 并包含实际子节点。
 
+# 文字颜色与可见性（必须遵守，否则文字不可见）
+- **每个文本节点必须显式指定 \`text-*\` 颜色类名**，禁止依赖默认色或省略颜色。
+- **浅色背景**（如 \`bg-white\`、\`bg-gray-50\`）时：
+  - 标题、重要信息：**必须** \`text-gray-900\` 或 \`text-slate-800\`，保证清晰可读。
+  - 正文、次要信息：**必须至少** \`text-gray-600\` 或 \`text-slate-600\`；**禁止**在浅色背景上使用 \`text-gray-400\`、\`text-gray-300\`、\`text-slate-400\` 等过浅色，会导致几乎不可见。
+  - 辅助/说明文字：至少 \`text-gray-500\`/\`text-slate-500\`。
+- **深色背景**（如 \`bg-gray-900\`、\`bg-slate-900\`）时：
+  - 主文字：\`text-white\` 或 \`text-gray-100\`；次要：至少 \`text-gray-300\`/\`text-slate-300\`。
+- 按钮内文字：主按钮 \`text-white\`；次要按钮若描边样式则用 \`text-gray-700\` 或与背景对比明显的颜色。
+
 # Platform & Viewport (平台与视口排版)
 请严格根据目标设备特性选择导航与布局：
-- **移动端**：必须使用 \`NavBar\`（包含顶部居中标题）作为主导航。若需底部标签栏，使用 \`BottomNav\` 和 \`BottomNavItem\`。整体排版在 iPhone 14 Pro 或 Oppo Find X6 Pro 等主流设备视口下，拥有合理的触控区域（如 min-h-[44px]）和边缘安全内边距（通常为 px-4）。
-- **PC 端**：必须使用 \`AppBar\` 作为顶部栏，若有侧边导航需求，使用 \`Sidebar\` 和 \`SidebarItem\` 组合；Sidebar 必须 \`min-w-[200px]\` 或 \`min-w-[240px]\`，主内容区 \`flex-1 min-w-0\` 保证有足够宽度横向排版。主内容区应具有最大宽度限制并居中对齐。禁止任何导致「整段文字竖排」的窄列或 \`writing-mode: vertical\`。
-- **侧栏/顶栏按钮可见性**：Sidebar 或 AppBar 内的所有 Button 必须带有可见内容（文案或内联 SVG/图标），禁止仅写 \`<Button />\` 或 \`<Button variant="ghost" />\` 无子节点；按钮文字颜色须与背景有对比度（避免白字白底、灰字灰底导致观感为空）。
-- **弹窗/浮窗（必须遮盖）**：增加交互时，任何「点击按钮弹出浮窗」必须使用 \`Dialog\` 组件，以保证遮罩完全盖住下层、不透出。写法：\`<Dialog open={isOpen} onClose={() => setIsOpen(false)}><DialogHeader>标题</DialogHeader><DialogContent>表单等</DialogContent><DialogFooter><Button onClick={...}>确定</Button></DialogFooter></Dialog>\`。禁止用裸 \`<div className="fixed ...">\` 做浮层，否则下层会透出、观感异常。
+- **移动端（必须像手机 App）**：
+  - 必须使用 \`NavBar\`（顶部居中标题）作为主导航；主内容区为**单列、竖长条**布局，宽度为 \`w-full\` 或 \`max-w-[375px] mx-auto\`，**禁止多列、禁止桌面式宽屏布局**。
+  - 主内容区必须 \`flex-1 min-h-0 overflow-y-auto\`，形成「顶栏固定 + 中间可滚动」的典型 App 结构；边缘内边距 \`px-4\`，内容不贴边。
+  - 触控区域：可点击元素（按钮、列表项、输入框）至少 \`min-h-[44px]\` 或 \`py-3\`，保证手指易点。
+  - 整体视觉应为「单列、上下滚动」的移动端页面，而非桌面端多列或宽幅排版。
+- **PC 端**：必须使用 \`AppBar\` 作为顶部栏，若有侧边导航使用 \`Sidebar\` 和 \`SidebarItem\`；Sidebar \`min-w-[200px]\` 或 \`min-w-[240px]\`，主内容区 \`flex-1 min-w-0\`。禁止整段文字竖排或极窄列。
+- **侧栏/顶栏按钮可见性**：所有 Button 须有可见文案或图标，文字颜色与背景有明显对比度。
+- **弹窗**：浮层必须使用 \`Dialog\` 组件，禁止裸 \`<div className="fixed ...">\` 导致下层透出。
 - ${rootContainerRule}
 
 # Design & Code Guidelines (开发规范)
@@ -116,7 +130,7 @@ export function buildUIGenerationUserPrompt(
   const deviceLine =
     viewport === 'desktop'
       ? '目标设备：桌面(PC)，标准视口 1280×800。根 div 使用 max-w-7xl mx-auto；侧栏 min-w-[200px] 以上，正文区横向排版，禁止竖排或极窄列导致一句话竖向排列。'
-      : '目标设备：移动端，根 div 使用 w-full overflow-x-hidden。';
+      : '目标设备：移动端（手机 App）。布局必须为单列竖排、顶栏+可滚动主内容，根 div 使用 w-full max-w-[375px] mx-auto overflow-x-hidden，主内容区 px-4；所有文字须使用深色类名（标题 text-gray-900，正文至少 text-gray-600），禁止过浅灰色导致不可见。';
 
   const contextBlock =
     pageDescription && pageDescription.trim().length > 0

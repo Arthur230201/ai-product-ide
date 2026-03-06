@@ -61,19 +61,16 @@ export function MobileDevicePreview({
         transformOrigin: 'top center',
       }}
     >
-      {/* 移动端：手机外框；桌面：简单圆角卡片，无手机边框 */}
+      {/* 移动端：手机黑边外框；桌面：PC 黑边外框（与移动端风格一致，无浏览器样式） */}
       <div 
-        className={`relative w-full h-full overflow-hidden flex flex-col bg-white ${
+        className={`relative w-full h-full overflow-hidden flex flex-col ${
           isDeviceFrame
-            ? 'border-[12px] border-gray-900 rounded-[45px]'
-            : 'rounded-xl'
+            ? 'bg-transparent border-[12px] border-gray-900 rounded-[45px]'
+            : 'bg-transparent border-[12px] border-gray-900 rounded-2xl'
         }`}
-        style={{
-          backgroundColor: isDeviceFrame ? 'transparent' : '#ffffff',
-        }}
       >
         <div 
-          className={`w-full h-full overflow-hidden relative flex flex-col bg-white ${isDeviceFrame ? 'rounded-[32px]' : 'rounded-lg'}`}
+          className={`w-full h-full overflow-hidden relative flex flex-col bg-white ${isDeviceFrame ? 'rounded-[32px]' : 'rounded-xl'}`}
           style={{
             margin: 0,
             width: '100%',
@@ -107,7 +104,7 @@ export function MobileDevicePreview({
             />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100 text-gray-400">
-              <div className="text-4xl mb-3 opacity-50">📱</div>
+              <div className="text-4xl mb-3 opacity-50">{isDeviceFrame ? '📱' : '🖥️'}</div>
               <p className="text-sm font-medium">暂无预览</p>
               <p className="text-xs mt-1 opacity-60">生成 UI 代码后将显示在这里</p>
             </div>

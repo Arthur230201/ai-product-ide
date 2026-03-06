@@ -518,6 +518,93 @@ ${hasExplicitDarkTheme ? '- 注意：背景是深色，确保所有文本使用�
 重要：这些设计令牌必须严格应用，不要使用其他颜色或样式。`;
 }
 
+/** 玻璃拟态风格：强制渐变底色 + 毛玻璃卡片，与预览一致（强约束，避免生成深灰不透明） */
+const GLASS_STYLE_ENFORCEMENT = `
+
+⚠️ 【重要】用户选择的是「玻璃拟态」，生成结果必须与风格预览一致。以下要求优先于任何其他背景/卡片描述。
+
+❌ 错误示例（禁止）：深色纯色底 \`bg-slate-900\`、\`bg-gray-800\`、\`bg-zinc-900\`；不透明深灰卡片 \`bg-slate-800\`、\`bg-gray-700\`；无渐变、无毛玻璃。
+✅ 正确示例（必须）：
+  - 页面根节点（最外层 div）：\`className="min-h-screen bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-700"\`（或 \`from-indigo-500 to-purple-700\`），必须是渐变，禁止任何 \`bg-slate-xxx\`、\`bg-gray-xxx\`、\`bg-zinc-xxx\` 作为页面背景。
+  - 所有卡片、顶栏 NavBar、弹层：\`className="... bg-white/20 backdrop-blur-xl rounded-2xl border border-white/20"\`（或 \`bg-white/10 backdrop-blur-md\`），必须半透明+模糊，禁止 \`bg-slate-800\`、\`bg-gray-800\` 等不透明深色。
+  - 主按钮：\`bg-white/90 text-gray-900\` 或 \`bg-violet-500 text-white\`。
+  - 文字：\`text-white\`、\`text-white/90\`、\`text-white/70\`（因背景是深色渐变）。
+
+请检查：根元素是否为 \`bg-gradient-to-br from-violet-500 ...\`？卡片是否为 \`bg-white/20 backdrop-blur-xl\`？若仍为深灰不透明则不符合要求。
+`;
+
+/** 极简中性：白/浅灰底，禁止渐变与毛玻璃，与预览一致 */
+const NEUTRAL_STYLE_ENFORCEMENT = `
+
+[极简中性 - 必须严格遵循，优先于前述背景/表面色]
+当前为「极简中性」：页面根背景必须为 \`bg-white\` 或 \`bg-gray-50\`，禁止渐变、禁止毛玻璃、禁止深色底。主色克制：\`text-gray-700\`、\`bg-gray-700\` 或低饱和蓝；卡片 \`bg-white\` \`shadow-sm\` \`rounded-lg\`；文字 \`text-gray-900\`、\`text-gray-600\`。
+`;
+
+/** 赛博朋克：深黑底 + 霓虹粉/青发光（与预览一致，有辨识度） */
+const CYBERPUNK_STYLE_ENFORCEMENT = `
+
+[赛博朋克 - 必须严格遵循，优先于前述背景/表面色]
+当前为「赛博朋克」，生成结果必须与风格预览一致（深黑底 + 霓虹粉/青发光、科幻感）：
+1. **页面根背景（必须）**：\`bg-black\` 或 \`bg-[#0a0a0f]\`，禁止灰底或白底。
+2. **卡片/表面**：\`bg-gray-900/90\` 或 \`bg-[#14141f]\`，加 \`border border-pink-500/30\` 或 \`border-cyan-400/30\` 发光边；圆角 \`rounded\` 或 \`rounded-sm\`（小圆角）；可用 \`shadow-[0_0_20px_rgba(236,72,153,0.2)]\` 霓虹光晕。
+3. **主色/强调**：霓虹粉 \`text-pink-500\`、\`bg-pink-500\` 或霓虹青 \`text-cyan-400\`、\`bg-cyan-400\`；按钮/标签带发光感。
+4. **文字**：\`text-gray-100\`、\`text-purple-300\`；可用等宽字体 \`font-mono\`。
+`;
+
+/** 温暖极简：奶油/米色底、单一暖色（2025 流行） */
+const WARM_STYLE_ENFORCEMENT = `
+
+[温暖极简 - 必须严格遵循，优先于前述背景/表面色]
+当前为「温暖极简」，生成结果必须与风格预览一致（奶油底 + 暖色点缀）：
+1. **页面根背景**：\`bg-amber-50\`、\`bg-stone-50\` 或 \`bg-[#faf8f5]\`，禁止纯白、禁止冷灰、禁止深色。
+2. **卡片**：\`bg-white\` 或 \`bg-[#fffefb]\`，\`rounded-xl\` 或 \`rounded-2xl\`，\`shadow-sm\`。
+3. **主色**：暖色 \`bg-amber-600\`、\`text-amber-700\` 或 \`bg-orange-600\`；单一强调色、克制使用。
+4. **文字**：\`text-stone-800\`、\`text-stone-600\`。整体温暖、留白充足。
+`;
+
+/** 新粗野主义：粗黑描边、厚阴影、高对比（反精致） */
+const BRUTAL_STYLE_ENFORCEMENT = `
+
+[新粗野主义 - 必须严格遵循，优先于前述背景/表面色]
+当前为「新粗野主义」，生成结果必须与风格预览一致（粗描边 + 厚实阴影 + 直角）：
+1. **页面根背景**：\`bg-yellow-50\`、\`bg-amber-50\` 或 \`bg-white\`。
+2. **卡片/按钮**：\`border-2\` 或 \`border-4\` \`border-stone-900\`，\`shadow-[4px_4px_0_0_#1c1917]\` 或 \`shadow-[6px_6px_0_0_#000]\` 厚实偏移阴影；\`rounded-none\` 直角，禁止大圆角。
+3. **主色**：高对比 \`bg-red-600\`、\`bg-blue-600\`、\`text-stone-900\`；色块鲜明、无渐变。
+4. **文字**：\`text-stone-900\`、\`text-stone-600\`，字重可偏粗。
+`;
+
+/** 扁平鲜明：高饱和色块、少阴影（与预览一致） */
+const FLAT_STYLE_ENFORCEMENT = `
+
+[扁平鲜明 - 必须严格遵循，优先于前述背景/表面色]
+当前为「扁平鲜明」，生成结果必须与风格预览一致（高饱和色块、无渐变无毛玻璃）：
+1. **页面根背景**：\`bg-white\` 或 \`bg-rose-50\`，禁止深色、禁止渐变、禁止毛玻璃。
+2. **主色**：高饱和 \`bg-rose-600\`、\`text-rose-600\` 或 \`bg-orange-500\`；按钮与标签用纯色块。
+3. **卡片**：\`bg-white\` \`rounded-xl\`，少用阴影（\`shadow-sm\` 或无），禁止 \`backdrop-blur\`。
+4. **文字**：\`text-gray-900\`、\`text-gray-600\`。
+`;
+
+/** 企业稳重：深蓝灰、小圆角（与预览一致） */
+const CORPORATE_STYLE_ENFORCEMENT = `
+
+[企业稳重 - 必须严格遵循，优先于前述背景/表面色]
+当前为「企业稳重」，生成结果必须与风格预览一致（B 端、专业）：
+1. **页面根背景**：\`bg-slate-50\` 或 \`bg-white\`。
+2. **主色**：深蓝 \`bg-blue-800\`、\`text-blue-800\`；卡片 \`bg-white\` \`shadow\` \`rounded-md\`（小圆角）。
+3. **文字**：\`text-slate-900\`、\`text-slate-600\`。整体克制、无高饱和点缀。
+`;
+
+/** 柔和拟态：同色系、双阴影浮雕（与预览一致） */
+const NEO_STYLE_ENFORCEMENT = `
+
+[柔和拟态 - 必须严格遵循，优先于前述背景/表面色]
+当前为「柔和拟态」，生成结果必须与风格预览一致（同色系 + 浮雕阴影）：
+1. **页面根背景**：\`bg-indigo-100\` 或 \`bg-slate-200\`，与卡片同色系，禁止白底、禁止渐变。
+2. **卡片/表面**：与背景同色系或略深，使用双阴影浮雕：\`shadow-[6px_6px_12px_#c4b8e0,-6px_-6px_12px_#fff]\` 或 \`shadow-[8px_8px_16px_rgba(0,0,0,0.08),-8px_-8px_16px_rgba(255,255,255,0.8)]\`；大圆角 \`rounded-2xl\`。
+3. **主色**：\`bg-violet-600\`、\`text-violet-700\`。
+4. **文字**：\`text-indigo-900\`、\`text-indigo-700\`。
+`;
+
 // ==================== Server Actions（用于 CommandBar）====================
 
 const GenerateUIFromImageInputSchema = z.object({
@@ -939,6 +1026,8 @@ const GenerateUIFromTextInputSchema = z.object({
     version: z.string(),
   }).optional().describe('项目画像配置'),
   themeConfig: z.any().optional().describe('UI主题配置'),
+  /** 视觉风格预设（与风格选择器一致）：glass 等会注入强约束如渐变底、毛玻璃 */
+  stylePreset: z.enum(['neutral', 'glass', 'flat', 'corporate', 'neo', 'cyberpunk', 'warm', 'brutal', 'custom']).optional().describe('风格预设'),
   /** 目标视口：与编辑区当前选择一致，生成对应布局 */
   viewportPreset: z.enum(['mobile', 'desktop']).optional().default('mobile').describe('目标视口'),
   /** Stitch 方案：draft=快速模型，quality=重量模型，默认 quality */
@@ -990,9 +1079,22 @@ export const generateUIFromText = createServerAction()
       ensureOpenAIKey();
 
       let systemPrompt = buildUIGenerationSystemPrompt(viewportPreset, input.projectMeta ?? undefined);
-      if (input.themeConfig) {
-        systemPrompt += buildDesignSystemEnforcement(input.themeConfig);
-        log(`📐 [generateUIFromText] 已注入主题约束，vibe: ${input.themeConfig.vibe || '—'}`);
+      // 玻璃拟态时优先注入风格约束并置于最前，且不注入 theme 背景（避免 theme 的 bg-slate-800 覆盖渐变要求）
+      if (input.stylePreset === 'glass') {
+        systemPrompt = systemPrompt.replace('# Design Philosophy', `${GLASS_STYLE_ENFORCEMENT}\n\n# Design Philosophy`);
+        log('📐 [generateUIFromText] 已注入玻璃拟态风格约束（置顶，渐变底+毛玻璃）');
+      } else {
+        if (input.themeConfig) {
+          systemPrompt += buildDesignSystemEnforcement(input.themeConfig);
+          log(`📐 [generateUIFromText] 已注入主题约束，vibe: ${input.themeConfig.vibe || '—'}`);
+        }
+        if (input.stylePreset === 'neutral') systemPrompt += NEUTRAL_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'cyberpunk') systemPrompt += CYBERPUNK_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'warm') systemPrompt += WARM_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'brutal') systemPrompt += BRUTAL_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'flat') systemPrompt += FLAT_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'corporate') systemPrompt += CORPORATE_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'neo') systemPrompt += NEO_STYLE_ENFORCEMENT;
       }
       const useEdit = shouldUseEditMode(input.existingCode, input.prompt ?? '');
       const userPromptFinal = useEdit && input.existingCode

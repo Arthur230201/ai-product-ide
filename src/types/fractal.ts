@@ -287,6 +287,8 @@ export interface CanvasState {
   edges: Edge[];
   selectedNodeId: string | null;
   currentTheme: import('@/types/theme').UIThemeConfig;
+  /** 视觉风格预设：用于 UI 生成 pipeline（apple/material/neutral/fluent/custom） */
+  stylePreset: import('@/types/theme').StylePresetId;
   projectMeta: ProjectMeta;
   globalRules: GlobalRules;
   aiConfig: AIConfig; // AI 模型配置

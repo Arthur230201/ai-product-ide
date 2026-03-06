@@ -20,8 +20,9 @@ export function StoreHydration() {
         if (persistState && typeof persistState.rehydrate === 'function') {
           await persistState.rehydrate();
         } else {
-          // 如果没有 persist 方法，直接访问 store 触发初始化
-          useCanvasStore.getState();
+          // 如果没有 persist 方法，直接访问 store 触发初始化（仅在 getState 可用时调用，避免 null.get 报错）
+          const getState = useCanvasStore?.getState;
+          if (typeof getState === 'function') getState();
         }
         // 标记 hydration 完成
         setIsHydrated(true);

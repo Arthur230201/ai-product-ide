@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { generateStaticUIFromText } from '@/app/actions/ui-pipeline-new';
 
-const STYLE_PRESETS = ['apple', 'material', 'neutral', 'custom'] as const;
+const STYLE_PRESETS = ['neutral', 'glass', 'flat', 'corporate', 'neo', 'cyberpunk', 'warm', 'brutal', 'custom'] as const;
 const VIEWPORT_PRESETS = ['mobile', 'desktop'] as const;
 
 /**
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     }
     const stylePreset = typeof body?.stylePreset === 'string' && STYLE_PRESETS.includes(body.stylePreset as (typeof STYLE_PRESETS)[number])
       ? (body.stylePreset as (typeof STYLE_PRESETS)[number])
-      : 'apple';
+      : 'neutral';
     const viewportPreset = typeof body?.viewportPreset === 'string' && VIEWPORT_PRESETS.includes(body.viewportPreset as (typeof VIEWPORT_PRESETS)[number])
       ? (body.viewportPreset as (typeof VIEWPORT_PRESETS)[number])
       : 'mobile';

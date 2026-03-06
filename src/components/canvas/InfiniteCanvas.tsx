@@ -17,7 +17,6 @@ import { useCanvasStore } from '@/store/canvas-store';
 import { EMPTY_CANVAS_PRIMARY, EMPTY_CANVAS_SECONDARY, NO_NODE_SELECTED_MESSAGE } from '@/lib/user-facing-messages';
 import { FractalNode } from './FractalNode';
 import { SmartEdge } from './SmartEdge';
-import { CommandBar } from './CommandBar';
 import { ProjectToolbar } from './ProjectToolbar';
 import { RefreshCw } from 'lucide-react';
 import { AutoLayoutButton } from './AutoLayoutButton';
@@ -25,8 +24,11 @@ import { StyleExtractor } from './StyleExtractor';
 import { AIConfigButton } from './AIConfigButton';
 import { NodeDetailPanel } from './NodeDetailPanel';
 import { PresentationMode } from './PresentationMode';
+import { ConversationPanel } from './ConversationPanel';
+import { CONVERSATION_PANEL_WIDTH_PX } from '@/lib/layout-constants';
+import { MessageCircle } from 'lucide-react';
 import { ContextMenu } from './ContextMenu';
-import { Play } from 'lucide-react';
+import { Play, Palette } from 'lucide-react';
 
 // 注册自定义节点类型（必须在组件外部定义，避免每次渲染重新创建）
 const nodeTypes: NodeTypes = {
@@ -59,6 +61,7 @@ function CanvasContent() {
     addChildNode,
     addSiblingNode,
     addBlankNode,
+    setConversationPanelOpen,
   } = useCanvasStore();
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; flowX: number; flowY: number } | null>(null);
   // 用于区分单击和双击的定时器和标志
@@ -324,12 +327,27 @@ function CanvasContent() {
     };
   }, [selectedNodeId, isDetailPanelOpen, deleteNode, nodes, selectNode, openNodeDetail, addChildNode, addSiblingNode, addBlankNode]);
 
-  // 空状态组件（最终执行版口径）
+  // 创建模式空状态：主行动引导 + 打开对话 CTA（P2 设计方案）
   const EmptyState = () => (
     <div className="fixed inset-0 flex items-center justify-center pointer-events-none" style={{ zIndex: 1 }}>
-      <div className="text-center max-w-lg px-8">
-        <p className="text-lg text-zinc-400">{EMPTY_CANVAS_PRIMARY}</p>
+      <div
+        className="text-center max-w-md px-8 py-10 rounded-2xl pointer-events-auto bg-zinc-900/80 border border-zinc-800 shadow-xl"
+        role="region"
+        aria-label="开始创建"
+      >
+        <div className="flex justify-center mb-4">
+          <MessageCircle className="w-12 h-12 text-cyan-500/70" aria-hidden />
+        </div>
+        <p className="text-xl font-medium text-zinc-200">{EMPTY_CANVAS_PRIMARY}</p>
         <p className="text-sm text-zinc-500 mt-2">{EMPTY_CANVAS_SECONDARY}</p>
+        <button
+          type="button"
+          onClick={() => setConversationPanelOpen(true)}
+          className="mt-6 px-6 py-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-white font-medium text-sm transition-colors shadow-lg hover:shadow-cyan-500/25"
+          aria-label="打开 AI 对话"
+        >
+          打开 AI 对话
+        </button>
       </div>
     </div>
   );
@@ -386,10 +404,16 @@ function AutoLayoutButtonWrapper() {
   return <AutoLayoutButton />;
 }
 
-// 风格提取器模态框
+// UI 风格选择模态框（z-index 高于 CommandBar 9998，确保盖住 AI 对话框）
 function StyleExtractorModal({ onClose }: { onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+    <div
+      className="fixed inset-0 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+      style={{ zIndex: 10002 }}
+      data-no-ai-trigger
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       <div className="relative w-full max-w-4xl h-[85vh] bg-zinc-900 rounded-xl border border-zinc-800 shadow-2xl overflow-hidden flex flex-col">
         <StyleExtractor onClose={onClose} />
       </div>
@@ -485,6 +509,17 @@ function TopButtons({
         }}
       >
         <div className="flex items-center gap-2">
+          {/* 画布上：UI 风格选择 */}
+          <button
+            onClick={handleStyleExtractor}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all bg-violet-600 hover:bg-violet-500 text-white shadow-lg hover:shadow-xl active:scale-95"
+            title="选择或提取 UI 风格"
+            aria-label="UI 风格选择"
+            data-testid="open-style-extractor"
+          >
+            <Palette className="w-4 h-4" />
+            UI风格选择
+          </button>
           {/* 主要功能：演示模式 */}
           {nodes.length > 0 && (
             <button
@@ -497,7 +532,6 @@ function TopButtons({
               演示
             </button>
           )}
-          
           {/* 高级功能：折叠菜单 */}
           <div className="relative">
             <button
@@ -509,24 +543,11 @@ function TopButtons({
             >
               <span className="text-xs">⋯</span>
             </button>
-            
             {showAdvanced && (
               <div className="absolute top-full right-0 mt-2 p-2 bg-zinc-900 border border-zinc-800 rounded-xl shadow-2xl min-w-[180px] z-50">
                 <AIConfigButton />
                 <div className="h-px bg-zinc-800 my-2" />
                 <AutoLayoutButtonWrapper />
-                <div className="h-px bg-zinc-800 my-2" />
-                <button
-                  onClick={() => {
-                    handleStyleExtractor();
-                    setShowAdvanced(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
-                  title="提取 UI 风格"
-                  data-testid="open-style-extractor"
-                >
-                  🎨 风格提取
-                </button>
               </div>
             )}
           </div>
@@ -542,60 +563,55 @@ function TopButtons({
 }
 
 export function InfiniteCanvas() {
-  const { nodes, selectedNodeId, isDetailPanelOpen } = useCanvasStore();
+  const {
+    nodes,
+    selectedNodeId,
+    isDetailPanelOpen,
+    isAiCreatePending,
+    setConversationPanelOpen,
+    pendingClarificationContext,
+  } = useCanvasStore();
   const [isPresentationMode, setIsPresentationMode] = useState(false);
 
   const handlePresentationModeChange = useCallback((isOpen: boolean) => {
     setIsPresentationMode(isOpen);
   }, []);
 
+  // 画布模式与编辑模式均展示右侧对话区（固定宽度，不收进）；仅演示模式不展示
+  const showConversationArea = !isPresentationMode;
+
   return (
-    <div className="fixed inset-0 w-full h-full bg-zinc-950 overflow-hidden">
-      <ReactFlowProvider>
-        <CanvasContent />
-        {/* TopButtons 必须在 ReactFlowProvider 内部，因为 AutoLayoutButton 使用了 useReactFlow */}
-        {/* 演示模式下不显示顶部按钮 */}
-        {!isPresentationMode && (
-          <TopButtons 
-            isDetailPanelOpen={isDetailPanelOpen}
-            onPresentationModeChange={handlePresentationModeChange}
-          />
-        )}
-        {/* 刷新按钮位于左下角，演示模式下不显示 */}
-        {!isPresentationMode && <RefreshButton isDetailPanelOpen={isDetailPanelOpen} />}
-      </ReactFlowProvider>
-      {/* 演示模式 */}
+    <div className="fixed inset-0 w-full h-full bg-zinc-950 overflow-hidden flex flex-col">
+      {/* 画布区域：占满剩余空间；有对话轨/面板时右侧被预留 */}
+      <div className="flex-1 min-h-0 relative">
+        <ReactFlowProvider>
+          <CanvasContent />
+          {!isPresentationMode && (
+            <TopButtons
+              isDetailPanelOpen={isDetailPanelOpen}
+              onPresentationModeChange={handlePresentationModeChange}
+            />
+          )}
+          {!isPresentationMode && <RefreshButton isDetailPanelOpen={isDetailPanelOpen} />}
+        </ReactFlowProvider>
+      </div>
       {isPresentationMode && (
         <PresentationMode
           initialNodeId={selectedNodeId || (nodes.length > 0 ? nodes[0].id : null)}
           onClose={() => setIsPresentationMode(false)}
         />
       )}
-      {/* CommandBar 只在非编辑模式且非演示模式显示 */}
-      {!isDetailPanelOpen && !isPresentationMode && (
-        <div 
-          className="fixed pointer-events-none"
-          style={{ 
-            position: 'fixed',
-            bottom: '2rem',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 'min(95vw, 48rem)',
-            maxWidth: '48rem',
-            maxHeight: 'calc(100vh - 4rem)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9998,
-            isolation: 'isolate',
-          }}
-        >
-          <div className="pointer-events-auto w-full" style={{ position: 'relative', zIndex: 9998 }}>
-            <CommandBar />
-          </div>
-        </div>
-      )}
       <NodeDetailPanel />
+      {/* 右侧对话区：固定宽度、不收进，画布与编辑模式均展示 */}
+      {showConversationArea && (
+        <aside
+          className="fixed top-0 bottom-0 right-0 flex flex-col bg-zinc-900 border-l border-zinc-800 z-30"
+          style={{ width: CONVERSATION_PANEL_WIDTH_PX }}
+          aria-label="AI 对话"
+        >
+          <ConversationPanel isSubmitting={isAiCreatePending} />
+        </aside>
+      )}
     </div>
   );
 }

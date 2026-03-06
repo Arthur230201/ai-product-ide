@@ -26,6 +26,14 @@ export const FractalNode = memo(
       human: 'bg-blue-500/20 text-blue-300 border-blue-500/50',
     }[data.source.type] || 'bg-zinc-500/20 text-zinc-300 border-zinc-500/50';
 
+    // 四维轻量标识：View / Spec / Impl / Test 是否有内容
+    const dims = [
+      { key: 'view', label: '界面', has: !!(data.artifacts?.view?.code?.trim()) },
+      { key: 'spec', label: '需求', has: !!(data.artifacts?.spec?.title || (Array.isArray(data.artifacts?.spec?.requirements) && data.artifacts.spec.requirements.length > 0)) },
+      { key: 'impl', label: '实现', has: !!((data.artifacts?.impl?.apiEndpoints?.length ?? 0) > 0 || data.artifacts?.impl?.dbSchema?.trim()) },
+      { key: 'test', label: '测试', has: !!(Array.isArray(data.artifacts?.test?.cases) && data.artifacts.test.cases.length > 0) },
+    ];
+
     return (
       <div
         data-testid={`canvas-node-${data.label?.replace(/\s+/g, '-').toLowerCase() || 'unknown'}`}
@@ -81,6 +89,21 @@ export const FractalNode = memo(
               {data.syncState.isSynced ? '已同步' : '未同步'}
             </span>
           </div>
+        </div>
+
+        {/* 四维轻量标识（P2：有节点时） */}
+        <div className="flex items-center gap-1.5" title="View · Spec · Impl · Test">
+          {dims.map((d) => (
+            <span
+              key={d.key}
+              className={clsx(
+                'w-1.5 h-1.5 rounded-full',
+                d.has ? 'bg-cyan-500' : 'bg-zinc-600'
+              )}
+              aria-hidden
+              title={d.label}
+            />
+          ))}
         </div>
 
         {/* Handles */}

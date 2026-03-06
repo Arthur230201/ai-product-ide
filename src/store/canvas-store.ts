@@ -22,12 +22,48 @@ import type {
   AIConfig,
 } from '@/types/fractal';
 import { getLayoutedElements, DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT } from '@/lib/layout';
-import type { UIThemeConfig } from '@/types/theme';
+import type { UIThemeConfig, StylePresetId } from '@/types/theme';
 import { defaultTheme } from '@/types/theme';
 import { preview } from '@/lib/safe/preview';
 import { log, logError, logWarn } from '@/lib/logger';
 
 type BlueprintTabType = 'profile' | 'business' | 'interaction' | 'data' | 'topology' | 'rules' | 'events' | 'userStories';
+
+/** 澄清选项（AI 追问时的可选项） */
+export interface ClarificationOption {
+  id: string;
+  label: string;
+  desc: string;
+  example: string;
+}
+
+/** 对话消息（含可选澄清载荷，用于 Stitch 风格对话窗口） */
+export interface ConversationMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  status?: 'sending' | 'done' | 'error';
+  attachmentSummary?: string;
+  /** 仅 role=assistant 时：澄清请求（追问 + 选项） */
+  clarification?: {
+    message: string;
+    question: string;
+    options: ClarificationOption[];
+    /** 视口澄清（首次建图必选）：移动端 / 桌面端 */
+    viewportQuestion?: string;
+    viewportOptions?: { id: string; label: string; desc?: string; example?: string }[];
+  };
+}
+
+/** 等待用户回复澄清时的上下文，用于再次调用 generateGraph */
+export interface PendingClarificationContext {
+  initialPrompt: string;
+  attachmentContent?: string;
+  attachmentType?: string;
+  mimeType?: string;
+  mediaBase64?: string;
+  mediaType?: 'image' | 'video';
+}
 
 interface CanvasStore extends CanvasState {
   // Detail Panel State
@@ -75,6 +111,22 @@ interface CanvasStore extends CanvasState {
   openBlueprint: (initialTab?: BlueprintTabType, initialData?: Partial<ProjectMeta>) => void;
   closeBlueprint: () => void;
   setViewportPreset: (preset: 'mobile' | 'desktop') => void;
+  setStylePreset: (preset: StylePresetId) => void;
+  // 对话窗口（Stitch 风格）与澄清
+  conversationPanelOpen: boolean;
+  conversationMessages: ConversationMessage[];
+  pendingClarificationContext: PendingClarificationContext | null;
+  pendingClarificationReply: string | null;
+  setConversationPanelOpen: (open: boolean) => void;
+  appendConversationMessage: (msg: ConversationMessage) => void;
+  setConversationMessages: (messages: ConversationMessage[]) => void;
+  updateLastAssistantMessage: (content: string, status: 'done' | 'error', clarification?: ConversationMessage['clarification']) => void;
+  setPendingClarificationContext: (ctx: PendingClarificationContext | null) => void;
+  setPendingClarificationReply: (reply: string | null) => void;
+  clearConversation: () => void;
+  /** 建图/澄清提交进行中，供常驻对话面板禁用发送与选项 */
+  isAiCreatePending: boolean;
+  setAiCreatePending: (v: boolean) => void;
 }
 
 /** 为节点补全 width/height，避免生产环境首帧 ResizeObserver 未就绪时边连接点错位（连线与节点视觉脱节） */
@@ -191,7 +243,22 @@ export const useCanvasStore = create<CanvasStore>()(
           openBlueprint: () => {},
           closeBlueprint: () => {},
           setViewportPreset: () => {},
+          setStylePreset: () => {},
+          conversationPanelOpen: false,
+          conversationMessages: [],
+          pendingClarificationContext: null,
+          pendingClarificationReply: null,
+          setConversationPanelOpen: () => {},
+          appendConversationMessage: () => {},
+          setConversationMessages: () => {},
+          updateLastAssistantMessage: () => {},
+          setPendingClarificationContext: () => {},
+          setPendingClarificationReply: () => {},
+          clearConversation: () => {},
+          isAiCreatePending: false,
+          setAiCreatePending: () => {},
           currentTheme: defaultTheme,
+          stylePreset: 'neutral',
           projectMeta: {
             projectName: '未命名项目',
             industry: '通用互联网',
@@ -272,6 +339,11 @@ export const useCanvasStore = create<CanvasStore>()(
             edges: parsed.edges || [],
             selectedNodeId: parsed.selectedNodeId || null,
             currentTheme: parsed.currentTheme || defaultTheme,
+            stylePreset: (() => {
+            const p = parsed.stylePreset;
+            if (p === 'tech') return 'cyberpunk';
+            return p && ['neutral', 'glass', 'flat', 'corporate', 'neo', 'cyberpunk', 'warm', 'brutal', 'custom'].includes(p) ? p : 'neutral';
+          })(),
             projectMeta: parsed.projectMeta || initialProjectMeta,
             globalRules: parsed.globalRules || initialGlobalRules,
             aiConfig: migratedAIConfig,
@@ -282,23 +354,25 @@ export const useCanvasStore = create<CanvasStore>()(
             nodes: [],
             edges: [],
             selectedNodeId: null,
-            currentTheme: defaultTheme,
-            projectMeta: initialProjectMeta,
-            globalRules: initialGlobalRules,
-            aiConfig: initialAIConfig,
-          };
-        }
-      } else {
-        initialState = {
-          nodes: [],
-          edges: [],
-          selectedNodeId: null,
-          currentTheme: defaultTheme,
-          projectMeta: initialProjectMeta,
-          globalRules: initialGlobalRules,
-          aiConfig: initialAIConfig,
-        };
-      }
+        currentTheme: defaultTheme,
+        stylePreset: 'neutral',
+        projectMeta: initialProjectMeta,
+        globalRules: initialGlobalRules,
+        aiConfig: initialAIConfig,
+      };
+    }
+  } else {
+    initialState = {
+      nodes: [],
+      edges: [],
+      selectedNodeId: null,
+      currentTheme: defaultTheme,
+      stylePreset: 'neutral',
+      projectMeta: initialProjectMeta,
+      globalRules: initialGlobalRules,
+      aiConfig: initialAIConfig,
+    };
+  }
 
       return {
         // Initial state with mock data
@@ -310,7 +384,13 @@ export const useCanvasStore = create<CanvasStore>()(
         isBlueprintOpen: false,
         blueprintInitialTab: undefined,
         blueprintInitialData: undefined,
+        conversationPanelOpen: false,
+        conversationMessages: [],
+        pendingClarificationContext: null,
+        pendingClarificationReply: null,
+        isAiCreatePending: false,
         currentTheme: defaultTheme,
+        stylePreset: 'neutral',
         projectMeta: initialProjectMeta,
         globalRules: initialGlobalRules,
         aiConfig: initialAIConfig,
@@ -1209,6 +1289,10 @@ export const useCanvasStore = create<CanvasStore>()(
     set({ currentTheme: theme });
   },
 
+  setStylePreset: (preset: StylePresetId) => {
+    set({ stylePreset: preset });
+  },
+
   // Project Meta Management
   updateProjectMeta: (meta: Partial<ProjectMeta>) => {
     set((state) => ({
@@ -1259,6 +1343,47 @@ export const useCanvasStore = create<CanvasStore>()(
   setViewportPreset: (preset: 'mobile' | 'desktop') => {
     set({ viewportPreset: preset });
   },
+
+  setConversationPanelOpen: (open: boolean) => {
+    set({ conversationPanelOpen: open });
+  },
+  appendConversationMessage: (msg: ConversationMessage) => {
+    set((state) => ({
+      conversationMessages: [...state.conversationMessages.slice(-99), msg],
+    }));
+  },
+  setConversationMessages: (messages: ConversationMessage[]) => {
+    set({ conversationMessages: messages });
+  },
+  updateLastAssistantMessage: (content: string, status: 'done' | 'error', clarification?: ConversationMessage['clarification']) => {
+    set((state) => {
+      const prev = state.conversationMessages;
+      const last = prev[prev.length - 1];
+      if (last?.role !== 'assistant') return state;
+      return {
+        conversationMessages: [
+          ...prev.slice(0, -1),
+          { ...last, content, status, ...(clarification ? { clarification } : {}) },
+        ],
+      };
+    });
+  },
+  setPendingClarificationContext: (ctx: PendingClarificationContext | null) => {
+    set({ pendingClarificationContext: ctx });
+  },
+  setPendingClarificationReply: (reply: string | null) => {
+    set({ pendingClarificationReply: reply });
+  },
+  clearConversation: () => {
+    set({
+      conversationMessages: [],
+      pendingClarificationContext: null,
+      pendingClarificationReply: null,
+    });
+  },
+  setAiCreatePending: (v: boolean) => {
+    set({ isAiCreatePending: v });
+  },
       }
     },
     {
@@ -1267,6 +1392,8 @@ export const useCanvasStore = create<CanvasStore>()(
       partialize: (state: CanvasStore) => ({
         nodes: state.nodes,
         edges: state.edges,
+        currentTheme: state.currentTheme,
+        stylePreset: state.stylePreset,
         projectMeta: state.projectMeta,
         globalRules: state.globalRules,
         aiConfig: state.aiConfig,
@@ -1392,6 +1519,10 @@ export const useCanvasStore = create<CanvasStore>()(
           if (persistedState.currentTheme === undefined) {
             persistedState.currentTheme = defaultTheme;
           }
+          if (persistedState.stylePreset === 'tech') persistedState.stylePreset = 'cyberpunk';
+          if (persistedState.stylePreset === undefined || !['neutral', 'glass', 'flat', 'corporate', 'neo', 'cyberpunk', 'warm', 'brutal', 'custom'].includes(persistedState.stylePreset)) {
+            persistedState.stylePreset = 'neutral';
+          }
           if (persistedState.viewportPreset === 'tablet') {
             persistedState.viewportPreset = 'desktop';
           }
@@ -1409,6 +1540,7 @@ export const useCanvasStore = create<CanvasStore>()(
           selectedNodeId: null,
           isDetailPanelOpen: false,
           currentTheme: defaultTheme,
+          stylePreset: 'neutral',
         };
       }
     },

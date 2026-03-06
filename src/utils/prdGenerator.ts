@@ -8,15 +8,21 @@ import { extractBodyContent, extractStylesFromHtml, isHtmlCode } from './html-bo
 import { PREVIEW_UI_PRD_BUNDLE, PREVIEW_UI_PRD_BUNDLE_CALL } from '@/lib/preview-ui-prd-bundle.generated';
 import { MOBILE_VIEWPORT_WIDTH, MOBILE_VIEWPORT_HEIGHT, PC_VIEWPORT_WIDTH, PC_VIEWPORT_HEIGHT } from '@/lib/viewport-constants';
 
-/** 判断是否为占位 UI 代码（无实际界面，导出时不应显示「UI 加载中」）。可供画布侧判断「是否已生成真实 UI」以锁定视口切换。 */
+/** 判断是否为占位 UI 代码（无实际界面）。仅当为真实生成的功能 UI 时，「界面」步骤才视为已完成。 */
 export function isPlaceholderUiCode(code: string | undefined): boolean {
   if (!code || !code.trim()) return true;
   const t = code.trim();
   if (t === '// PLACEHOLDER') return true;
   if (/生成\s*UI\s*后将替换/.test(code)) return true;
   if (code.length < 280 && /这是\s*[\s\S]*?\s*页面[\s\S]*?生成\s*UI/.test(code)) return true;
-  // 「这是 XXX 页面」类简单占位（无真实组件），不展示为「由代码渲染」、不参与 mount
+  // 「这是 XXX 页面」类简单占位（无真实组件）
   if (code.length < 520 && /这是\s*[\s\S]*?页面/.test(code) && !/Button|Card|Input|ListItem|AppBar|Sidebar|Dialog|Badge|StatCard|PageHeader|NavBar|TabsList|Separator|Progress|Alert|Avatar/.test(code)) return true;
+  // 空白节点模板（generateBlankNodeCode）：BlankPage + 居中 div
+  if (code.length < 700 && /BlankPage\s*\(\)/.test(code) && /border\s+border-gray-200\s+flex\s+items-center\s+justify-center/.test(code)) return true;
+  // fallback 图生成：function App() + 「这是 XXX 页面」、无真实组件
+  if (code.length < 700 && /function\s+App\s*\(\)/.test(code) && /这是\s*[\s\S]*?页面/.test(code) && !/Button|Card|Input|ListItem|AppBar|Sidebar|Dialog|Badge|StatCard|PageHeader|NavBar|TabsList|Separator|Progress|Alert|Avatar/.test(code)) return true;
+  // 仅标题 + 单一句子（如单行 p 标签）的极简模板，无列表/表单/卡片等
+  if (code.length < 600 && /<h1[^>]*>[\s\S]*?<\/h1>/.test(code) && !/<(ul|ol|table|form|input|select|textarea|button)[\s>]/.test(code) && !/Button|Card|Input|ListItem|AppBar|Sidebar|Dialog|Badge|StatCard|PageHeader|NavBar|TabsList|Separator|Progress|Alert|Avatar/.test(code)) return true;
   return false;
 }
 
@@ -1690,4 +1696,919 @@ ${globalRules.dataTracking || '（待补充）'}
     nodes: nodeData,
   };
   return generateFullPrdHtml(fullPrdData);
+}
+
+/** 节点最小结构：用于测试报告 / 系统设计说明 / 使用说明书导出 */
+type NodeForExport = {
+  id: string;
+  data: {
+    label?: string;
+    artifacts?: {
+      spec?: { title?: string; requirements?: string | string[] };
+      test?: { cases?: string[] };
+      impl?: { apiEndpoints?: string[]; dbSchema?: string };
+    };
+  };
+};
+
+/** 测试报告可选元数据（后续可在项目/导出配置中维护，用于预填章节） */
+export interface TestReportMeta {
+  /** 编写人、评审人、批准人及日期（文档控制） */
+  author?: string;
+  reviewer?: string;
+  approver?: string;
+  revisionHistory?: Array<{ version: string; date: string; author: string; description: string }>;
+  distribution?: string;
+  confidentiality?: string;
+  /** 报告摘要 */
+  conclusion?: '通过' | '有条件通过' | '不通过';
+  topRisks?: string;
+  releaseSuggestion?: string;
+  /** 背景与目标 */
+  testBackground?: string;
+  testObjectives?: string;
+  references?: string;
+  /** 范围与对象 */
+  outOfScope?: string;
+  buildInfo?: string;
+  /** 策略与方法 */
+  testTypes?: string;
+  entryExitCriteria?: string;
+  /** 环境与配置 */
+  environmentTopology?: string;
+  testDataStrategy?: string;
+  /** 执行概况（可自动汇总后覆盖） */
+  testCycle?: string;
+  /** 缺陷与风险（可粘贴或链接） */
+  keyDefectsSummary?: string;
+  knownIssues?: string;
+  risksAndWaivers?: string;
+  /** 结论与发布建议 */
+  goLiveSuggestion?: string;
+  releaseConditions?: string;
+}
+
+/**
+ * 导出测试报告（标准 12 章结构，含测试用例列表，执行结果列为空）
+ * 从各节点聚合 artifacts.test.cases；其余章节使用 meta 预填或占位。
+ */
+export async function exportTestReport(options: {
+  projectMeta: { projectName: string; version?: string };
+  nodes: NodeForExport[];
+  meta?: TestReportMeta;
+}): Promise<void> {
+  const { projectMeta, nodes, meta = {} } = options;
+  const dateStr = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+  const version = projectMeta.version || 'V1.0';
+
+  const rows: Array<{ page: string; case: string }> = [];
+  const moduleNames: string[] = [];
+  for (const node of nodes) {
+    const cases = node.data?.artifacts?.test?.cases;
+    const pageName = node.data?.artifacts?.spec?.title || node.data?.label || node.id || '未命名';
+    if (!moduleNames.includes(pageName)) moduleNames.push(pageName);
+    if (Array.isArray(cases) && cases.length > 0) {
+      for (const c of cases) {
+        rows.push({ page: pageName, case: c });
+      }
+    }
+  }
+  const totalCases = rows.length;
+  const caseTableHeader = '| 序号 | 所属页面/模块 | 测试场景/步骤 | 预期结果 | 执行结果 | 备注 |';
+  const caseTableSep = '|------|----------------|--------------|----------|----------|------|';
+  const caseTableRows = rows.map((r, i) =>
+    `| ${i + 1} | ${r.page} | ${(r.case || '').replace(/\|/g, '\\|').replace(/\n/g, ' ').slice(0, 200)} | （见用例） |  |  |`
+  );
+  const caseTable = [caseTableHeader, caseTableSep, ...caseTableRows].join('\n');
+  const testObjectList = moduleNames.length > 0 ? moduleNames.map((m, i) => `${i + 1}. ${m}`).join('\n') : '（暂无，请在各节点维护测试用例后自动生成）';
+
+  const revHistory = meta.revisionHistory?.length
+    ? meta.revisionHistory.map(r => `| ${r.version} | ${r.date} | ${r.author} | ${r.description} |`).join('\n')
+    : `| ${version} | ${dateStr} | （待填写） | 初稿 |`;
+  const revTable = '| 版本 | 日期 | 修订人 | 修订说明 |\n|------|------|--------|----------|\n' + revHistory;
+
+  const s1 = `## 1. 文档控制信息
+
+| 项 | 内容 |
+|----|------|
+| 标题 | ${projectMeta.projectName} - 测试报告 |
+| 项目/系统名称 | ${projectMeta.projectName} |
+| 版本号 | ${version} |
+| 编写人/日期 | ${meta.author ?? '（待填写）'} / ${dateStr} |
+| 评审人/日期 | ${meta.reviewer ?? '（待填写）'} |
+| 批准人/日期 | ${meta.approver ?? '（待填写）'} |
+| 分发范围 | ${meta.distribution ?? '（待填写）'} |
+| 保密级别 | ${meta.confidentiality ?? '（待填写）'} |
+
+**文档修订记录**
+
+${revTable}
+`;
+
+  const s2 = `## 2. 报告摘要（Executive Summary）
+
+| 项 | 内容 |
+|----|------|
+| 测试结论 | ${meta.conclusion ?? '（待填写：通过/有条件通过/不通过）'} |
+| 当前质量风险概览 | ${meta.topRisks ?? '（待填写：TOP 风险、影响范围）'} |
+| 发布/上线建议与前置条件 | ${meta.releaseSuggestion ?? '（待填写：如必须修复的问题清单）'} |
+
+**关键数据一页化**（可补充表格或要点）
+
+- 测试用例总数：${totalCases}
+- 覆盖模块/页面数：${moduleNames.length}
+`;
+
+  const s3 = `## 3. 背景与目标
+
+- **测试背景**：${meta.testBackground ?? '（待填写：为何测、对应里程碑/发布）'}
+- **测试目标**：${meta.testObjectives ?? '（待填写：验证什么、不验证什么）'}
+- **参考依据**：${meta.references ?? '（待填写：需求文档、设计文档、标准、合同条款等）'}
+`;
+
+  const s4 = `## 4. 测试范围与对象
+
+- **测试对象（模块/页面）**：
+${testObjectList}
+
+- **版本与构建信息**：${meta.buildInfo ?? '（待填写：Commit/Tag/Build ID）'}
+- **覆盖范围**：功能点、业务流程、平台/终端等（待根据实际上报补充）
+- **不在范围（Out of Scope）及原因**：${meta.outOfScope ?? '（待填写）'}
+`;
+
+  const s5 = `## 5. 测试策略与方法
+
+- **测试类型**：${meta.testTypes ?? '（待填写：功能/回归/接口/兼容/性能/安全/可用性/可靠性等）'}
+- **测试方法**：黑盒/白盒/探索式/风险驱动（待选定）
+- **优先级与准入/准出标准（Entry/Exit Criteria）**：${meta.entryExitCriteria ?? '（待填写）'}
+- **风险评估与测试重点**：（待按业务/技术风险排序）
+`;
+
+  const s6 = `## 6. 测试环境与配置
+
+- **环境拓扑**：${meta.environmentTopology ?? '（待填写：DEV/UAT/Pre/Prod-like）'}
+- **软硬件配置**：OS、DB、中间件、浏览器/机型（待填写）
+- **依赖系统与外部接口**：模拟/真实、桩/Mock（待填写）
+- **测试数据策略**：${meta.testDataStrategy ?? '（待填写：数据准备、脱敏、回收/清理）'}
+- **环境问题与对测试的影响**：（待填写）
+`;
+
+  const s7 = `## 7. 测试执行概况
+
+- **测试周期、人员投入、执行日历**：${meta.testCycle ?? '（待填写）'}
+- **测试轮次**：第1轮/回归轮/补测轮（待填写）
+- **测试用例执行统计**：
+
+| 统计项 | 数量 |
+|--------|------|
+| 计划用例总数 | ${totalCases} |
+| 已执行 | （待填写） |
+| 通过 | （待填写） |
+| 失败 | （待填写） |
+| 阻塞 | （待填写） |
+| 跳过 | （待填写） |
+
+- **需求/用户故事覆盖率**：（若有，待填写）
+`;
+
+  const s8 = `## 8. 缺陷与问题分析
+
+- **缺陷统计**：按严重级别、模块、原因、发现阶段（待填写或从缺陷系统导出）
+- **缺陷趋势**：随时间的新增/关闭（待填写）
+- **关键缺陷清单（Blocking/Critical）**：${meta.keyDefectsSummary ?? '（待填写：描述、影响、复现率、状态、责任人、计划修复版本）'}
+- **根因分析（RCA）与过程改进建议**：（可选）
+`;
+
+  const s9 = `## 9. 质量度量与覆盖度（可选但推荐）
+
+- **功能覆盖**：需求覆盖率、用例覆盖率（待填写）
+- **代码质量**：单测覆盖率、静态扫描、圈复杂度（如纳入）（待填写）
+- **性能指标**：响应时间、吞吐、资源利用率、容量边界（待填写）
+- **稳定性指标**：Crash率、可用性、长稳运行结果（待填写）
+- **安全结果**：漏洞扫描/渗透测试结论（如适用）（待填写）
+`;
+
+  const s10 = `## 10. 风险、遗留问题与豁免项
+
+- **已知问题（Known Issues）与影响评估**：${meta.knownIssues ?? '（待填写）'}
+- **风险清单**：风险等级、概率×影响、缓解措施（待填写）
+- **豁免/延期项**：${meta.risksAndWaivers ?? '（待填写：谁批准、为何批准、补救计划）'}
+`;
+
+  const s11 = `## 11. 结论与发布建议
+
+- **是否满足准出标准**：（逐条对照，待填写）
+- **上线建议**：${meta.goLiveSuggestion ?? '（待填写：允许上线/需修复后上线/建议延期）'}
+- **上线/发布门槛**：${meta.releaseConditions ?? '（待填写：必须满足条件）'}
+- **回滚策略验证情况**：（若有，待填写）
+`;
+
+  const s12 = `## 12. 附录（证据与可追溯）
+
+**测试用例清单**（执行结果列留空，供执行时填写）
+
+${totalCases === 0 ? '（暂无测试用例，请在各节点「测试」中维护）' : caseTable}
+
+**其他附录**（可后续追加）：
+- 缺陷列表导出（ID、标题、严重级别、状态）
+- 测试日志、截图、抓包、监控图、性能报告原始数据
+- 需求-用例-缺陷追踪矩阵（RTM）
+- 术语表与缩略语
+`;
+
+  const markdown = `# ${projectMeta.projectName} - 测试报告
+
+**版本**：${version}  
+**生成日期**：${dateStr}
+
+---
+
+${s1}
+
+---
+
+${s2}
+
+---
+
+${s3}
+
+---
+
+${s4}
+
+---
+
+${s5}
+
+---
+
+${s6}
+
+---
+
+${s7}
+
+---
+
+${s8}
+
+---
+
+${s9}
+
+---
+
+${s10}
+
+---
+
+${s11}
+
+---
+
+${s12}
+`;
+
+  const contentHtml = await marked.parse(markdown);
+  const wordHtml = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><style>${STYLES}</style></head>
+<body>
+<div class="doc-wrapper">
+  <div style="text-align: center; margin-bottom: 48px;">
+    <h1>${projectMeta.projectName} - 测试报告</h1>
+    <p>版本：${version}</p>
+    <p>生成日期：${dateStr}</p>
+  </div>
+  ${contentHtml}
+</div>
+</body>
+</html>`;
+
+  const buffer = await asBlob(wordHtml, { orientation: 'portrait' });
+  const blob = buffer instanceof Blob
+    ? buffer
+    : new Blob([buffer as unknown as ArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+  saveAs(blob, `${projectMeta.projectName}_测试报告.docx`);
+}
+
+/** 系统设计说明书可选元数据（用于预填各章，后续可在项目蓝图/导出配置中维护） */
+export interface SystemDesignMeta {
+  /** 1. 文档总览 */
+  documentPurpose?: string;
+  scopeAndBoundary?: string;
+  targetReaders?: string;
+  glossary?: string;
+  references?: string;
+  revisionHistory?: Array<{ version: string; date: string; author: string; description: string }>;
+  /** 2. 背景与目标 */
+  businessBackground?: string;
+  buildGoals?: string;
+  successMetrics?: string;
+  constraints?: string;
+  /** 3. 总体架构 */
+  systemPositionAndBoundary?: string;
+  architectureStyle?: string;
+  keyTechChoices?: string;
+  adrList?: string;
+  /** 4. 业务与领域 */
+  businessProcess?: string;
+  domainModel?: string;
+  rulesAndPolicies?: string;
+  /** 5. 功能架构（不做清单可填） */
+  outOfScopeFeatures?: string;
+  /** 6. 数据架构 */
+  dataClassification?: string;
+  dataConsistency?: string;
+  dataLifecycle?: string;
+  dataMigration?: string;
+  /** 7. 接口与集成 */
+  apiOverview?: string;
+  apiSpec?: string;
+  callbackEventProtocol?: string;
+  thirdPartyIntegration?: string;
+  compatibilityStrategy?: string;
+  /** 8. 关键非功能 */
+  performanceCapacity?: string;
+  highAvailability?: string;
+  scalability?: string;
+  reliability?: string;
+  securityDesign?: string;
+  compliancePrivacy?: string;
+  observability?: string;
+  costDesign?: string;
+  /** 10. 缓存/搜索/异步 */
+  cacheDesign?: string;
+  messageQueueDesign?: string;
+  /** 11. 部署与运维 */
+  environmentPlan?: string;
+  cicd?: string;
+  configManagement?: string;
+  monitoringAlert?: string;
+  /** 12. 测试与验收 */
+  testStrategy?: string;
+  acceptanceCriteria?: string;
+  /** 13. 风险与开放项 */
+  riskList?: string;
+  knownIssues?: string;
+  openItems?: string;
+}
+
+const EMPTY_IMPL_MARKERS = ['-- 将在后续阶段生成', '-- PLACEHOLDER', '-- 暂无数据库需求', '-- 待生成', ''];
+
+function isMeaningfulDbSchema(db: string | undefined): boolean {
+  const t = (db ?? '').trim();
+  return t.length > 0 && !EMPTY_IMPL_MARKERS.includes(t);
+}
+
+/**
+ * 导出系统设计说明书（标准 14 章 + 附录）
+ * 从各节点聚合 artifacts.impl（apiEndpoints、dbSchema）填入第 5/6/7/9 章及附录 D；其余章节使用 meta 预填或占位。
+ */
+export async function exportSystemDesignDoc(options: {
+  projectMeta: { projectName: string; version?: string };
+  nodes: NodeForExport[];
+  meta?: SystemDesignMeta;
+}): Promise<void> {
+  const { projectMeta, nodes, meta = {} } = options;
+  const dateStr = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+  const version = projectMeta.version || 'V1.0';
+
+  const modules: Array<{ name: string; apis: string[]; dbSchema: string }> = [];
+  const allApis: string[] = [];
+  for (const node of nodes) {
+    const impl = node.data?.artifacts?.impl;
+    const name = (node.data?.artifacts?.spec as { title?: string } | undefined)?.title || node.data?.label || node.id || '未命名';
+    const apis = impl?.apiEndpoints?.filter(Boolean) ?? [];
+    const db = (impl?.dbSchema ?? '').trim();
+    const dbSchema = isMeaningfulDbSchema(db) ? db : '';
+    modules.push({ name, apis, dbSchema });
+    allApis.push(...apis);
+  }
+  const moduleList = modules.map((m, i) => `${i + 1}. ${m.name}`).join('\n');
+  const revRows = meta.revisionHistory?.length
+    ? meta.revisionHistory.map(r => `| ${r.version} | ${r.date} | ${r.author} | ${r.description} |`).join('\n')
+    : `| ${version} | ${dateStr} | （待填写） | 初稿 |`;
+  const revTable = '| 版本 | 日期 | 修订人 | 修订说明 |\n|------|------|--------|----------|\n' + revRows;
+
+  const s1 = `## 1. 文档总览
+
+### 1.1 文档目的
+${meta.documentPurpose ?? '（待填写：本说明书用于描述系统架构、接口、数据与关键非功能设计，供研发/测试/运维及评审使用。）'}
+
+### 1.2 适用范围（系统边界/业务范围）
+${meta.scopeAndBoundary ?? '（待填写）'}
+
+### 1.3 读者对象（业务/研发/测试/运维/安全/审计）
+${meta.targetReaders ?? '（待填写）'}
+
+### 1.4 术语与缩写（Glossary）
+${meta.glossary ?? '（待填写）'}
+
+### 1.5 参考资料（需求文档、架构规范、接口规范、法规标准）
+${meta.references ?? '（待填写）'}
+
+### 1.6 文档版本记录（变更历史、评审记录）
+${revTable}
+`;
+
+  const s2 = `## 2. 背景与目标
+
+### 2.1 业务背景与痛点
+${meta.businessBackground ?? projectMeta.projectName + ' 相关业务背景与痛点（待补充）'}
+
+### 2.2 建设目标（业务目标、技术目标、合规目标）
+${meta.buildGoals ?? '（待填写）'}
+
+### 2.3 成功指标（SLA/SLO、吞吐、延迟、成本、交付周期等）
+${meta.successMetrics ?? '（待填写）'}
+
+### 2.4 约束条件（时间、预算、资源、技术栈、合规、数据出境等）
+${meta.constraints ?? '（待填写）'}
+`;
+
+  const s3 = `## 3. 总体架构设计
+
+### 3.1 系统定位与边界（上下游系统、外部依赖）
+${meta.systemPositionAndBoundary ?? '（待填写）'}
+
+### 3.2 架构风格与原则（分层、DDD、微服务、事件驱动等）
+${meta.architectureStyle ?? '（待填写）'}
+
+### 3.3 总体架构图（逻辑架构/物理架构/部署架构）
+（待补充：可插入架构图或引用附录 A）
+
+### 3.4 关键技术选型与理由（语言、框架、中间件、云服务）
+${meta.keyTechChoices ?? '（待填写）'}
+
+### 3.5 核心设计决策与权衡（ADR 列表）
+${meta.adrList ?? '（待填写，可引用附录 E）'}
+`;
+
+  const s4 = `## 4. 业务与领域设计
+
+### 4.1 业务流程（主流程/异常流程）
+${meta.businessProcess ?? '（待填写）'}
+
+### 4.2 领域模型（领域对象、聚合、实体、值对象）
+${meta.domainModel ?? '（待填写）'}
+
+### 4.3 用例/场景（用户旅程、权限角色）
+（可参考 PRD/需求规格说明书中的用例与角色）
+
+### 4.4 规则与策略（计费、风控、审批、状态机等）
+${meta.rulesAndPolicies ?? '（待填写）'}
+`;
+
+  const s5 = `## 5. 功能架构与模块设计
+
+### 5.1 功能清单与范围（含不做清单）
+- **在范围（模块/页面）**：
+${moduleList.length > 0 ? moduleList : '（暂无，请在各节点维护后自动生成）'}
+- **不做清单**：${meta.outOfScopeFeatures ?? '（待填写）'}
+
+### 5.2 模块划分与职责边界
+当前按页面/功能模块划分，见下表（由画布节点自动汇总）：
+
+| 序号 | 模块/页面 | 主要接口数 | 是否有数据模型 |
+|------|-----------|------------|----------------|
+${modules.map((m, i) => `| ${i + 1} | ${m.name} | ${m.apis.length} | ${m.dbSchema ? '是' : '否'} |`).join('\n')}
+
+### 5.3 模块交互关系（调用链/事件流）
+（待补充：可结合架构图与第 7 章接口说明）
+
+### 5.4 关键页面/关键接口的业务逻辑说明（如适用）
+（见第 9 章按模块详细设计及第 7 章接口明细）
+`;
+
+  const dataSections: string[] = [];
+  for (const m of modules) {
+    if (!m.dbSchema) continue;
+    dataSections.push(`#### ${m.name}\n\`\`\`\n${m.dbSchema}\n\`\`\``);
+  }
+  const s6 = `## 6. 数据架构设计
+
+### 6.1 数据分类分级（敏感数据、PII、密级）
+${meta.dataClassification ?? '（待填写）'}
+
+### 6.2 概念模型/逻辑模型/物理模型
+（待填写或引用下图/附录）
+
+### 6.3 核心表结构说明（字段、索引、分区、约束）
+以下按模块/页面汇总自各节点「实现」中的数据库设计（dbSchema），可后续细化字段与索引。
+
+${dataSections.length > 0 ? dataSections.join('\n\n') : '（暂无，请在各节点「实现」中维护 dbSchema）'}
+
+### 6.4 数据一致性策略（强一致/最终一致、幂等）
+${meta.dataConsistency ?? '（待填写）'}
+
+### 6.5 数据生命周期（采集/存储/归档/删除）
+${meta.dataLifecycle ?? '（待填写）'}
+
+### 6.6 数据迁移与初始化方案
+${meta.dataMigration ?? '（待填写）'}
+
+### 6.7 主数据/字典/编码规范（如适用）
+（待填写）
+`;
+  const s7 = `## 7. 接口与集成设计
+
+### 7.1 接口总览（内部/外部、同步/异步）
+${meta.apiOverview ?? '（待填写）'}  
+以下接口清单由各节点「实现」中的 apiEndpoints 自动汇总，共 ${allApis.length} 个。
+
+### 7.2 API 规范（REST/gRPC、命名、版本、错误码）
+${meta.apiSpec ?? '（待填写）'}
+
+### 7.3 关键接口明细（入参/出参/示例/校验/权限）
+| 序号 | 所属模块 | 接口 |
+|------|----------|------|
+${((): string => { let idx = 0; const rows = modules.flatMap(m => m.apis.map(a => `| ${++idx} | ${m.name} | \`${a}\` |`)); return rows.length === 0 ? '| - | - | （暂无，请在各节点「实现」中维护 apiEndpoints） |' : rows.join('\n'); })()}
+
+（入参/出参/示例/校验/权限待在附录 D 或接口文档中补充）
+
+### 7.4 回调/事件/消息协议（Topic、Schema、顺序、重试）
+${meta.callbackEventProtocol ?? '（待填写）'}
+
+### 7.5 第三方系统集成（认证、限流、容灾、对账）
+${meta.thirdPartyIntegration ?? '（待填写）'}
+
+### 7.6 兼容性与演进策略（向后兼容、灰度）
+${meta.compatibilityStrategy ?? '（待填写）'}
+`;
+  const s8 = `## 8. 关键非功能设计
+
+### 8.1 性能与容量规划（QPS、并发、峰值、压测目标）
+${meta.performanceCapacity ?? '（待填写）'}
+
+### 8.2 高可用与容灾（多活/主备、RTO/RPO、故障切换）
+${meta.highAvailability ?? '（待填写）'}
+
+### 8.3 可扩展性（水平扩展、分片、无状态化）
+${meta.scalability ?? '（待填写）'}
+
+### 8.4 可靠性（重试、超时、熔断、降级、限流、幂等）
+${meta.reliability ?? '（待填写）'}
+
+### 8.5 安全设计（认证鉴权、密钥、加密、审计、零信任）
+${meta.securityDesign ?? '（待填写）'}
+
+### 8.6 合规与隐私（等保、ISO、GDPR/个保法、数据出境）
+${meta.compliancePrivacy ?? '（待填写）'}
+
+### 8.7 可维护性（代码规范、模块化、配置化）
+（待填写）
+
+### 8.8 可观测性（日志/指标/链路追踪、告警）
+${meta.observability ?? '（待填写）'}
+
+### 8.9 成本设计（资源规格、存储/带宽、成本估算）
+${meta.costDesign ?? '（待填写）'}
+`;
+  const s9Parts: string[] = [];
+  modules.forEach((m, i) => {
+    if (m.apis.length === 0 && !m.dbSchema) return;
+    s9Parts.push(`### 9.${i + 1} ${m.name}
+
+#### 9.${i + 1}.1 职责与边界
+（待填写）
+
+#### 9.${i + 1}.2 主要接口（API/事件）
+${m.apis.length > 0 ? m.apis.map((a, j) => `${j + 1}. \`${a}\``).join('\n') : '（无）'}
+
+#### 9.${i + 1}.3 核心流程与时序图
+（待填写）
+
+#### 9.${i + 1}.4 数据模型与存储访问
+${m.dbSchema ? '```\n' + m.dbSchema + '\n```' : '（无）'}
+
+#### 9.${i + 1}.5 关键算法/规则/状态机
+（待填写）
+
+#### 9.${i + 1}.6 异常处理与错误码
+（待填写）
+
+#### 9.${i + 1}.7 安全与权限点
+（待填写）
+
+#### 9.${i + 1}.8 性能要点与缓存策略
+（待填写）
+
+#### 9.${i + 1}.9 配置项与开关（Feature Flag）
+（待填写）
+
+#### 9.${i + 1}.10 依赖项与风险点
+（待填写）
+`);
+  });
+  const s9 = `## 9. 应用与服务详细设计（按服务/模块展开）
+
+${s9Parts.length > 0 ? s9Parts.join('\n') : '（暂无模块级设计，请在各节点「实现」中维护 API 与 dbSchema 后自动生成本章节骨架）'}
+`;
+  const s10 = `## 10. 缓存、搜索与异步化设计（如适用）
+
+### 10.1 缓存模型（读写策略、TTL、淘汰、一致性）
+${meta.cacheDesign ?? '（待填写）'}
+
+### 10.2 分布式锁/并发控制
+（待填写）
+
+### 10.3 搜索索引（mapping、增量/全量、延迟）
+（待填写）
+
+### 10.4 消息队列/事件总线（消费组、顺序、死信、补偿）
+${meta.messageQueueDesign ?? '（待填写）'}
+`;
+  const s11 = `## 11. 部署与运维设计
+
+### 11.1 环境规划（DEV/UAT/PROD，网络、域名）
+${meta.environmentPlan ?? '（待填写）'}
+
+### 11.2 CI/CD（构建、发布、回滚、灰度、蓝绿）
+${meta.cicd ?? '（待填写）'}
+
+### 11.3 配置管理（配置中心、密钥管理、参数化）
+${meta.configManagement ?? '（待填写）'}
+
+### 11.4 运行时依赖（中间件、云资源清单）
+（待填写）
+
+### 11.5 监控与告警策略（阈值、分级、值班）
+${meta.monitoringAlert ?? '（待填写）'}
+
+### 11.6 运维手册要点（常见故障、排障路径、SOP）
+（待填写）
+`;
+  const s12 = `## 12. 测试与验收设计
+
+### 12.1 测试范围与策略（单测/集成/回归/性能/安全）
+${meta.testStrategy ?? '（待填写）'}
+
+### 12.2 测试数据与Mock策略
+（待填写）
+
+### 12.3 性能压测方案（场景、指标、工具、报告模板）
+（待填写）
+
+### 12.4 安全测试（渗透、基线、漏洞修复流程）
+（待填写）
+
+### 12.5 验收标准与交付物清单
+${meta.acceptanceCriteria ?? '（待填写）'}
+`;
+  const s13 = `## 13. 风险、问题与开放项
+
+### 13.1 风险清单（技术/进度/依赖/合规）
+${meta.riskList ?? '（待填写）'}
+
+### 13.2 缓解措施与Owner
+（待填写）
+
+### 13.3 已知问题与限制（Known Issues）
+${meta.knownIssues ?? '（待填写）'}
+
+### 13.4 开放项与后续规划（Roadmap）
+${meta.openItems ?? '（待填写）'}
+`;
+  const s14 = `## 14. 附录
+
+**A. 架构图/时序图/ER图清单**  
+（待补充）
+
+**B. 错误码总表**  
+（待补充）
+
+**C. 配置项总表**  
+（待补充）
+
+**D. 接口样例与字段字典**  
+以下为各模块 API 列表（来自画布节点 impl.apiEndpoints），明细入参/出参可后续在接口文档中补充。
+
+${allApis.length === 0 ? '（暂无）' : allApis.map((a, i) => `${i + 1}. \`${a}\``).join('\n')}
+
+**E. 关键决策记录（ADR）**  
+（待补充）
+`;
+
+  const markdown = `# ${projectMeta.projectName} - 系统设计说明书
+
+**版本**：${version}  
+**生成日期**：${dateStr}
+
+---
+
+${s1}
+
+---
+
+${s2}
+
+---
+
+${s3}
+
+---
+
+${s4}
+
+---
+
+${s5}
+
+---
+
+${s6}
+
+---
+
+${s7}
+
+---
+
+${s8}
+
+---
+
+${s9}
+
+---
+
+${s10}
+
+---
+
+${s11}
+
+---
+
+${s12}
+
+---
+
+${s13}
+
+---
+
+${s14}
+`;
+
+  const contentHtml = await marked.parse(markdown);
+  const wordHtml = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><style>${STYLES}</style></head>
+<body>
+<div class="doc-wrapper">
+  <div style="text-align: center; margin-bottom: 48px;">
+    <h1>${projectMeta.projectName} - 系统设计说明书</h1>
+    <p>版本：${version}</p>
+    <p>生成日期：${dateStr}</p>
+  </div>
+  ${contentHtml}
+</div>
+</body>
+</html>`;
+
+  const buffer = await asBlob(wordHtml, { orientation: 'portrait' });
+  const blob = buffer instanceof Blob
+    ? buffer
+    : new Blob([buffer as unknown as ArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+  saveAs(blob, `${projectMeta.projectName}_系统设计说明书.docx`);
+}
+
+/** 使用说明书可选元数据（用于预填章节，后续可在项目蓝图/导出配置中维护） */
+export interface UserManualMeta {
+  /** 文档总览 */
+  documentPurpose?: string;
+  scopeAndReaders?: string;
+  revisionHistory?: Array<{ version: string; date: string; description: string }>;
+  /** 快速入门 */
+  gettingStarted?: string;
+  accessAndLogin?: string;
+  /** 常见问题 */
+  faq?: string;
+  /** 附录（术语表、快捷操作等） */
+  appendix?: string;
+}
+
+/**
+ * 导出使用说明书（标准结构：总览、快速入门、按页面功能说明、常见问题、附录）
+ * 从各节点聚合 spec（title、requirements）作为功能概述；其余章节使用 meta 预填或占位。
+ */
+export async function exportUserManual(options: {
+  projectMeta: { projectName: string; version?: string };
+  nodes: NodeForExport[];
+  meta?: UserManualMeta;
+}): Promise<void> {
+  const { projectMeta, nodes, meta = {} } = options;
+  const dateStr = new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
+  const version = projectMeta.version || 'V1.0';
+
+  const revRows = meta.revisionHistory?.length
+    ? meta.revisionHistory.map(r => `| ${r.version} | ${r.date} | ${r.description} |`).join('\n')
+    : `| ${version} | ${dateStr} | 初稿 |`;
+  const revTable = '| 版本 | 日期 | 修订说明 |\n|------|------|----------|\n' + revRows;
+
+  const s1 = `## 1. 文档总览
+
+### 1.1 文档目的
+${meta.documentPurpose ?? `本文档为「${projectMeta.projectName}」的使用说明书，面向最终用户，说明系统功能与操作步骤。`}
+
+### 1.2 适用范围与读者
+${meta.scopeAndReaders ?? '（待填写：适用系统/模块、目标读者）'}
+
+### 1.3 文档版本记录
+${revTable}
+`;
+
+  const s2 = `## 2. 快速入门 / 使用前准备
+
+### 2.1 访问与登录
+${meta.accessAndLogin ?? '（待填写：系统访问地址、登录方式、账号权限说明）'}
+
+### 2.2 使用前准备
+${meta.gettingStarted ?? '（待填写：浏览器要求、前置条件、首次使用指引等）'}
+`;
+
+  const featureSections: string[] = [];
+  nodes.forEach((node, i) => {
+    const title = node.data?.artifacts?.spec?.title || node.data?.label || node.id || '未命名';
+    const req = node.data?.artifacts?.spec?.requirements;
+    const overview = req != null
+      ? (Array.isArray(req) ? req.join('\n') : req)
+      : '（请在各节点「需求」中补充本页功能说明，导出时将自动带入此处）';
+    featureSections.push(`### 3.${i + 1} ${title}
+
+**功能概述**
+
+${overview}
+
+**操作说明**
+
+（待补充：操作步骤、截图与注意事项，或从 PRD/需求文档整理后粘贴）
+`);
+  });
+
+  const s3 = `## 3. 功能说明（按页面/模块）
+
+${featureSections.length > 0 ? featureSections.join('\n') : '（暂无页面/模块，请先在画布中创建节点并维护「需求」后重新导出）'}
+`;
+
+  const s4 = `## 4. 常见问题（FAQ）
+
+${meta.faq ?? '（待填写：常见问题与解答，如登录失败、权限不足、操作异常等）'}
+`;
+
+  const s5 = `## 5. 附录
+
+${meta.appendix ?? '（待填写：术语表、快捷操作、联系支持等）'}
+`;
+
+  const markdown = `# ${projectMeta.projectName} - 使用说明书
+
+**版本**：${version}  
+**生成日期**：${dateStr}
+
+---
+
+${s1}
+
+---
+
+${s2}
+
+---
+
+${s3}
+
+---
+
+${s4}
+
+---
+
+${s5}
+`;
+
+  const contentHtml = await marked.parse(markdown);
+  const wordHtml = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="UTF-8"><style>${STYLES}</style></head>
+<body>
+<div class="doc-wrapper">
+  <div style="text-align: center; margin-bottom: 48px;">
+    <h1>${projectMeta.projectName} - 使用说明书</h1>
+    <p>版本：${version}</p>
+    <p>生成日期：${dateStr}</p>
+  </div>
+  ${contentHtml}
+</div>
+</body>
+</html>`;
+
+  const buffer = await asBlob(wordHtml, { orientation: 'portrait' });
+  const blob = buffer instanceof Blob
+    ? buffer
+    : new Blob([buffer as unknown as ArrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+  saveAs(blob, `${projectMeta.projectName}_使用说明书.docx`);
 }

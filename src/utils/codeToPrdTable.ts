@@ -840,9 +840,9 @@ ${performance.join('\n')}`;
 }
 
 /**
- * 从已有需求文档中提取功能表格
+ * 从已有需求文档中提取功能表格（包含「功能ID」列的表视为功能表格）
  */
-function extractFunctionTableFromRequirements(requirements: string | string[]): string | null {
+export function extractFunctionTableFromRequirements(requirements: string | string[]): string | null {
   const requirementsText = Array.isArray(requirements) 
     ? requirements.join('\n') 
     : String(requirements || '');

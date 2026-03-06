@@ -40,11 +40,11 @@ export const SYNC_STATE_TOOLTIP = '仅表示最近一次更新来源，非实时
 /** 无选中节点时详情区文案 */
 export const NO_NODE_SELECTED_MESSAGE = '请先选择画布上的节点。';
 
-/** 空白画布主文案 */
-export const EMPTY_CANVAS_PRIMARY = '输入想法或上传文档，开始生成。';
+/** 空白画布主文案（创建模式 P2：主行动引导） */
+export const EMPTY_CANVAS_PRIMARY = '用一句话描述产品，或拖入文件';
 
-/** 空白画布次句 */
-export const EMPTY_CANVAS_SECONDARY = '或按 Tab 添加节点';
+/** 空白画布次句（引导打开右侧对话） */
+export const EMPTY_CANVAS_SECONDARY = '打开右侧 AI 对话开始';
 
 /** 四维 Tab tooltip 中文短说明 */
 export const TAB_TOOLTIPS: Record<string, string> = {

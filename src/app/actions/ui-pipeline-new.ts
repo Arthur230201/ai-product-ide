@@ -33,19 +33,84 @@ const getOutputFooter = (stage: 'STATIC' | 'BEAUTIFY' | 'INTERACT') => {
 - Append this marker at the end: ${marker}`;
 };
 
-/** 风格预设：默认苹果风格，用户未指定时使用（仅 pipeline 内部使用，避免 use server 导出非函数） */
-const STYLE_PRESETS = ['apple', 'material', 'neutral', 'custom'] as const;
+/** 风格预设：按视觉气质分类，默认极简中性（仅 pipeline 内部使用） */
+const STYLE_PRESETS = ['neutral', 'glass', 'flat', 'corporate', 'neo', 'cyberpunk', 'warm', 'brutal', 'custom'] as const;
 
-/** 苹果风格 Prompt 片段（Stage 1/2 注入，见 HIGH_QUALITY_UI_APPLE_STYLE_STITCH_PLAN.md） */
-const APPLE_STYLE_FRAGMENT = `
-## 默认视觉风格：Apple HIG（用户未指定时必须遵守）
+/** 极简中性：留白、灰阶、无强烈色 */
+const NEUTRAL_STYLE_FRAGMENT = `
+## 视觉风格：极简中性
 
-- **整体气质**：干净、留白充足、层次分明；避免拥挤与高饱和色块堆砌。
-- **字体**：使用系统无衬线栈（如 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif）；层级清晰：大标题 1.25–1.5rem/粗体，正文 0.9375–1rem，辅助 0.8125–0.875rem/常规；行高 1.4–1.5。
-- **圆角与阴影**：卡片/按钮圆角 8–12px（如 0.5rem–0.75rem）；阴影轻量（如 0 1px 3px rgba(0,0,0,0.08)），避免大块重阴影。
-- **色彩**：背景以白/浅灰为主（#fff, #f5f5f7）；主文字深灰/黑（#1d1d1f, #424245）；强调色克制（如系统蓝 #0071e3 或品牌主色单点使用）。
-- **间距**：8px 基准网格；区块间距 16–24px；内容区 padding 不少于 16px。
-- **组件**：按钮主色单一、hover 略深；列表/卡片对齐网格、分割线细而淡。
+- **整体气质**：黑白灰为主、留白充足、无高饱和色块；适合内容与通用产品。
+- **色彩**：背景白/浅灰（#fff, #f9fafb）；主文字深灰（#111827, #374151）；主色可用单一灰或低饱和蓝，克制使用。
+- **圆角与阴影**：圆角 6–8px；阴影轻（0 1px 2px rgba(0,0,0,0.05)）。
+- **字体**：系统无衬线；层级清晰。
+`.trim();
+
+/** 赛博朋克：深黑、霓虹粉/青发光 */
+const CYBERPUNK_STYLE_FRAGMENT = `
+## 视觉风格：赛博朋克（Cyberpunk）
+
+- **整体气质**：深黑背景、霓虹粉/青发光、科幻感；锐利边角、等宽字体。
+- **色彩**：背景 #0a0a0f 或 black；主文字浅色；强调色霓虹粉 #ec4899、霓虹青 #22d3ee；卡片可带发光边框。
+- **圆角**：小或直角；box-shadow 可带霓虹光晕。
+`.trim();
+
+/** 温暖极简：奶油/米色、单一暖色 */
+const WARM_STYLE_FRAGMENT = `
+## 视觉风格：温暖极简（Warm Minimalism）
+
+- **整体气质**：奶油/米色底、单一暖色点缀、大圆角、留白充足；2025 流行。
+- **色彩**：背景 #faf8f5、#fffefb 或 amber-50；主色 amber/orange；文字 stone-800/600。
+- **圆角**：12–16px；阴影轻。
+`.trim();
+
+/** 新粗野主义：粗描边、厚阴影、直角 */
+const BRUTAL_STYLE_FRAGMENT = `
+## 视觉风格：新粗野主义（Neo-Brutalism）
+
+- **整体气质**：粗黑描边、厚实偏移阴影、直角、高对比色块；反精致、有冲击力。
+- **色彩**：背景浅黄/白；边框与阴影用黑色；主色红/蓝等高饱和。
+- **圆角**：直角 rounded-none；shadow 如 4px 4px 0 0 #1c1917。
+`.trim();
+
+/** 玻璃拟态：半透明、模糊、大圆角 */
+const GLASS_STYLE_FRAGMENT = `
+## 视觉风格：玻璃拟态（Glassmorphism）
+
+- **整体气质**：半透明毛玻璃、背景模糊、大圆角；现代 C 端感。
+- **色彩**：卡片/面板使用 rgba 半透明（如 rgba(255,255,255,0.2)）、backdrop-filter: blur(12px)；可配渐变或彩色背景衬托。
+- **圆角**：12–16px 或更大；轻边框（如 1px solid rgba(255,255,255,0.2)）。
+- **阴影**：柔和、偏大范围。
+`.trim();
+
+/** 扁平鲜明：高饱和、少阴影 */
+const FLAT_STYLE_FRAGMENT = `
+## 视觉风格：扁平鲜明（Flat Bold）
+
+- **整体气质**：高饱和色块、无渐变、少阴影或扁平阴影；清晰边界、年轻活力。
+- **色彩**：主色鲜明（如红/橙/玫红 #e11d48、#f97316）；背景可浅色衬托；对比强。
+- **圆角**：8–12px；阴影可有可无，若有则轻。
+- **组件**：按钮与卡片用纯色块，少立体感。
+`.trim();
+
+/** 企业稳重：深蓝灰、专业 */
+const CORPORATE_STYLE_FRAGMENT = `
+## 视觉风格：企业稳重（B 端/专业）
+
+- **整体气质**：深蓝/灰主色、小圆角、适度阴影；专业、可信、偏后台与 ToB。
+- **色彩**：主色深蓝（#1e40af、#1e3a8a）；背景浅灰（#f1f5f9）；文字深灰/黑。
+- **圆角**：4–6px；阴影适度（0 1px 3px rgba(0,0,0,0.08)）。
+- **组件**：表格、表单、卡片结构清晰；避免花哨。
+`.trim();
+
+/** 柔和拟态：双阴影浮雕 */
+const NEO_STYLE_FRAGMENT = `
+## 视觉风格：柔和拟态（Neumorphism）
+
+- **整体气质**：同色系深浅、内外双阴影形成浮雕感；柔和、舒适。
+- **色彩**：背景与卡片同色系（如浅紫灰 #e0e7ff）；凸起用浅色阴影、凹陷用深色阴影（如 6px 6px 12px #c4b8e0, -6px -6px 12px #fff）。
+- **圆角**：大圆角（12–16px）；无边框或极淡边框。
+- **组件**：按钮/输入框用凸起或凹陷的 box-shadow 表现。
 `.trim();
 
 // ==================== Stage 1: 静态 HTML 生成 ====================
@@ -55,7 +120,7 @@ const VIEWPORT_PRESETS = ['mobile', 'desktop'] as const;
 const GenerateStaticUIInputSchema = z.object({
   prompt: z.string().optional().default('').describe('页面描述'),
   nodeLabel: z.string().optional().describe('节点标签'),
-  stylePreset: z.enum(STYLE_PRESETS).optional().default('apple').describe('视觉风格预设，默认苹果'),
+  stylePreset: z.enum(STYLE_PRESETS).optional().default('neutral').describe('视觉风格预设，默认极简中性'),
   viewportPreset: z.enum(VIEWPORT_PRESETS).optional().default('mobile').describe('目标视口：mobile/tablet/desktop，决定生成布局宽度与结构'),
   aiConfig: z.object({
     textModel: z.string().optional(),
@@ -121,9 +186,14 @@ QUALITY TARGET:
 - Keep total output reasonably compact (< ~40KB if possible, ~800 lines max).
 - All text content must be in Chinese (中文).`;
 
-      if (input.stylePreset === 'apple') {
-        systemPrompt += `\n\n${APPLE_STYLE_FRAGMENT}`;
-      }
+      if (input.stylePreset === 'neutral') systemPrompt += `\n\n${NEUTRAL_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'cyberpunk') systemPrompt += `\n\n${CYBERPUNK_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'warm') systemPrompt += `\n\n${WARM_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'brutal') systemPrompt += `\n\n${BRUTAL_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'glass') systemPrompt += `\n\n${GLASS_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'flat') systemPrompt += `\n\n${FLAT_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'corporate') systemPrompt += `\n\n${CORPORATE_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'neo') systemPrompt += `\n\n${NEO_STYLE_FRAGMENT}`;
 
       const viewportInstruction =
         input.viewportPreset === 'desktop'
@@ -267,7 +337,7 @@ ${STAGE_MARKER_STATIC}
 const BeautifyUIInputSchema = z.object({
   html: z.string().describe('当前 HTML 代码'),
   prompt: z.string().optional().describe('美化要求（可选）'),
-  stylePreset: z.enum(STYLE_PRESETS).optional().default('apple').describe('视觉风格预设，默认苹果'),
+  stylePreset: z.enum(STYLE_PRESETS).optional().default('neutral').describe('视觉风格预设，默认极简中性'),
   aiConfig: z.object({
     textModel: z.string().optional(),
   }).optional(),
@@ -322,9 +392,14 @@ CSS CONCISENESS:
 - Prefer variables and reusable selectors.
 - Avoid long repetitive per-element styles.`;
 
-      if (input.stylePreset === 'apple') {
-        systemPrompt += `\n\n${APPLE_STYLE_FRAGMENT}`;
-      }
+      if (input.stylePreset === 'neutral') systemPrompt += `\n\n${NEUTRAL_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'cyberpunk') systemPrompt += `\n\n${CYBERPUNK_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'warm') systemPrompt += `\n\n${WARM_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'brutal') systemPrompt += `\n\n${BRUTAL_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'glass') systemPrompt += `\n\n${GLASS_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'flat') systemPrompt += `\n\n${FLAT_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'corporate') systemPrompt += `\n\n${CORPORATE_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'neo') systemPrompt += `\n\n${NEO_STYLE_FRAGMENT}`;
 
       const userPrompt = input.prompt 
         ? `美化要求：${input.prompt}\n\n[CURRENT HTML]\n${input.html}`

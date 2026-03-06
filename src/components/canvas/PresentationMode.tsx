@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import Image from 'next/image';
-import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Maximize2, Minimize2, Palette } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvas-store';
 import type { FractalNode } from '@/types/fractal';
 import { LivePreview } from './LivePreview';
@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { clsx } from 'clsx';
 import { selectNavigationEdge } from '@/lib/navigation/edge-navigator';
 import { getViewportSize } from '@/lib/viewport-constants';
+import { StyleExtractor } from './StyleExtractor';
 
 interface PresentationModeProps {
   initialNodeId: string | null;
@@ -24,6 +25,7 @@ interface PresentationModeProps {
 export function PresentationMode({ initialNodeId, onClose }: PresentationModeProps) {
   const { nodes, edges, viewportPreset } = useCanvasStore();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [styleDrawerOpen, setStyleDrawerOpen] = useState(false);
   
   // 计算初始节点：优先使用 initialNodeId，如果为 null 或无效则使用第一个节点
   const computeInitialNodeId = useMemo((): string | null => {
@@ -299,6 +301,44 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
       style={{ zIndex: 10000 }}
       data-presentation-mode="true"
     >
+      {/* 左侧 - 风格按钮（阻止冒泡，避免触发 AI 对话框） */}
+      <div
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-[10001] flex flex-col"
+        data-no-ai-trigger
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={() => setStyleDrawerOpen(true)}
+          className="px-3 py-3 bg-zinc-700 hover:bg-zinc-600 text-white rounded-r-md text-sm font-medium transition-all shadow-lg flex items-center gap-2"
+          title="风格"
+        >
+          <Palette className="w-4 h-4" />
+          <span>风格</span>
+        </button>
+      </div>
+
+      {/* 风格抽屉 - 从左侧滑出（阻止冒泡，避免触发 AI 对话框） */}
+      {styleDrawerOpen && (
+        <div
+          className="absolute inset-y-0 left-0 z-[10002] flex"
+          data-no-ai-trigger
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="w-[380px] max-w-[90vw] h-full bg-zinc-900 shadow-2xl flex flex-col overflow-hidden">
+            <StyleExtractor onClose={() => setStyleDrawerOpen(false)} />
+          </div>
+          <button
+            type="button"
+            onClick={() => setStyleDrawerOpen(false)}
+            className="flex-1 bg-black/30 backdrop-blur-sm"
+            aria-label="关闭风格面板"
+          />
+        </div>
+      )}
+
       {/* 退出 / 全屏 按钮 - 右上角 */}
       <div className="absolute top-4 right-4 z-[10001] flex items-center gap-2">
         <button

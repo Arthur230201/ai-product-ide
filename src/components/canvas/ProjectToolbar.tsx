@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { FilePlus, Save, FolderOpen, PlusSquare, BookOpen, Download, ChevronDown, Globe, FileText, FileCode } from 'lucide-react';
+import { FilePlus, Save, FolderOpen, PlusSquare, BookOpen, Download, ChevronDown, Globe, FileText, FileCode, ClipboardList, TestTube2, Cpu, BookMarked } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvas-store';
 import { ProjectBlueprint } from './ProjectBlueprint';
 import { toast } from 'sonner';
-import { exportToFullPrdHtml, exportToWord } from '@/utils/prdGenerator';
+import { exportToFullPrdHtml, exportToWord, exportTestReport, exportSystemDesignDoc, exportUserManual } from '@/utils/prdGenerator';
+import { exportToEnterpriseWord } from '@/utils/wordGenerator';
 import { captureNodePreviews } from '@/utils/capture-node-preview';
 import { isHtmlCode } from '@/utils/html-body-extractor';
 
@@ -214,6 +215,74 @@ export function ProjectToolbar() {
     }
   };
 
+  const handleExportSRS = async () => {
+    setIsExportMenuOpen(false);
+    try {
+      await exportToEnterpriseWord({
+        projectMeta: {
+          projectName: projectMeta.projectName,
+          version: projectMeta.version ?? 'V1.0.0',
+          industry: projectMeta.industry ?? '通用互联网',
+          targetAudience: projectMeta.targetAudience ?? '通用用户',
+          description: projectMeta.description ?? '',
+        },
+        globalRules: {
+          performance: globalRules.performance ?? '',
+          security: globalRules.security ?? '',
+          compatibility: globalRules.compatibility ?? '',
+          errorHandling: globalRules.errorHandling ?? '',
+          dataTracking: globalRules.dataTracking ?? '',
+        },
+        nodes,
+      });
+      toast.success('需求规格说明书导出成功！');
+    } catch (error) {
+      console.error('Export SRS error:', error);
+      toast.error('导出需求规格说明书失败', {
+        description: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  };
+
+  const handleExportTestReport = async () => {
+    setIsExportMenuOpen(false);
+    try {
+      await exportTestReport({ projectMeta, nodes });
+      toast.success('测试报告导出成功！');
+    } catch (error) {
+      console.error('Export test report error:', error);
+      toast.error('导出测试报告失败', {
+        description: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  };
+
+  const handleExportSystemDesign = async () => {
+    setIsExportMenuOpen(false);
+    try {
+      await exportSystemDesignDoc({ projectMeta, nodes });
+      toast.success('系统设计说明导出成功！');
+    } catch (error) {
+      console.error('Export system design error:', error);
+      toast.error('导出系统设计说明失败', {
+        description: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  };
+
+  const handleExportUserManual = async () => {
+    setIsExportMenuOpen(false);
+    try {
+      await exportUserManual({ projectMeta, nodes });
+      toast.success('使用说明书导出成功！');
+    } catch (error) {
+      console.error('Export user manual error:', error);
+      toast.error('导出使用说明书失败', {
+        description: error instanceof Error ? error.message : '未知错误',
+      });
+    }
+  };
+
   const handleExportToMarkdown = async () => {
     setIsExportMenuOpen(false);
     try {
@@ -412,10 +481,43 @@ export function ProjectToolbar() {
               <button
                 type="button"
                 onClick={handleExportToMarkdown}
-                className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white flex items-center gap-2 transition-colors duration-150 focus-ring last:rounded-b-lg"
+                className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white flex items-center gap-2 transition-colors duration-150 focus-ring"
               >
                 <FileCode className="w-4 h-4 shrink-0" />
                 <span>导出 Markdown</span>
+              </button>
+              <div className="border-t border-zinc-700 my-1" aria-hidden />
+              <button
+                type="button"
+                onClick={handleExportSRS}
+                className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white flex items-center gap-2 transition-colors duration-150 focus-ring"
+              >
+                <ClipboardList className="w-4 h-4 shrink-0" />
+                <span>导出需求规格说明书</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleExportTestReport}
+                className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white flex items-center gap-2 transition-colors duration-150 focus-ring"
+              >
+                <TestTube2 className="w-4 h-4 shrink-0" />
+                <span>导出测试报告</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleExportSystemDesign}
+                className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white flex items-center gap-2 transition-colors duration-150 focus-ring"
+              >
+                <Cpu className="w-4 h-4 shrink-0" />
+                <span>导出系统设计说明</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleExportUserManual}
+                className="w-full text-left px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 hover:text-white flex items-center gap-2 transition-colors duration-150 focus-ring last:rounded-b-lg"
+              >
+                <BookMarked className="w-4 h-4 shrink-0" />
+                <span>导出使用说明书</span>
               </button>
             </div>
           )}

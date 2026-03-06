@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Paperclip, X, Send, Loader2, FileText, Image as ImageIcon, Video, Bot, User } from 'lucide-react';
+import { Paperclip, X, Send, Loader2, FileText, Image as ImageIcon, Video, Bot, User, MessageCircle } from 'lucide-react';
 import { useServerAction } from 'zsa-react';
 import { generateGraph } from '@/app/actions/generate-graph';
 import { updateNodeArtifacts, generateUIFromImage, generateUIFromText, generateAnalysisFromCode, type UIGenerationResponse } from '@/app/actions/node-operations';
-import { useCanvasStore } from '@/store/canvas-store';
+import { useCanvasStore, type ConversationMessage } from '@/store/canvas-store';
 import { toast } from 'sonner';
 import { log, logError, logWarn } from '@/lib/logger';
 import { classifyHTMLFile, getClassificationDescription, type HTMLFileClassificationContext } from '@/utils/html-file-classifier';
@@ -55,19 +55,12 @@ function getDefaultUIPrompt(nodeLabel: string): string {
 
 type ViewportPreset = 'mobile' | 'desktop';
 
-/** 对话区消息：用户输入与 AI 回复的展示 */
-export type ChatMessage = {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  status?: 'sending' | 'done' | 'error';
-  attachmentSummary?: string;
-};
-
-const MAX_MESSAGES = 50;
-
-export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<ViewportPreset | null> }) {
-  const { viewportSubmitRef } = props;
+export function CommandBar(props: {
+  viewportSubmitRef?: React.MutableRefObject<ViewportPreset | null>;
+  /** 嵌入右侧常驻对话面板底部时为 true：仅展示建图输入、紧凑布局、不展示编辑模式 UI */
+  embedInPanel?: boolean;
+}) {
+  const { viewportSubmitRef, embedInPanel = false } = props;
   const [prompt, setPrompt] = useState('');
   const [attachment, setAttachment] = useState<FileAttachment | null>(null);
   const [attachments, setAttachments] = useState<FileAttachment[]>([]);
@@ -77,15 +70,42 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
   // 超时覆盖标志：当超时发生时，强制重置所有 loading 状态
   const [isTimeoutOverride, setIsTimeoutOverride] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  /** 对话区消息列表（会话级，不持久化） */
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const conversationEndRef = useRef<HTMLDivElement>(null);
-  const pendingAssistantIdRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const loadingTimersRef = useRef<NodeJS.Timeout[]>([]);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { nodes, selectedNodeId, selectNode, addNodes, addEdges, updateNodeData, layoutNodes, currentTheme, stylePreset, aiConfig, openBlueprint, updateProjectMeta } = useCanvasStore();
+  const {
+    nodes,
+    selectedNodeId,
+    selectNode,
+    addNodes,
+    addEdges,
+    updateNodeData,
+    layoutNodes,
+    currentTheme,
+    stylePreset,
+    aiConfig,
+    openBlueprint,
+    updateProjectMeta,
+    appendConversationMessage,
+    setPendingClarificationContext,
+    setConversationPanelOpen,
+    pendingClarificationContext,
+    pendingClarificationReply,
+    setPendingClarificationReply,
+    updateLastAssistantMessage,
+    setAiCreatePending,
+    setViewportPreset,
+  } = useCanvasStore();
+  /** 最近一次建图请求的入参，用于澄清时再次调用 */
+  const lastCreateInputRef = useRef<{
+    prompt: string;
+    attachmentContent?: string;
+    attachmentType?: string;
+    mimeType?: string;
+    mediaBase64?: string;
+    mediaType?: 'image' | 'video';
+  } | null>(null);
   
   // 获取当前选中的节点
   const selectedNode = selectedNodeId 
@@ -93,7 +113,7 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
     : null;
   
   // 判断是否为编辑模式
-  const isEditMode = selectedNode !== null;
+  const isEditMode = embedInPanel ? false : selectedNode !== null;
 
   // 输入框聚焦状态 - 必须在所有其他 hooks 之前定义
   const [isFocused, setIsFocused] = useState(false);
@@ -115,21 +135,6 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
       textarea.style.height = `${newHeight}px`;
     }
   }, []);
-
-  /** 更新当前「进行中」的助手消息为最终内容 */
-  const updatePendingAssistantMessage = useCallback((content: string, status: 'done' | 'error') => {
-    setMessages((prev) => {
-      const id = pendingAssistantIdRef.current;
-      if (!id) return prev;
-      return prev.map((m) => (m.id === id ? { ...m, content, status } : m));
-    });
-    pendingAssistantIdRef.current = null;
-  }, []);
-
-  /** 新消息时滚到底部 */
-  useEffect(() => {
-    conversationEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
 
   // 创建模式的 action（必须在所有使用它的函数之前定义）
   const { execute: executeCreate, isPending: isCreating } = useServerAction(generateGraph, {
@@ -180,8 +185,39 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
         return;
       }
 
-      // 澄清逻辑已取消：不再根据 clarification_needed 跳转或阻塞，一律按图结构结果处理（无图时由后续空结果逻辑统一处理）
-      const responseData = resultData?.data;
+      // 若服务端返回澄清请求：展示在对话窗口，等待用户选择/输入后再次请求
+      const responseData = resultData?.data ?? resultData;
+      const isClarification = (resultData as any)?.type === 'clarification_needed' || responseData?.type === 'clarification_needed';
+      const clarificationData = (resultData as any)?.data ?? responseData?.data;
+      if (isClarification && clarificationData?.message) {
+        const ctx = lastCreateInputRef.current;
+        if (ctx) {
+          setPendingClarificationContext({
+            initialPrompt: ctx.prompt,
+            attachmentContent: ctx.attachmentContent,
+            attachmentType: ctx.attachmentType,
+            mimeType: ctx.mimeType,
+            mediaBase64: ctx.mediaBase64,
+            mediaType: ctx.mediaType,
+          });
+        }
+        updateLastAssistantMessage(clarificationData.message, 'done', {
+          message: clarificationData.message,
+          question: clarificationData.question ?? '',
+          options: clarificationData.options ?? [],
+          viewportQuestion: clarificationData.viewportQuestion,
+          viewportOptions: clarificationData.viewportOptions,
+        });
+        setConversationPanelOpen(true); // 自动展开对话面板，便于用户看到追问与选项
+        clearLoadingTimers();
+        setIsProcessingVideo(false);
+        setIsTimeoutOverride(false);
+        setProgress(0);
+        setLoadingStep('');
+        toast.info('请补充说明', { description: '在右侧对话面板选择或输入后发送', duration: 4000 });
+        return;
+      }
+
       log('🔍 [CommandBar] 检查返回数据，按图结构处理', {
         hasData: !!responseData,
         dataType: responseData?.type,
@@ -411,7 +447,7 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
       if ((!nodes || !Array.isArray(nodes) || nodes.length === 0) && 
           (!edges || !Array.isArray(edges) || edges.length === 0)) {
         log('⚠️ [CommandBar] 无法生成有效的图结构，可能是输入不够明确，打开项目画像页面');
-        updatePendingAssistantMessage('输入信息不够明确，请在项目画像页面补充详细信息。', 'done');
+        updateLastAssistantMessage('输入信息不够明确，请在项目画像页面补充详细信息。', 'done');
         openBlueprint('profile', {
           description: prompt.trim(),
         });
@@ -445,7 +481,7 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
       const finalNodesCount = useCanvasStore.getState().nodes.length;
       if (finalNodesCount > nodesBeforeAdd) {
         log('🔄 [CommandBar] 节点已成功添加，重置状态');
-        updatePendingAssistantMessage(`已根据描述生成画布并添加 ${nodes?.length ?? 0} 个节点。`, 'done');
+        updateLastAssistantMessage(`已根据描述生成画布并添加 ${nodes?.length ?? 0} 个节点。`, 'done');
         // 移除自动生成UI的逻辑，用户需要手动在节点详情面板中生成UI
         
         setPrompt('');
@@ -464,7 +500,7 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
         }
       } else {
         logError('❌ [CommandBar] 节点添加失败，不重置状态，保留用户输入以便重试');
-        updatePendingAssistantMessage('节点添加失败，请重试。', 'error');
+        updateLastAssistantMessage('节点添加失败，请重试。', 'error');
         // 不清空 prompt 和 attachment，让用户可以重试
         setIsProcessingVideo(false);
         setIsTimeoutOverride(false);
@@ -518,12 +554,57 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
         description: errorMessage,
         duration: 5000,
       });
-      updatePendingAssistantMessage(errorMessage, 'error');
+      updateLastAssistantMessage(errorMessage, 'error');
       setIsProcessingVideo(false);
       setIsTimeoutOverride(false); // 重置超时覆盖标志
       clearLoadingTimers();
     },
   });
+
+  // 澄清回复：用户在选择/输入后由对话窗口设置 pendingClarificationReply，此处带上下文再次请求建图（加锁防双请求）
+  const clarificationSubmitInFlightRef = useRef(false);
+  useEffect(() => {
+    if (clarificationSubmitInFlightRef.current) return;
+    let reply: string | null = null;
+    let ctx: typeof pendingClarificationContext = null;
+    try {
+      const getState = useCanvasStore?.getState;
+      if (typeof getState !== 'function') return;
+      const state = getState();
+      if (!state) return;
+      reply = state.pendingClarificationReply ?? null;
+      ctx = state.pendingClarificationContext ?? null;
+    } catch (e) {
+      logWarn('澄清回复 effect 中 getState 不可用（可能为 SSR 或 store 未挂载）', e);
+      return;
+    }
+    if (!reply || !ctx) return;
+    clarificationSubmitInFlightRef.current = true;
+    setPendingClarificationReply(null);
+    setPendingClarificationContext(null);
+    setAiCreatePending(true);
+    // 从澄清回复中解析视口并写入 store，供后续 UI 生成与预览使用
+    if (/视口[：:]\s*桌面/.test(reply)) setViewportPreset('desktop');
+    else if (/视口[：:]\s*移动/.test(reply)) setViewportPreset('mobile');
+    const enrichedPrompt = `${ctx.initialPrompt}\n\n用户澄清: ${reply}`;
+    executeCreate({
+      prompt: enrichedPrompt,
+      mediaBase64: ctx.mediaBase64,
+      mediaType: ctx.mediaType,
+      attachmentContent: ctx.attachmentContent,
+      attachmentType: ctx.attachmentType as 'media' | 'text' | undefined,
+      mimeType: ctx.mimeType,
+      aiConfig,
+    })
+      .catch((err) => {
+        logError('澄清后再次建图失败', err);
+        updateLastAssistantMessage(err instanceof Error ? err.message : '请求失败，请重试。', 'error');
+      })
+      .finally(() => {
+        clarificationSubmitInFlightRef.current = false;
+        setAiCreatePending(false);
+      });
+  }, [pendingClarificationReply, pendingClarificationContext, aiConfig, executeCreate, setPendingClarificationReply, setPendingClarificationContext, updateLastAssistantMessage, setAiCreatePending, setViewportPreset]);
 
   // Model Relay actions（必须在所有使用它的函数之前定义）
   const { execute: executeUI, isPending: isGeneratingUI } = useServerAction(generateUIFromImage, {
@@ -1319,24 +1400,23 @@ export function CommandBar(props: { viewportSubmitRef?: React.MutableRefObject<V
       return;
     }
 
-    // 对话区：追加用户消息与助手「进行中」占位
+    // 对话区：追加用户消息与助手「进行中」占位（本地 + store，供对话窗口展示）
     const userContent = prompt.trim() || '(无文字)';
     const attachmentSummary = attachments.length > 0 ? `附：${attachments.length} 个文件` : undefined;
-    setMessages((prev) => {
-      const next = [
-        ...prev.slice(-(MAX_MESSAGES - 2)),
-        { id: `user-${Date.now()}`, role: 'user', content: userContent, attachmentSummary },
-      ];
-      const astId = `ast-${Date.now()}`;
-      pendingAssistantIdRef.current = astId;
-      next.push({
-        id: astId,
-        role: 'assistant',
-        content: isEditMode ? '正在生成或更新 UI…' : '正在生成画布…',
-        status: 'sending',
-      });
-      return next;
-    });
+    const userMsg: ConversationMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: userContent,
+      attachmentSummary,
+    };
+    const astMsg: ConversationMessage = {
+      id: `ast-${Date.now()}`,
+      role: 'assistant',
+      content: isEditMode ? '正在生成或更新 UI…' : '正在生成画布…',
+      status: 'sending',
+    };
+    appendConversationMessage(userMsg);
+    appendConversationMessage(astMsg);
 
     // 启动加载步骤动画
     startLoadingSteps();
@@ -1706,7 +1786,7 @@ Generate the complete .tsx code now.`;
 
           setLoadingStep('✅ UI 代码已生成');
           setProgress(100);
-          updatePendingAssistantMessage(`已为「${targetNodeLabel}」更新 UI 代码。`, 'done');
+          updateLastAssistantMessage(`已为「${targetNodeLabel}」更新 UI 代码。`, 'done');
 
           // UI生成成功，提示用户可以手动生成PRD
           toast.success('UI 代码已生成', {
@@ -1783,7 +1863,7 @@ Generate the complete .tsx code now.`;
             log('❌ [CommandBar] UI生成失败（从图片），已清除超时定时器');
           }
           
-          updatePendingAssistantMessage(errorMessage, 'error');
+          updateLastAssistantMessage(errorMessage, 'error');
           if (currentCode && currentCode.length > 0 && currentCode !== '// PLACEHOLDER') {
             toast.warning('UI 生成失败', {
               description: errorMessage,
@@ -2576,7 +2656,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
             log('✅ [CommandBar] UI代码生成成功');
             setLoadingStep('✅ UI代码生成完成');
             setProgress(100);
-            updatePendingAssistantMessage(`已为「${selectedNode.data.label}」生成 UI 代码。`, 'done');
+            updateLastAssistantMessage(`已为「${selectedNode.data.label}」生成 UI 代码。`, 'done');
             const vLabel = vUsed === 'desktop' ? '桌面' : vUsed === 'mobile' ? '移动' : '';
             toast.success('UI代码生成成功', {
               description: `已为"${selectedNode.data.label}"生成UI代码${vLabel ? `（服务端已按${vLabel}视口）` : ''}`,
@@ -2606,7 +2686,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                 return; // 成功生成UI，直接返回
               } else {
                 logWarn('⚠️ [CommandBar] UI代码生成失败或为空');
-                updatePendingAssistantMessage('生成的代码为空，请重试。', 'error');
+                updateLastAssistantMessage('生成的代码为空，请重试。', 'error');
                 toast.warning('UI代码生成失败', {
                   description: '生成的代码为空，请重试',
                   duration: 3000,
@@ -2644,7 +2724,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
           const displayMsg = isNetworkError
             ? '网络连接失败。请确保服务器正在运行 (npm run dev) 并检查网络与防火墙'
             : msg || '未知错误';
-          updatePendingAssistantMessage(displayMsg, 'error');
+          updateLastAssistantMessage(displayMsg, 'error');
           toast.error('UI代码生成失败', {
             description: displayMsg,
             duration: isNetworkError ? 8000 : 5000,
@@ -2862,7 +2942,16 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
         currentNodesCount: nodes.length,
       });
 
+      lastCreateInputRef.current = {
+        prompt: prompt.trim() || '',
+        attachmentContent,
+        attachmentType,
+        mimeType: mimeType,
+        mediaBase64,
+        mediaType,
+      };
       try {
+        setAiCreatePending(true);
         await executeCreate({
           prompt: prompt.trim() || '',
           mediaBase64,
@@ -2886,6 +2975,8 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
         clearLoadingTimers();
         setProgress(0);
         setLoadingStep('');
+      } finally {
+        setAiCreatePending(false);
       }
     }
   };
@@ -2945,65 +3036,34 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
       ? '👀 扫描构建'
       : '生成');
 
+  const waitingClarification = Boolean(pendingClarificationContext && !isEditMode);
+
   return (
-    <div 
+    <div
       data-command-bar
-      className="w-full pointer-events-auto flex flex-col max-h-[50vh]"
+      className={
+        embedInPanel
+          ? 'w-full pointer-events-auto flex flex-col border-t border-zinc-800'
+          : 'w-full pointer-events-auto flex flex-col max-h-[50vh]'
+      }
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
-
-      {/* 对话区：用户消息 + AI 回复 */}
-      <div
-        className="flex-shrink-0 border-b border-zinc-800 bg-zinc-900/50 py-3 px-4 max-h-[280px] overflow-y-auto overscroll-contain"
-        role="log"
-        aria-live="polite"
-        aria-label="对话记录"
-      >
-        {messages.length === 0 ? (
-          <p className="text-zinc-500 text-sm">在这里会显示你的输入与 AI 的回复</p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {messages.map((m) => (
-              <div
-                key={m.id}
-                className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`flex items-start gap-2 max-w-[85%] ${
-                    m.role === 'user'
-                      ? 'bg-cyan-500/20 border border-cyan-500/30 rounded-lg px-3 py-2'
-                      : 'bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2'
-                  } ${m.status === 'error' ? 'border-red-500/50 text-red-300' : ''}`}
-                  aria-busy={m.status === 'sending'}
-                >
-                  {m.role === 'assistant' && (
-                    m.status === 'sending' ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-cyan-400 flex-shrink-0 mt-0.5" aria-hidden />
-                    ) : (
-                      <Bot className="w-4 h-4 text-zinc-400 flex-shrink-0 mt-0.5" aria-hidden />
-                    )
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-sm text-zinc-100 break-words whitespace-pre-wrap">{m.content}</p>
-                    {m.role === 'user' && m.attachmentSummary && (
-                      <p className="text-xs text-zinc-500 mt-1">{m.attachmentSummary}</p>
-                    )}
-                  </div>
-                  {m.role === 'user' && (
-                    <User className="w-4 h-4 text-cyan-400 flex-shrink-0 mt-0.5" aria-hidden />
-                  )}
-                </div>
-              </div>
-            ))}
-            <div ref={conversationEndRef} />
-          </div>
-        )}
-      </div>
+      {/* 等待澄清时：明确引导在面板内选择或输入 */}
+      {waitingClarification && (
+        <div
+          className="flex-shrink-0 flex items-center justify-center gap-2 px-3 py-2 bg-cyan-500/15 border-b border-cyan-500/30 text-cyan-200 text-xs"
+          role="status"
+          aria-live="polite"
+        >
+          <MessageCircle className="w-3.5 h-3.5 flex-shrink-0 text-cyan-400" />
+          <span>AI 在等你补充说明，请在上方选择或输入后发送</span>
+        </div>
+      )}
 
       {/* 附件预览（如果有） */}
       {attachments.length > 0 && (
-        <div className="mb-2 flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto">
+        <div className={embedInPanel ? 'mb-1.5 flex flex-wrap items-center gap-2 px-2' : 'mb-2 flex flex-wrap items-center justify-center gap-2 max-w-3xl mx-auto'}>
           {attachments.map((att, index) => {
             // 判断文件类型并返回对应的图标颜色
             const getFileIcon = () => {
@@ -3090,8 +3150,8 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
         </div>
       )}
 
-      {/* 编辑模式提示：当前编辑的节点 */}
-      {isEditMode && selectedNode && (
+      {/* 编辑模式提示：当前编辑的节点（嵌入面板时不显示） */}
+      {!embedInPanel && isEditMode && selectedNode && (
         <div className="mb-2 flex justify-center">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-400">
             <span>编辑中：{selectedNode.data.label}</span>
@@ -3103,7 +3163,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
       <div className="w-full">
         {/* 进度条 - 统一视觉语言 */}
         {isLoading && (
-          <div className="mb-3 w-full max-w-2xl mx-auto">
+          <div className={embedInPanel ? 'mb-2 w-full px-2' : 'mb-3 w-full max-w-2xl mx-auto'}>
             <div className="h-1 bg-zinc-900/50 rounded-full overflow-hidden">
               <div
                 className="h-full bg-cyan-500 transition-all duration-300"
@@ -3119,10 +3179,12 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
         )}
 
         {/* 主表单容器 - 统一视觉语言 */}
-        <div className="w-full max-w-2xl mx-auto">
+        <div className={embedInPanel ? 'w-full px-2 pb-2' : 'w-full max-w-2xl mx-auto'}>
           <form
             onSubmit={handleSubmit}
-            className={`relative flex items-center gap-3 bg-zinc-900/95 backdrop-blur-xl border rounded-xl px-6 py-4 shadow-2xl transition-all ${
+            className={`relative flex items-center gap-2 bg-zinc-900/95 backdrop-blur-xl border rounded-xl transition-all ${
+              embedInPanel ? 'px-3 py-2.5 border-zinc-800' : 'px-6 py-4 shadow-2xl'
+            } ${
               isFocused 
                 ? 'border-cyan-500/50 shadow-[0_0_20px_rgba(6,182,212,0.15)]' 
                 : isDragging
@@ -3247,12 +3309,14 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
               onClick={handleAttachClick}
               onMouseDown={(e) => e.stopPropagation()}
               disabled={isLoading}
-              className="p-2.5 text-zinc-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 self-center"
+              className={`text-zinc-400 hover:text-cyan-400 hover:bg-cyan-500/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 self-center ${
+                embedInPanel ? 'p-2' : 'p-2.5'
+              }`}
               style={{ pointerEvents: 'auto' }}
               title="上传文件"
               aria-label="上传文件"
             >
-              <Paperclip className="w-5 h-5" />
+              <Paperclip className={embedInPanel ? 'w-4 h-4' : 'w-5 h-5'} />
             </button>
 
             {/* 输入框 */}
@@ -3282,13 +3346,19 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
               }}
               onClick={(e) => e.stopPropagation()}
               placeholder={
-                isEditMode && selectedNode
+                waitingClarification
+                  ? (embedInPanel ? '请在上方选择或输入后发送' : '请在右侧对话窗口选择或输入后发送')
+                  : isEditMode && selectedNode
                   ? `编辑 ${selectedNode.data.label}...`
+                  : embedInPanel
+                  ? '描述产品想法，或拖拽文件到这里'
                   : '描述你的想法，或拖拽文件到这里'
               }
-              className="flex-1 bg-transparent text-zinc-100 placeholder-zinc-500 outline-none text-base resize-none overflow-y-auto py-2.5 min-h-[60px] max-h-[200px] leading-relaxed"
+              className={`flex-1 bg-transparent text-zinc-100 placeholder-zinc-500 outline-none resize-none overflow-y-auto leading-relaxed ${
+                embedInPanel ? 'text-sm py-2 min-h-[44px] max-h-[120px]' : 'text-base py-2.5 min-h-[60px] max-h-[200px]'
+              }`}
               style={{ pointerEvents: 'auto' }}
-              disabled={isLoading}
+              disabled={isLoading || waitingClarification}
               rows={1}
             />
 
@@ -3298,20 +3368,23 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
               data-testid="command-send"
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              disabled={!hasContent || isLoading}
+              disabled={!hasContent || isLoading || waitingClarification}
               title={
-                !hasContent 
-                  ? "请输入内容或上传文件" 
-                  : isLoading 
-                  ? "正在处理中..." 
-                  : isEditMode 
-                  ? "更新当前节点" 
+                waitingClarification
+                  ? (embedInPanel ? "请先在上方选择或输入后发送" : "请先在右侧对话窗口选择或输入后发送")
+                  : !hasContent
+                  ? "请输入内容或上传文件"
+                  : isLoading
+                  ? "正在处理中..."
+                  : isEditMode
+                  ? "更新当前节点"
                   : "生成新的节点和连接"
               }
               className={`
-                p-3 rounded-lg transition-all flex items-center justify-center flex-shrink-0 self-center
+                rounded-lg transition-all flex items-center justify-center flex-shrink-0 self-center
+                ${embedInPanel ? 'p-2' : 'p-3'}
                 ${
-                  hasContent && !isLoading
+                  hasContent && !isLoading && !waitingClarification
                     ? 'bg-cyan-500 hover:bg-cyan-400 text-white cursor-pointer shadow-lg hover:shadow-xl active:scale-95'
                     : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
                 }
@@ -3319,15 +3392,16 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
               style={{ pointerEvents: 'auto' }}
             >
               {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className={embedInPanel ? 'w-4 h-4 animate-spin' : 'w-5 h-5 animate-spin'} />
               ) : (
-                <Send className="w-5 h-5" />
+                <Send className={embedInPanel ? 'w-4 h-4' : 'w-5 h-5'} />
               )}
             </button>
           </form>
         </div>
 
       </div>
+
     </div>
   );
 }

@@ -430,6 +430,15 @@ Generate appropriate scenarios based on the detected domain.`;
     question: z.string().describe('引导用户提供更多信息的问题'),
   });
 
+  // 视口（移动/桌面）为首次建图必澄清项，由后端固定返回，不交给 LLM 生成
+  const VIEWPORT_CLARIFICATION = {
+    viewportQuestion: '请选择使用设备类型',
+    viewportOptions: [
+      { id: 'mobile', label: '移动端', desc: '手机、平板等小屏', example: '触控优先、单列布局、底部导航' },
+      { id: 'desktop', label: '桌面端', desc: 'PC、笔记本等大屏', example: '多栏布局、侧边导航、复杂表单' },
+    ],
+  } as const;
+
   // Use unified LLM gateway
   const result = await callObject({
     model: textModel,
@@ -458,7 +467,11 @@ Generate appropriate scenarios based on the detected domain.`;
 
   return {
     type: 'clarification_needed' as const,
-    data: clarificationData,
+    data: {
+      ...clarificationData,
+      viewportQuestion: VIEWPORT_CLARIFICATION.viewportQuestion,
+      viewportOptions: VIEWPORT_CLARIFICATION.viewportOptions,
+    },
   };
 }
 
@@ -504,6 +517,36 @@ export const generateGraph = createServerAction()
     }
     if (input.mediaBase64) {
       userPrompt += `\n\n注意：用户上传了${input.mediaType === 'image' ? '图片' : '视频'}文件，请结合图片/视频内容进行分析。`;
+    }
+
+    // 可选：输入模糊时先返回澄清请求，供前端对话窗口展示并收集用户回复后再重试
+    const clarityAnalysis = await analyzeInputClarity(
+      input.prompt,
+      textModel,
+      input.aiConfig,
+      input.attachmentContent,
+      input.mediaBase64,
+      input.mediaType
+    );
+    const hasMediaOrAttachment = !!(input.attachmentContent || input.mediaBase64);
+    if (clarityAnalysis.isVague && clarityAnalysis.confidence < 60) {
+      const clarificationResult = await generateClarificationRequest(
+        clarityAnalysis,
+        textModel,
+        hasMediaOrAttachment
+      );
+      if (clarificationResult && typeof clarificationResult === 'object' && 'type' in clarificationResult && clarificationResult.type === 'clarification_needed') {
+        log('📋 [generateGraph] 输入较模糊，返回澄清请求', {
+          requestId,
+          confidence: clarityAnalysis.confidence,
+          optionsCount: (clarificationResult as any).data?.options?.length ?? 0,
+        });
+        return {
+          type: 'clarification_needed',
+          data: (clarificationResult as any).data,
+        };
+      }
+      // 若生成澄清失败（如 API 错误），继续走图生成
     }
 
     // 构建系统提示词（产品信息架构师 + 用户流程 + 业务事件建模，支持澄清/图/SingleCall 三种输出）
