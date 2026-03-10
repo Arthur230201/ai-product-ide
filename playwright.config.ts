@@ -10,6 +10,8 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
+    // 固定视口，避免小窗口导致工具栏/下拉菜单被裁切、点击「滚动到可见」失败（如 Cursor 内嵌浏览器约 300x408）
+    viewport: { width: 1280, height: 800 },
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {

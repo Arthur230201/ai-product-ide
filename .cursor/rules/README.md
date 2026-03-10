@@ -26,6 +26,7 @@
 | **ADR.mdc** | 架构决策记录 | 适用于 `**/*.md`、`**/*.ts` 等 |
 | **development-journal.mdc** | 进度、Todo、自动化记录 | 按需 |
 | **audit.mdc** | 递归审计、模式学习、修复策略 | 按需 |
+| **harness-engineering.mdc** | Harness Engineering：AGENTS.md 即目录、docs 结构化、架构约束、人机分工（见 docs/HARNESS_ENGINEERING_TEMPLATE.md） | `alwaysApply: true`，全项目生效 |
 | **terminal.mdc** | 终端命令模式：结构化输出、幂等、安全读写、Git/包管理、缓存与重试 | 按需 |
 | **tailwind-css-v4.mdc** | Tailwind v4：CSS-first 配置、@theme、容器查询、新 utility/variant、Breaking 对照 | 适用于 `**/*.{tsx,ts,jsx,js,css}` |
 | **frontend-react-next.mdc** | React/Next/TS：函数组件、Shadcn/Radix、Tailwind、RSC、Server Actions、错误与表单 | 适用于 `**/*.tsx`、`**/components/**`、`**/app/**` |

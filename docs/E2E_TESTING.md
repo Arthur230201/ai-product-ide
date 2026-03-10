@@ -55,6 +55,14 @@ npm run ui:selfcheck
 3. 验证每个阶段的HTML约束
 4. 验证结构稳定性（Stage 2保留component IDs）
 
+### 视口与导出类测试（彻底避免小视口限制）
+
+Playwright 在 `playwright.config.ts` 中**固定视口为 1280×800**，避免小窗口下工具栏/下拉菜单被裁切、导致「滚动到可见」失败或点击不到菜单项。
+
+- **导出使用说明书**：`npx playwright test e2e/export-user-manual.spec.ts`  
+  会打开首页 → 点击「导出 PRD 文档」→ 点击「导出使用说明书」，并校验下载或成功 toast。
+- 若在 **Cursor 内嵌浏览器**（MCP）中跑自动化，视口由 Cursor 控制且偏小，导出类操作可能失败；**建议导出相关验证用本地 Playwright（`npm run e2e` 或上述单测）执行**，可彻底规避视口限制。
+
 ## 测试选择器
 
 所有关键UI元素都添加了 `data-testid` 属性：
