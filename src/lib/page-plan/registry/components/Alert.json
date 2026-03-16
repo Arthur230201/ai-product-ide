@@ -1,0 +1,6 @@
+{
+  "name": "Alert",
+  "props": { "variant": ["default", "destructive"] },
+  "do": ["Error state must include Retry button data-action"],
+  "dont": []
+}

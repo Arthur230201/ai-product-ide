@@ -1,0 +1,6 @@
+{
+  "name": "Skeleton",
+  "props": { "shape": ["rect", "circle", "text"] },
+  "do": ["Use in loadingState section"],
+  "dont": []
+}

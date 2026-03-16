@@ -1,0 +1,18 @@
+{
+  "templateId": "detail",
+  "defaultDensity": "comfortable",
+  "allowedSections": ["header", "summary", "content", "states", "footer"],
+  "requiredSections": ["header", "summary", "states"],
+  "ctaRules": {
+    "primaryCtaLocation": "header_right",
+    "secondaryCtaLocation": "header_left"
+  },
+  "stateRules": {
+    "requireLoading": true,
+    "requireEmpty": false,
+    "requireError": true
+  },
+  "layoutRules": {
+    "requireBackNav": true
+  }
+}

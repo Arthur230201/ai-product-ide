@@ -1,0 +1,35 @@
+{
+  "templateId": "list_detail_split",
+  "defaultDensity": "comfortable",
+  "allowedSections": ["header", "filterBar", "results", "summary", "content", "states", "footer"],
+  "requiredSections": ["header", "results", "summary", "states"],
+  "maxComponentsPerSection": {
+    "header": 4,
+    "filterBar": 5,
+    "results": 3,
+    "summary": 4,
+    "content": 4,
+    "states": 3,
+    "footer": 2
+  },
+  "ctaRules": {
+    "primaryCtaLocation": "header_right",
+    "secondaryCtaLocation": "summary_right"
+  },
+  "stateRules": {
+    "requireLoading": true,
+    "requireEmpty": true,
+    "requireError": true
+  },
+  "bindingRequirements": {
+    "view": {
+      "minPrimaryDataQueries": 1,
+      "requireResultsDataBinding": true,
+      "requireSelectionToDetailNav": true
+    }
+  },
+  "layoutRules": {
+    "twoPaneLayout": true,
+    "resultsSelectionUpdatesDetail": true
+  }
+}

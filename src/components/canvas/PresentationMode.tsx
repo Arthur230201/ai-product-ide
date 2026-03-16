@@ -8,9 +8,8 @@ import type { FractalNode } from '@/types/fractal';
 import { LivePreview } from './LivePreview';
 import { SpecViewer } from './SpecViewer';
 import { DemoRouter } from '@/utils/demo-router';
-import { HtmlSandbox } from './HtmlSandbox';
+import { HtmlPreviewSurface } from '@/components/html-preview/HtmlPreviewSurface';
 import { isHTMLContent } from '@/utils/html-rationalizer';
-import { buildInjectorScript } from '@/lib/ui/injector';
 import { toast } from 'sonner';
 import { clsx } from 'clsx';
 import { selectNavigationEdge } from '@/lib/navigation/edge-navigator';
@@ -525,55 +524,32 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
                             </div>
                           ) : isHTML ? (
                             <div className="w-full h-full">
-                              <HtmlSandbox
-                                html={artifacts.view.code}
-                                mode="preview"
-                                injectorScript={buildInjectorScript({})}
-                                heightMode="device"
+                              <HtmlPreviewSurface
+                                rawHtml={artifacts.view.code}
                                 className="w-full h-full"
-                                onMessage={(msg) => {
-                                  if (msg.type === 'READY') {
-                                    handleIframeReady();
-                                  } else if (msg.type === 'NAV') {
-                                    // Handle navigation from injector
-                                    const navTarget = msg.to;
-                                    if (navTarget) {
-                                      // Try to find node by title or ID
-                                      const targetNode = nodes.find(n => 
-                                        n.data.label === navTarget || 
-                                        n.id === navTarget ||
-                                        n.data.artifacts?.spec?.title === navTarget
-                                      );
-                                      
-                                      if (targetNode) {
-                                        setCurrentSlideNodeId(targetNode.id);
-                                        // Add to navigation history
-                                        if (currentSlideNodeId) {
-                                          navigationHistoryRef.current.push(currentSlideNodeId);
-                                        }
-                                      } else {
-                                        // Try to use DemoRouter if available
-                                        if (demoRouterRef.current) {
-                                          // DemoRouter will handle navigation
-                                          console.log('[PresentationMode] Navigation via DemoRouter:', navTarget);
-                                        } else {
-                                          toast.warning('导航目标未找到', {
-                                            description: `无法找到节点: ${navTarget}`,
-                                            duration: 2000,
-                                          });
-                                        }
-                                      }
+                                onReady={handleIframeReady}
+                                onNav={(navTarget) => {
+                                  const targetNode = nodes.find(
+                                    (n) =>
+                                      n.data?.label === navTarget ||
+                                      n.id === navTarget ||
+                                      n.data?.artifacts?.spec?.title === navTarget
+                                  );
+                                  if (targetNode) {
+                                    if (currentSlideNodeId) {
+                                      navigationHistoryRef.current.push(currentSlideNodeId);
                                     }
+                                    setCurrentSlideNodeId(targetNode.id);
+                                  } else if (demoRouterRef.current?.navigateTo) {
+                                    demoRouterRef.current.navigateTo(navTarget);
+                                  } else {
+                                    toast.warning('导航目标未找到', {
+                                      description: `无法找到节点: ${navTarget}`,
+                                      duration: 2000,
+                                    });
                                   }
                                 }}
-                                ref={(ref) => {
-                                  if (ref && ref.getIframe) {
-                                    const iframe = ref.getIframe();
-                                    if (iframe) {
-                                      (iframeRef as React.MutableRefObject<HTMLIFrameElement | null>).current = iframe;
-                                    }
-                                  }
-                                }}
+                                iframeRef={iframeRef as React.RefObject<HTMLIFrameElement>}
                               />
                             </div>
                           ) : (

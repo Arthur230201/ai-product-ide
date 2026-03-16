@@ -1,0 +1,6 @@
+{
+  "name": "Radio",
+  "props": {},
+  "do": ["Group with same name"],
+  "dont": []
+}

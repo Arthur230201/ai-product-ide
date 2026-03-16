@@ -1,0 +1,6 @@
+{
+  "name": "Textarea",
+  "props": { "rows": ["3", "4", "6"] },
+  "do": ["Use name or data-bind for injector"],
+  "dont": ["No rawHtml"]
+}

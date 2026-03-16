@@ -5,9 +5,8 @@ import * as Recharts from 'recharts';
 import * as PreviewUI from '@/components/preview-ui';
 import { UniversalHtmlRenderer } from './UniversalHtmlRenderer';
 import { HtmlSandboxRenderer } from './HtmlSandboxRenderer';
-import { HtmlSandbox } from './HtmlSandbox';
+import { HtmlPreviewSurface } from '@/components/html-preview/HtmlPreviewSurface';
 import { isHTMLContent } from '@/utils/html-rationalizer';
-import { buildInjectorScript } from '@/lib/ui/injector';
 import { preview } from '@/lib/safe/preview';
 import { PreviewFrame } from './PreviewFrame';
 import { PC_VIEWPORT_WIDTH, PC_VIEWPORT_HEIGHT, MOBILE_VIEWPORT_WIDTH, MOBILE_VIEWPORT_HEIGHT } from '@/lib/viewport-constants';
@@ -737,30 +736,15 @@ export const LivePreview = ({
     </div>
   ) : null;
 
-  // HTML-First Architecture: Render HTML as-is in sandbox, no React conversion
+  // HTML-First: 统一经 HtmlPreviewSurface → prepareHtmlForDisplay → HtmlSandboxRenderer（单一展示路径）
   if (isHTMLCode) {
-    // Use HtmlSandbox for HTML-first architecture
-    // This preserves all original behavior (Tailwind, styles, scroll, positioning)
-    // Uses srcDoc and minimal sandbox permissions
-    // Inject behavior injector script for data-* driven interactions
-    const injectorScript = buildInjectorScript({});
-    
     return (
       <div className="relative w-full h-full">
         {debugStrip}
-        <HtmlSandbox
-          html={code}
-          mode="preview"
-          injectorScript={injectorScript}
-          heightMode={isMobile ? 'device' : 'auto'}
+        <HtmlPreviewSurface
+          rawHtml={code}
           className="w-full h-full"
-          onMessage={(msg) => {
-            // Handle navigation events from iframe
-            if (msg.type === 'NAV') {
-              console.log('[LivePreview] Navigation event:', msg.to);
-              // Navigation is handled by PresentationMode or parent component
-            }
-          }}
+          onNav={onNavigateToNode}
         />
       </div>
     );

@@ -6,21 +6,21 @@
 
 | 项 | 值 |
 | --- | --- |
-| 生成时间 | 2026-03-05T05:26:18.723Z |
-| 节点名称 | 个人中心 |
+| 生成时间 | 2026-03-14T15:28:25.308Z |
+| 节点名称 | 首页 |
 | 视口 | desktop |
 | flex-1 | true |
 | <main> | true |
-| ListItem 数量 | 0 |
-| Card 数量 | 9 |
+| ListItem 数量 | 2 |
+| Card 数量 | 4 |
 | NavBar | false |
 | AppBar | true |
-| 根 flex-col | true |
+| 根 flex-col | false |
 
 ### 发给模型的页面描述（pageDescription）
 
 
-页面：个人中心。页面描述：展示用户资料、历史记录入口、设置等基础信息。。作为用户，查看个人基础信息，以便确认个人资料与偏好设置。作为用户，查看个人基础信息，以便确认个人资料与偏好设置。验收标准：可见用户名；可见设置入口
+页面：首页。页面描述：应用入口，展示部分推荐新闻与入口导航。。作为用户，进入应用，以便快速看到推荐新闻。作为用户，进入应用，以便快速看到推荐新闻。验收标准：可看到推荐区；可进入新闻列表
 
 
 ---
@@ -28,552 +28,994 @@
 ## 代码（复制下方整块到可运行 React+Tailwind 环境对比）
 
 ```tsx
-export default function App() {
-  const profile = {
-    name: "林若曦",
-    role: "高级产品运营 · UO",
-    dept: "增长与用户运营中心",
-    city: "上海",
-    email: "ruoxi.lin@company.com",
-    phone: "138-****-2196",
-    joinedAt: "2023-04-18",
-    status: "在职",
-    bio: "负责增长策略、用户分层与生命周期运营，关注数据闭环与体验一致性。",
-  };
-
-  const uoMetrics = [
-    { title: "本周新增激活用户", value: "12,480", delta: "+8.6%", tone: "cyan" },
-    { title: "7 日留存率", value: "34.2%", delta: "+1.9%", tone: "emerald" },
-    { title: "转化漏斗完成率", value: "6.8%", delta: "+0.4%", tone: "cyan" },
-    { title: "NPS（近 30 天）", value: "42", delta: "+3", tone: "emerald" },
-  ];
-
-  const uoProjects = [
+export default function Page() {
+  const news = [
     {
-      name: "新用户引导 2.0（A/B）",
-      owner: "林若曦",
-      status: "进行中",
-      progress: 62,
-      lastUpdate: "2026-03-03 17:20",
-      desc: "优化首登路径与关键触达点，降低跳失并提升激活率。",
-      tags: ["A/B", "新手引导", "激活"],
-      priority: "高",
+      id: "n-20260314-01",
+      title: "AI 时代的个人隐私保护：你需要立刻检查的 7 个设置",
+      summary:
+        "从系统权限到浏览器指纹，这份清单帮你在 10 分钟内完成核心自查，避免“默认授权”带来的隐患。",
+      channel: "科技前沿",
+      time: "今天 09:20",
+      readTime: "5 分钟",
+      heat: 92,
+      tag: "必读",
+      source: "TechWave",
     },
     {
-      name: "会员续费唤醒策略",
-      owner: "林若曦",
-      status: "待上线",
-      progress: 86,
-      lastUpdate: "2026-03-01 10:05",
-      desc: "基于用户分层与权益偏好，制定多通道唤醒与优惠梯度。",
-      tags: ["CRM", "分层", "续费"],
-      priority: "中",
+      id: "n-20260314-02",
+      title: "本周市场观察：消费电子回暖，供应链价格出现拐点",
+      summary:
+        "多家上游厂商释放产能恢复信号，关键原材料价格波动收敛；机构建议关注二季度需求修复。",
+      channel: "财经",
+      time: "今天 08:10",
+      readTime: "6 分钟",
+      heat: 86,
+      tag: "热度",
+      source: "星辰财经",
     },
     {
-      name: "增长看板口径统一",
-      owner: "张启明",
-      status: "已完成",
-      progress: 100,
-      lastUpdate: "2026-02-25 19:44",
-      desc: "统一 DAU/激活/留存等指标口径与数据源，减少跨部门对齐成本。",
-      tags: ["数据治理", "指标", "看板"],
-      priority: "中",
+      id: "n-20260313-03",
+      title: "城市通勤报告：地铁拥挤度下降，但换乘效率差异拉大",
+      summary:
+        "基于一线城市 30 天出行数据，早高峰拥挤度整体下降 8%，但跨线换乘等待时间差距最高达 2.4 倍。",
+      channel: "生活方式",
+      time: "昨天 18:45",
+      readTime: "4 分钟",
+      heat: 79,
+      tag: "趋势",
+      source: "城市研究所",
     },
     {
-      name: "Push 触达节奏优化",
-      owner: "许雅雯",
-      status: "进行中",
-      progress: 38,
-      lastUpdate: "2026-03-04 09:10",
-      desc: "基于频控与兴趣画像，提升打开率并降低退订率。",
-      tags: ["Push", "频控", "画像"],
-      priority: "高",
+      id: "n-20260313-04",
+      title: "开发者手记：如何用一套规范把前端性能指标落地到日常迭代",
+      summary:
+        "从 LCP/INP 到资源分层与回归机制，给出可复制的周迭代流程与指标看板结构。",
+      channel: "产品与研发",
+      time: "昨天 16:05",
+      readTime: "8 分钟",
+      heat: 74,
+      tag: "实战",
+      source: "工程笔记",
     },
     {
-      name: "流失预警模型联调",
-      owner: "周远航",
-      status: "阻塞",
-      progress: 21,
-      lastUpdate: "2026-03-02 14:32",
-      desc: "与数据团队联调特征与阈值策略，当前受限于埋点缺失与延迟。",
-      tags: ["模型", "预警", "埋点"],
-      priority: "高",
+      id: "n-20260312-05",
+      title: "健康科普：睡眠质量与咖啡因代谢的关系，被忽略的时间窗口",
+      summary:
+        "并不是“别喝太晚”那么简单。不同代谢速度的人群，建议把最后一杯咖啡的时间提前到不同的节点。",
+      channel: "健康",
+      time: "03-12 21:30",
+      readTime: "5 分钟",
+      heat: 68,
+      tag: "科普",
+      source: "新知健康",
     },
     {
-      name: "渠道投放归因复盘",
-      owner: "陈思齐",
-      status: "待排期",
-      progress: 12,
-      lastUpdate: "2026-03-04 16:18",
-      desc: "补齐多触点归因与成本口径，输出可执行的投放优化建议。",
-      tags: ["归因", "投放", "ROI"],
-      priority: "低",
+      id: "n-20260312-06",
+      title: "摄影入门：同一张照片，如何用 3 步把氛围感做出来",
+      summary:
+        "从构图留白、色彩对比到局部提亮，给出适合手机后期的轻量处理方法。",
+      channel: "兴趣",
+      time: "03-12 14:10",
+      readTime: "3 分钟",
+      heat: 63,
+      tag: "教程",
+      source: "光影实验室",
     },
   ];
 
-  const uoTasks = [
+  const quickEntrances = [
     {
-      title: "完善新手任务链路埋点",
-      status: "处理中",
-      due: "2026-03-07",
-      owner: "数据分析-郑思远",
-      note: "补齐 step_start/step_complete，校验事件延迟 < 3min。",
+      id: "e-01",
+      title: "新闻列表",
+      desc: "进入全部频道与筛选",
+      pill: "推荐入口",
+      color: "from-violet-400/40 to-indigo-400/30",
     },
     {
-      title: "会员续费唤醒短信模板评审",
-      status: "待评审",
-      due: "2026-03-06",
-      owner: "品牌法务-刘颖",
-      note: "重点核对权益文案与优惠期限描述。",
+      id: "e-02",
+      title: "热点追踪",
+      desc: "查看今日热度榜",
+      pill: "趋势",
+      color: "from-fuchsia-400/35 to-violet-400/25",
     },
     {
-      title: "Push 频控策略灰度参数确认",
-      status: "待确认",
-      due: "2026-03-05",
-      owner: "客户端-梁一鸣",
-      note: "按人群设置 1/3/7 天窗口，支持紧急消息白名单。",
+      id: "e-03",
+      title: "订阅管理",
+      desc: "配置频道与关键词",
+      pill: "个性化",
+      color: "from-indigo-400/35 to-sky-400/20",
     },
     {
-      title: "增长看板指标口径对齐会",
-      status: "已完成",
-      due: "2026-03-01",
-      owner: "数据平台-杨澈",
-      note: "对齐 DAU、激活、留存口径与数据源，形成 PRD 附录。",
-    },
-    {
-      title: "流失预警模型特征清单补充",
-      status: "阻塞",
-      due: "2026-03-08",
-      owner: "算法-韩亦辰",
-      note: "缺少支付失败与客服接触特征，等待数据侧补表。",
+      id: "e-04",
+      title: "离线阅读",
+      desc: "缓存通勤必读内容",
+      pill: "效率",
+      color: "from-violet-400/30 to-purple-400/25",
     },
   ];
 
-  const statusBadge = (status: string) => {
-    const base = "border rounded px-2 py-0.5 text-xs";
-    if (status === "进行中")
-      return (
-        <Badge className={cn(base, "bg-cyan-500/15 text-cyan-300 border-cyan-500/30")}>
-          {status}
-        </Badge>
-      );
-    if (status === "待上线" || status === "待排期" || status === "待评审" || status === "待确认")
-      return (
-        <Badge className={cn(base, "bg-emerald-500/15 text-emerald-300 border-emerald-500/30")}>
-          {status}
-        </Badge>
-      );
-    if (status === "已完成")
-      return (
-        <Badge className={cn(base, "bg-slate-700/40 text-slate-200 border-slate-600")}>
-          {status}
-        </Badge>
-      );
-    if (status === "阻塞")
-      return (
-        <Badge className={cn(base, "bg-slate-950 text-slate-100 border-cyan-500/40")}>
-          {status}
-        </Badge>
-      );
-    return (
-      <Badge className={cn(base, "bg-slate-700/30 text-slate-200 border-slate-600")}>
-        {status}
-      </Badge>
-    );
-  };
+  const channels = [
+    { id: "c-all", name: "全部", count: 128 },
+    { id: "c-tech", name: "科技前沿", count: 34 },
+    { id: "c-fin", name: "财经", count: 26 },
+    { id: "c-life", name: "生活方式", count: 22 },
+    { id: "c-dev", name: "产品与研发", count: 18 },
+    { id: "c-health", name: "健康", count: 16 },
+    { id: "c-hobby", name: "兴趣", count: 12 },
+  ];
 
-  const priorityBadge = (p: string) => {
-    const base = "border rounded px-2 py-0.5 text-xs";
-    if (p === "高")
-      return (
-        <Badge className={cn(base, "bg-cyan-500/15 text-cyan-300 border-cyan-500/30")}>P0</Badge>
-      );
-    if (p === "中")
-      return (
-        <Badge className={cn(base, "bg-emerald-500/15 text-emerald-300 border-emerald-500/30")}>P1</Badge>
-      );
-    return (
-      <Badge className={cn(base, "bg-slate-700/40 text-slate-200 border-slate-600")}>P2</Badge>
-    );
-  };
+  const notifications = [
+    {
+      id: "m1",
+      title: "为你更新：隐私保护清单",
+      meta: "已根据你关注的「科技前沿」更新",
+      time: "今天 09:25",
+      tone: "info",
+    },
+    {
+      id: "m2",
+      title: "热点提醒：消费电子回暖",
+      meta: "热度进入前 10，建议关注后续跟进",
+      time: "今天 08:15",
+      tone: "warn",
+    },
+    {
+      id: "m3",
+      title: "订阅建议：新增关键词「供应链」",
+      meta: "近期与你阅读偏好高度匹配",
+      time: "昨天 20:40",
+      tone: "success",
+    },
+  ];
 
-  const MetricCard = ({ item }: any) => (
-    <Card className="bg-slate-800/80 border border-cyan-500/20 shadow-lg rounded">
-      <CardHeader className="p-2">
-        <CardTitle className="text-sm font-medium text-slate-200">{item.title}</CardTitle>
-      </CardHeader>
-      <CardContent className="p-2 pt-0">
-        <div className="flex items-end justify-between gap-2">
-          <div className="text-2xl font-bold text-slate-100">{item.value}</div>
-          <div
-            className={cn(
-              "text-sm font-medium",
-              item.tone === "emerald" ? "text-emerald-300" : "text-cyan-300"
-            )}
-          >
-            {item.delta}
-          </div>
-        </div>
-        <div className="mt-2">
-          <Progress value={item.tone === "emerald" ? 68 : 58} />
-        </div>
-      </CardContent>
-    </Card>
-  );
+  const trend = [
+    { label: "今日推荐", value: 18, hint: "基于阅读偏好与热度综合" },
+    { label: "你关注的频道", value: 6, hint: "科技/财经/研发等" },
+    { label: "待读清单", value: 9, hint: "已收藏，未阅读" },
+    { label: "本周阅读时长", value: "2h 35m", hint: "同比 +12%" },
+  ];
+
+  const heatMax = 100;
 
   return (
-    <div className={cn("flex flex-col h-full min-h-full bg-slate-900")}>
-      <AppBar
-        title="个人中心"
-        className="bg-slate-950 border-b border-slate-700"
-        right={
-          <div className="flex items-center gap-2">
-            <Button className="rounded shadow bg-cyan-500 text-white hover:bg-cyan-600 min-h-[36px] px-3">
-              生成 UO 报告
-            </Button>
-            <Button
-              variant="outline"
-              className="rounded shadow border border-slate-700 bg-slate-900 text-slate-100 hover:bg-slate-800 min-h-[36px] px-3"
-            >
-              设置
-            </Button>
-          </div>
-        }
-      />
-
-      <div className="flex flex-1 min-h-0">
-        <Sidebar className="min-w-[240px] bg-slate-950 border-r border-slate-700">
-          <div className="p-2">
-            <div className="flex items-center gap-2 p-2 rounded border border-cyan-500/20 bg-slate-900 shadow">
-              <Avatar name={profile.name} />
+    <div className="min-h-screen bg-gradient-to-br from-violet-500 via-purple-600 to-indigo-700">
+      <div className={cn("flex flex-col h-full min-h-full")}>
+        <AppBar className="bg-white/10 backdrop-blur-xl border-b border-white/20">
+          <div className="max-w-7xl mx-auto w-full px-4 py-3 flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-10 w-10 rounded-2xl bg-white/20 border border-white/20 backdrop-blur-xl flex items-center justify-center shrink-0">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="w-5 h-5 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                >
+                  <path d="M4 19h16" />
+                  <path d="M6 16V7a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v9" />
+                  <path d="M8 9h8" />
+                  <path d="M8 12h6" />
+                </svg>
+              </div>
               <div className="min-w-0">
-                <div className="text-sm font-bold text-slate-100 truncate">{profile.name}</div>
-                <div className="text-xs text-slate-400 truncate">{profile.role}</div>
+                <div className="text-white font-semibold leading-tight truncate">
+                  云镜资讯
+                </div>
+                <div className="text-white/70 text-sm leading-tight truncate">
+                  首页 · 推荐新闻与快捷入口
+                </div>
               </div>
             </div>
 
-            <div className="mt-2 grid gap-2">
-              <SidebarItem active>概览</SidebarItem>
-              <SidebarItem>UO 项目</SidebarItem>
-              <SidebarItem>待办事项</SidebarItem>
-              <SidebarItem>资料与权限</SidebarItem>
-              <SidebarItem>通知与订阅</SidebarItem>
+            <div className="flex-1 min-w-0 flex items-center gap-2 justify-center">
+              <div className="w-full max-w-xl">
+                <Label className="sr-only">搜索新闻</Label>
+                <div className="relative">
+                  <Input
+                    defaultValue=""
+                    placeholder="搜索：频道 / 关键词 / 来源（例如：隐私、供应链、性能指标）"
+                    className="min-h-[44px] bg-white/20 text-white placeholder:text-white/60 border-white/20 backdrop-blur-xl rounded-2xl pl-11 pr-28 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-0"
+                    aria-label="搜索新闻"
+                  />
+                  <div className="absolute left-4 top-1/2 -translate-y-1/2 text-white/70">
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      aria-hidden="true"
+                    >
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="M20 20l-3.5-3.5" />
+                    </svg>
+                  </div>
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                    <Button
+                      className="min-h-[40px] rounded-xl bg-white/90 text-gray-900 hover:bg-white transition cursor-pointer focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-0"
+                      aria-label="搜索"
+                    >
+                      搜索
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="min-h-[40px] rounded-xl bg-white/10 text-white hover:bg-white/20 transition cursor-pointer border border-white/20 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-0"
+                      aria-label="高级筛选"
+                    >
+                      筛选
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <Separator className="my-2 bg-slate-700" />
-
-            <Card className="bg-slate-900 border border-slate-700 shadow-lg rounded">
-              <CardHeader className="p-2">
-                <CardTitle className="text-sm text-slate-100">快速操作</CardTitle>
-              </CardHeader>
-              <CardContent className="p-2 pt-0 grid gap-2">
-                <Button className="rounded shadow bg-emerald-500 text-white hover:bg-emerald-600 min-h-[40px]">
-                  新建 UO 活动
-                </Button>
-                <Button
-                  variant="outline"
-                  className="rounded shadow border border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800 min-h-[40px]"
-                >
-                  导出指标明细
-                </Button>
-                <Button
-                  variant="outline"
-                  className="rounded shadow border border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800 min-h-[40px]"
-                >
-                  申请数据权限
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="flex items-center gap-3 shrink-0">
+              <Button
+                variant="ghost"
+                className="min-h-[44px] px-3 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-white transition cursor-pointer focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-0"
+                aria-label="消息中心"
+              >
+                <span className="inline-flex items-center gap-2">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-5 h-5 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    aria-hidden="true"
+                  >
+                    <path d="M18 8a6 6 0 10-12 0c0 7-3 7-3 7h18s-3 0-3-7" />
+                    <path d="M13.73 21a2 2 0 01-3.46 0" />
+                  </svg>
+                  <span className="hidden lg:inline text-white/90">消息</span>
+                </span>
+                <Badge className="ml-2 bg-violet-500/90 text-white border border-white/20">
+                  3
+                </Badge>
+              </Button>
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl px-3 py-2">
+                <Avatar className="h-9 w-9 border border-white/20" />
+                <div className="hidden xl:block">
+                  <div className="text-white/90 text-sm leading-tight font-medium">
+                    林若溪
+                  </div>
+                  <div className="text-white/60 text-xs leading-tight">
+                    已登录 · 个性化推荐开启
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </Sidebar>
+        </AppBar>
 
-        <main className="flex-1 min-w-0 flex flex-col min-h-0">
-          <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="max-w-7xl mx-auto p-2 grid gap-2">
-              <Card className="bg-slate-800/80 border border-cyan-500/20 shadow-lg rounded">
-                <CardHeader className="p-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <CardTitle className="text-base text-slate-100">UO 概览</CardTitle>
-                      <div className="mt-1 text-sm text-slate-400 whitespace-normal">
-                        以「用户运营（UO）」视角汇总关键指标、项目推进与待办风险，便于你每天 3 分钟完成自检。
-                      </div>
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="max-w-7xl mx-auto px-4 py-6">
+            <div className="grid grid-cols-12 gap-6">
+              {/* Sidebar */}
+              <aside className="col-span-3 min-w-[240px]">
+                <Sidebar className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-3">
+                  <div className="px-2 py-2">
+                    <div className="text-white/90 text-sm font-semibold">
+                      导航
                     </div>
-                    <Badge className="rounded border border-emerald-500/30 bg-emerald-500/15 text-emerald-300">
-                      {profile.status}
-                    </Badge>
+                    <div className="text-white/60 text-xs mt-1">
+                      快速到达核心功能
+                    </div>
                   </div>
-                </CardHeader>
-                <CardContent className="p-2 pt-0">
-                  <div className="grid grid-cols-4 gap-2">
-                    {uoMetrics.map((m, idx) => (
-                      <MetricCard key={idx} item={m} />
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                  <div className="mt-2 space-y-2">
+                    <SidebarItem
+                      className="bg-white/20 border border-white/20 rounded-2xl px-3 py-3 cursor-pointer hover:bg-white/25 transition"
+                      aria-label="进入首页"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center shrink-0">
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="w-5 h-5 text-white"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            aria-hidden="true"
+                          >
+                            <path d="M3 11l9-8 9 8" />
+                            <path d="M5 10v10h14V10" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-white font-medium truncate">
+                            首页
+                          </div>
+                          <div className="text-white/60 text-sm truncate">
+                            推荐与入口
+                          </div>
+                        </div>
+                      </div>
+                    </SidebarItem>
 
-              <div className="grid grid-cols-3 gap-2">
-                <Card className="col-span-2 bg-slate-800/80 border border-cyan-500/20 shadow-lg rounded">
-                  <CardHeader className="p-2">
+                    <SidebarItem
+                      className="bg-white/10 border border-white/20 rounded-2xl px-3 py-3 cursor-pointer hover:bg-white/20 transition"
+                      aria-label="进入新闻列表"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0">
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="w-5 h-5 text-white"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            aria-hidden="true"
+                          >
+                            <path d="M8 6h13" />
+                            <path d="M8 12h13" />
+                            <path d="M8 18h13" />
+                            <path d="M3 6h.01" />
+                            <path d="M3 12h.01" />
+                            <path d="M3 18h.01" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-white font-medium truncate">
+                            新闻列表
+                          </div>
+                          <div className="text-white/60 text-sm truncate">
+                            全部频道与筛选
+                          </div>
+                        </div>
+                      </div>
+                    </SidebarItem>
+
+                    <SidebarItem
+                      className="bg-white/10 border border-white/20 rounded-2xl px-3 py-3 cursor-pointer hover:bg-white/20 transition"
+                      aria-label="进入订阅管理"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0">
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="w-5 h-5 text-white"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            aria-hidden="true"
+                          >
+                            <path d="M12 2v2" />
+                            <path d="M12 20v2" />
+                            <path d="M4.93 4.93l1.41 1.41" />
+                            <path d="M17.66 17.66l1.41 1.41" />
+                            <path d="M2 12h2" />
+                            <path d="M20 12h2" />
+                            <path d="M4.93 19.07l1.41-1.41" />
+                            <path d="M17.66 6.34l1.41-1.41" />
+                            <circle cx="12" cy="12" r="4" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-white font-medium truncate">
+                            订阅管理
+                          </div>
+                          <div className="text-white/60 text-sm truncate">
+                            频道/关键词/屏蔽
+                          </div>
+                        </div>
+                      </div>
+                    </SidebarItem>
+                  </div>
+
+                  <Separator className="my-4 bg-white/15" />
+
+                  <div className="px-2">
                     <div className="flex items-center justify-between gap-2">
-                      <CardTitle className="text-base text-slate-100">UO 项目推进</CardTitle>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          placeholder="搜索项目：如 新用户引导"
-                          className="rounded bg-slate-950 border border-slate-700 text-slate-100 placeholder:text-slate-400 min-h-[36px]"
-                        />
-                        <Button className="rounded shadow bg-cyan-500 text-white hover:bg-cyan-600 min-h-[36px] px-3">
-                          查询
-                        </Button>
+                      <div>
+                        <div className="text-white/90 text-sm font-semibold">
+                          推荐偏好
+                        </div>
+                        <div className="text-white/60 text-xs mt-1">
+                          开启后更贴合你的阅读
+                        </div>
                       </div>
+                      <Switch aria-label="个性化推荐开关" defaultChecked />
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-2 pt-0 grid gap-2">
-                    {uoProjects.map((p, i) => (
-                      <Card
-                        key={i}
-                        className="bg-slate-900 border border-slate-700 shadow-lg rounded"
-                      >
-                        <CardContent className="p-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="text-sm font-bold text-slate-100 truncate">
-                                  {p.name}
+
+                    <div className="mt-4">
+                      <div className="text-white/80 text-sm font-medium">
+                        频道覆盖度
+                      </div>
+                      <div className="text-white/60 text-xs mt-1">
+                        当前订阅 {channels.length - 1} 个频道，建议补齐兴趣类
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {channels.slice(1).map((c) => {
+                          const pct = Math.min(
+                            100,
+                            Math.round((c.count / channels[0].count) * 100)
+                          );
+                          return (
+                            <div
+                              key={c.id}
+                              className="bg-white/10 border border-white/20 rounded-2xl p-3"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="text-white/85 text-sm font-medium truncate">
+                                  {c.name}
                                 </div>
-                                {statusBadge(p.status)}
-                                {priorityBadge(p.priority)}
-                              </div>
-                              <div className="mt-1 text-sm text-slate-400 whitespace-normal">
-                                {p.desc}
-                              </div>
-                              <div className="mt-2 flex flex-wrap items-center gap-2">
-                                {p.tags.map((t: string, ti: number) => (
-                                  <Badge
-                                    key={ti}
-                                    className="rounded border border-cyan-500/20 bg-slate-950 text-slate-200"
-                                  >
-                                    {t}
-                                  </Badge>
-                                ))}
-                                <span className="text-xs text-slate-400">
-                                  负责人：{p.owner}
-                                </span>
-                                <span className="text-xs text-slate-400">
-                                  更新：{p.lastUpdate}
-                                </span>
+                                <div className="text-white/60 text-xs shrink-0">
+                                  {c.count} 篇
+                                </div>
                               </div>
                               <div className="mt-2">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs text-slate-400">进度</span>
-                                  <span className="text-xs text-slate-200">{p.progress}%</span>
-                                </div>
-                                <div className="mt-1">
-                                  <Progress value={p.progress} />
+                                <Progress
+                                  value={pct}
+                                  className="h-2 bg-white/10"
+                                />
+                                <div className="mt-2 text-white/60 text-xs">
+                                  覆盖度 {pct}%
                                 </div>
                               </div>
                             </div>
-                            <div className="flex flex-col gap-2 shrink-0">
-                              <Button className="rounded shadow bg-emerald-500 text-white hover:bg-emerald-600 min-h-[36px] px-3">
-                                进入
-                              </Button>
-                              <Button
-                                variant="outline"
-                                className="rounded shadow border border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800 min-h-[36px] px-3"
-                              >
-                                复盘
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </CardContent>
-                </Card>
-
-                <div className="grid gap-2">
-                  <Card className="bg-slate-800/80 border border-cyan-500/20 shadow-lg rounded">
-                    <CardHeader className="p-2">
-                      <CardTitle className="text-base text-slate-100">个人资料</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-2 pt-0 grid gap-2">
-                      <div className="flex items-center gap-2">
-                        <Avatar name={profile.name} />
-                        <div className="min-w-0">
-                          <div className="text-sm font-bold text-slate-100 truncate">
-                            {profile.name}
-                          </div>
-                          <div className="text-xs text-slate-400 truncate">
-                            {profile.dept} · {profile.city}
-                          </div>
-                        </div>
+                          );
+                        })}
                       </div>
-                      <Separator className="bg-slate-700" />
-                      <div className="grid gap-2">
-                        <div>
-                          <div className="text-xs text-slate-400">邮箱</div>
-                          <div className="text-sm text-slate-100">{profile.email}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-slate-400">手机</div>
-                          <div className="text-sm text-slate-100">{profile.phone}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-slate-400">入职日期</div>
-                          <div className="text-sm text-slate-100">{profile.joinedAt}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-slate-400">个人简介</div>
-                          <div className="text-sm text-slate-100 whitespace-normal">
-                            {profile.bio}
-                          </div>
-                        </div>
-                      </div>
-                      <Button className="rounded shadow bg-cyan-500 text-white hover:bg-cyan-600 min-h-[40px]">
-                        编辑资料
-                      </Button>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
+                </Sidebar>
+              </aside>
 
-                  <Card className="bg-slate-800/80 border border-cyan-500/20 shadow-lg rounded">
-                    <CardHeader className="p-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="text-base text-slate-100">UO 待办</CardTitle>
-                        <Badge className="rounded border border-slate-700 bg-slate-900 text-slate-200">
-                          {uoTasks.length} 条
+              {/* Main */}
+              <main className="col-span-9 min-w-0">
+                <PageHeader className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="text-white text-xl font-semibold tracking-tight">
+                        今日为你推荐
+                      </div>
+                      <div className="text-white/70 text-sm mt-1 whitespace-normal">
+                        聚合热度与偏好，优先呈现你更可能读完的内容；支持一键进入新闻列表继续浏览。
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <Badge className="bg-white/20 text-white border border-white/20">
+                          主色：violet-500
+                        </Badge>
+                        <Badge className="bg-white/10 text-white/90 border border-white/20">
+                          更新频率：每 30 分钟
+                        </Badge>
+                        <Badge className="bg-white/10 text-white/90 border border-white/20">
+                          推荐策略：热度 × 兴趣 × 新鲜度
                         </Badge>
                       </div>
-                    </CardHeader>
-                    <CardContent className="p-2 pt-0 grid gap-2">
-                      {uoTasks.map((t, i) => (
-                        <Card
-                          key={i}
-                          className="bg-slate-900 border border-slate-700 shadow-lg rounded"
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Button
+                        className="min-h-[44px] rounded-2xl bg-white/90 text-gray-900 hover:bg-white transition cursor-pointer focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-0"
+                        aria-label="进入新闻列表"
+                      >
+                        进入新闻列表
+                      </Button>
+                      <Dialog>
+                        <Button
+                          variant="ghost"
+                          className="min-h-[44px] rounded-2xl bg-white/10 text-white hover:bg-white/20 transition cursor-pointer border border-white/20 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-0"
+                          aria-label="打开推荐说明"
                         >
-                          <CardContent className="p-2">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <div className="text-sm font-bold text-slate-100 truncate">
-                                    {t.title}
+                          推荐说明
+                        </Button>
+                        <DialogContent className="bg-white/20 backdrop-blur-xl rounded-2xl border border-white/20 text-white">
+                          <DialogHeader>
+                            <div className="text-white text-lg font-semibold">
+                              推荐规则（示例）
+                            </div>
+                            <div className="text-white/70 text-sm mt-1">
+                              说明面向展示：热度、阅读时长、频道偏好与新鲜度共同计算。
+                            </div>
+                          </DialogHeader>
+
+                          <div className="mt-4 space-y-3">
+                            <Alert className="bg-white/10 border border-white/20 text-white">
+                              <div className="text-white/90 font-medium">
+                                热度因子
+                              </div>
+                              <div className="text-white/70 text-sm mt-1">
+                                结合全站阅读量、收藏量、分享量与时效衰减，优先展示“正在发生”的内容。
+                              </div>
+                            </Alert>
+                            <Alert className="bg-white/10 border border-white/20 text-white">
+                              <div className="text-white/90 font-medium">
+                                兴趣因子
+                              </div>
+                              <div className="text-white/70 text-sm mt-1">
+                                根据你近 7 天阅读完成率、停留时间与频道点击，动态调整推荐权重。
+                              </div>
+                            </Alert>
+                            <Alert className="bg-white/10 border border-white/20 text-white">
+                              <div className="text-white/90 font-medium">
+                                负反馈
+                              </div>
+                              <div className="text-white/70 text-sm mt-1">
+                                你可以在列表中选择“不感兴趣/屏蔽来源”，降低相似内容曝光。
+                              </div>
+                            </Alert>
+                          </div>
+
+                          <DialogFooter className="mt-5">
+                            <Button
+                              className="min-h-[44px] rounded-2xl bg-violet-500 text-white hover:bg-violet-400 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-0"
+                              aria-label="我知道了"
+                            >
+                              我知道了
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </PageHeader>
+
+                <div className="mt-6 grid grid-cols-4 gap-4">
+                  {trend.map((t) => (
+                    <StatCard
+                      key={t.label}
+                      className="bg-white/15 backdrop-blur-xl rounded-2xl border border-white/20"
+                      title={t.label}
+                      value={t.value}
+                      footer={
+                        <div className="text-white/60 text-xs whitespace-normal">
+                          {t.hint}
+                        </div>
+                      }
+                    />
+                  ))}
+                </div>
+
+                <div className="mt-6 grid grid-cols-12 gap-6">
+                  <section className="col-span-8 min-w-0">
+                    <Card className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <CardTitle className="text-white">
+                              推荐区
+                            </CardTitle>
+                            <div className="text-white/60 text-sm mt-1 whitespace-normal">
+                              精选 {news.length} 条，优先展示你可能读完的文章
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <TabsList className="bg-white/10 border border-white/20 rounded-2xl p-1">
+                              <TabsTrigger
+                                value="for-you"
+                                className="rounded-xl text-white/90 data-[state=active]:bg-white/20 data-[state=active]:text-white cursor-pointer transition"
+                              >
+                                为你推荐
+                              </TabsTrigger>
+                              <TabsTrigger
+                                value="hot"
+                                className="rounded-xl text-white/90 data-[state=active]:bg-white/20 data-[state=active]:text-white cursor-pointer transition"
+                              >
+                                今日热榜
+                              </TabsTrigger>
+                            </TabsList>
+                          </div>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="pt-0">
+                        <div className="space-y-3">
+                          {news.slice(0, 5).map((n, idx) => {
+                            const heatPct = Math.round(
+                              (n.heat / heatMax) * 100
+                            );
+                            const tone =
+                              n.tag === "必读"
+                                ? "bg-violet-500/90"
+                                : n.tag === "热度"
+                                ? "bg-fuchsia-500/80"
+                                : "bg-white/20";
+
+                            return (
+                              <ListItem
+                                key={n.id}
+                                className="bg-white/10 hover:bg-white/15 transition cursor-pointer rounded-2xl border border-white/20 p-4"
+                              >
+                                <div className="flex items-start gap-4">
+                                  <div className="h-12 w-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0">
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="w-6 h-6 text-white/90"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      aria-hidden="true"
+                                    >
+                                      <path d="M6 3h12v18H6z" />
+                                      <path d="M9 7h6" />
+                                      <path d="M9 11h6" />
+                                      <path d="M9 15h4" />
+                                    </svg>
                                   </div>
-                                  {statusBadge(t.status)}
+
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <div className="text-white font-semibold leading-snug whitespace-normal">
+                                        {n.title}
+                                      </div>
+                                      <Badge
+                                        className={cn(
+                                          "text-white border border-white/20",
+                                          tone
+                                        )}
+                                      >
+                                        {n.tag}
+                                      </Badge>
+                                      {idx === 0 ? (
+                                        <Badge className="bg-white/10 text-white/90 border border-white/20">
+                                          置顶推荐
+                                        </Badge>
+                                      ) : null}
+                                    </div>
+                                    <div className="text-white/70 text-sm mt-1 whitespace-normal">
+                                      {n.summary}
+                                    </div>
+
+                                    <div className="mt-3 grid grid-cols-12 gap-3 items-center">
+                                      <div className="col-span-7 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <Badge className="bg-white/10 text-white/85 border border-white/20">
+                                            {n.channel}
+                                          </Badge>
+                                          <div className="text-white/60 text-xs">
+                                            {n.time}
+                                          </div>
+                                          <Separator className="hidden lg:block w-px h-3 bg-white/20" />
+                                          <div className="text-white/60 text-xs">
+                                            预计阅读 {n.readTime}
+                                          </div>
+                                          <Separator className="hidden lg:block w-px h-3 bg-white/20" />
+                                          <div className="text-white/60 text-xs">
+                                            来源：{n.source}
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <div className="col-span-3">
+                                        <div className="text-white/60 text-xs mb-2">
+                                          热度 {n.heat}/100
+                                        </div>
+                                        <Progress
+                                          value={heatPct}
+                                          className="h-2 bg-white/10"
+                                        />
+                                      </div>
+                                      <div className="col-span-2 flex items-center justify-end gap-2">
+                                        <Button
+                                          className="min-h-[44px] rounded-2xl bg-white/90 text-gray-900 hover:bg-white transition cursor-pointer focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-0"
+                                          aria-label={`打开文章：${n.title}`}
+                                        >
+                                          阅读
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="mt-1 text-xs text-slate-400 whitespace-normal">
-                                  {t.note}
-                                </div>
-                                <div className="mt-2 flex items-center gap-2">
-                                  <Badge className="rounded border border-emerald-500/30 bg-emerald-500/15 text-emerald-300">
-                                    截止 {t.due}
+                              </ListItem>
+                            );
+                          })}
+                        </div>
+
+                        <div className="mt-4 flex items-center justify-between gap-3">
+                          <div className="text-white/60 text-xs">
+                            已展示 5 条 · 进入列表查看更多与筛选
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              className="min-h-[44px] rounded-2xl bg-white/10 text-white hover:bg-white/20 transition cursor-pointer border border-white/20 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-0"
+                              aria-label="刷新推荐"
+                            >
+                              刷新推荐
+                            </Button>
+                            <Button
+                              className="min-h-[44px] rounded-2xl bg-violet-500 text-white hover:bg-violet-400 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-0"
+                              aria-label="去新闻列表"
+                            >
+                              去新闻列表
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </section>
+
+                  <aside className="col-span-4 min-w-0">
+                    <Card className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-white">
+                          快捷入口
+                        </CardTitle>
+                        <div className="text-white/60 text-sm mt-1 whitespace-normal">
+                          常用功能一键直达
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="grid grid-cols-1 gap-3">
+                          {quickEntrances.map((e) => (
+                            <div
+                              key={e.id}
+                              className={cn(
+                                "rounded-2xl border border-white/20 backdrop-blur-xl p-4 cursor-pointer transition hover:translate-y-[-1px] hover:bg-white/10",
+                                "bg-white/10"
+                              )}
+                            >
+                              <div
+                                className={cn(
+                                  "rounded-2xl p-4 border border-white/20",
+                                  "bg-gradient-to-br",
+                                  e.color
+                                )}
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="text-white font-semibold">
+                                      {e.title}
+                                    </div>
+                                    <div className="text-white/70 text-sm mt-1 whitespace-normal">
+                                      {e.desc}
+                                    </div>
+                                  </div>
+                                  <Badge className="bg-white/20 text-white border border-white/20 shrink-0">
+                                    {e.pill}
                                   </Badge>
-                                  <span className="text-xs text-slate-400">经办：{t.owner}</span>
+                                </div>
+                                <div className="mt-4 flex items-center justify-between gap-2">
+                                  <div className="text-white/70 text-xs">
+                                    建议操作：立即查看
+                                  </div>
+                                  <Button
+                                    className="min-h-[44px] rounded-2xl bg-white/90 text-gray-900 hover:bg-white transition cursor-pointer focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-0"
+                                    aria-label={`进入：${e.title}`}
+                                  >
+                                    打开
+                                  </Button>
                                 </div>
                               </div>
-                              <Button
-                                variant="outline"
-                                className="rounded shadow border border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800 min-h-[36px] px-3 shrink-0"
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                      <CardFooter className="pt-0">
+                        <Alert className="w-full bg-white/10 border border-white/20 text-white">
+                          <div className="text-white/90 font-medium">
+                            提示
+                          </div>
+                          <div className="text-white/70 text-sm mt-1 whitespace-normal">
+                            进入「新闻列表」可按频道、热度、阅读时长筛选，并支持收藏与离线。
+                          </div>
+                        </Alert>
+                      </CardFooter>
+                    </Card>
+
+                    <Card className="mt-6 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-white">
+                          更新与提醒
+                        </CardTitle>
+                        <div className="text-white/60 text-sm mt-1 whitespace-normal">
+                          你的订阅与热点变化
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-3">
+                          {notifications.map((m) => {
+                            const badgeCls =
+                              m.tone === "warn"
+                                ? "bg-fuchsia-500/70"
+                                : m.tone === "success"
+                                ? "bg-violet-500/70"
+                                : "bg-white/20";
+                            const toneText =
+                              m.tone === "warn"
+                                ? "提醒"
+                                : m.tone === "success"
+                                ? "建议"
+                                : "更新";
+
+                            return (
+                              <ListItem
+                                key={m.id}
+                                className="bg-white/10 hover:bg-white/15 transition cursor-pointer rounded-2xl border border-white/20 p-4"
                               >
-                                标记
+                                <div className="flex items-start gap-3">
+                                  <div className="h-10 w-10 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0">
+                                    <svg
+                                      viewBox="0 0 24 24"
+                                      className="w-5 h-5 text-white/90"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      aria-hidden="true"
+                                    >
+                                      <path d="M12 22a2 2 0 0 0 2-2H10a2 2 0 0 0 2 2z" />
+                                      <path d="M18 16v-5a6 6 0 1 0-12 0v5" />
+                                      <path d="M5 16h14" />
+                                    </svg>
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <div className="text-white/90 font-semibold whitespace-normal">
+                                        {m.title}
+                                      </div>
+                                      <Badge
+                                        className={cn(
+                                          "text-white border border-white/20 shrink-0",
+                                          badgeCls
+                                        )}
+                                      >
+                                        {toneText}
+                                      </Badge>
+                                    </div>
+                                    <div className="text-white/70 text-sm mt-1 whitespace-normal">
+                                      {m.meta}
+                                    </div>
+                                    <div className="text-white/60 text-xs mt-2">
+                                      {m.time}
+                                    </div>
+                                  </div>
+                                </div>
+                              </ListItem>
+                            );
+                          })}
+                        </div>
+
+                        <Separator className="my-4 bg-white/15" />
+
+                        <div className="bg-white/10 border border-white/20 rounded-2xl p-4">
+                          <div className="text-white/90 font-semibold">
+                            反馈偏好
+                          </div>
+                          <div className="text-white/60 text-sm mt-1 whitespace-normal">
+                            告诉我们你想看到什么，推荐会更准确。
+                          </div>
+                          <div className="mt-3 space-y-2">
+                            <div>
+                              <Label className="text-white/80">
+                                关注关键词
+                              </Label>
+                              <Input
+                                defaultValue="隐私保护, 供应链, 性能指标"
+                                className="mt-2 min-h-[44px] bg-white/20 text-white border-white/20 backdrop-blur-xl rounded-2xl focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-0"
+                                aria-label="关注关键词输入"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-white/80">
+                                不感兴趣的来源
+                              </Label>
+                              <Input
+                                defaultValue="营销号, 转载聚合站"
+                                className="mt-2 min-h-[44px] bg-white/20 text-white border-white/20 backdrop-blur-xl rounded-2xl focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-0"
+                                aria-label="不感兴趣的来源输入"
+                              />
+                            </div>
+                            <div>
+                              <Label className="text-white/80">
+                                备注（可选）
+                              </Label>
+                              <Textarea
+                                defaultValue="希望多推荐有数据、有结论的深度内容；少一些标题党。"
+                                className="mt-2 min-h-[88px] bg-white/20 text-white border-white/20 backdrop-blur-xl rounded-2xl focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-0"
+                                aria-label="偏好备注输入"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2 pt-1">
+                              <Button
+                                className="min-h-[44px] rounded-2xl bg-violet-500 text-white hover:bg-violet-400 transition cursor-pointer focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-0"
+                                aria-label="保存偏好"
+                              >
+                                保存偏好
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                className="min-h-[44px] rounded-2xl bg-white/10 text-white hover:bg-white/20 transition cursor-pointer border border-white/20 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-0"
+                                aria-label="重置"
+                              >
+                                重置
                               </Button>
                             </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                      <Button className="rounded shadow bg-emerald-500 text-white hover:bg-emerald-600 min-h-[40px]">
-                        新增待办
-                      </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </aside>
+                </div>
+
+                <div className="mt-6">
+                  <Card className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-white">
+                        继续浏览（频道导览）
+                      </CardTitle>
+                      <div className="text-white/60 text-sm mt-1 whitespace-normal">
+                        快速定位你关心的频道，进入列表后可继续细分与排序
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="grid grid-cols-7 gap-3">
+                        {channels.map((c) => (
+                          <div
+                            key={c.id}
+                            className="bg-white/10 hover:bg-white/15 transition cursor-pointer rounded-2xl border border-white/20 p-4"
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`打开频道：${c.name}`}
+                          >
+                            <div className="text-white/90 font-semibold truncate">
+                              {c.name}
+                            </div>
+                            <div className="text-white/60 text-sm mt-1">
+                              {c.count} 篇
+                            </div>
+                            <div className="mt-3">
+                              <Button
+                                className="w-full min-h-[44px] rounded-2xl bg-white/90 text-gray-900 hover:bg-white transition cursor-pointer focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-0"
+                                aria-label={`进入列表并筛选频道：${c.name}`}
+                              >
+                                进入列表
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
-              </div>
 
-              <Card className="bg-slate-800/80 border border-cyan-500/20 shadow-lg rounded">
-                <CardHeader className="p-2">
-                  <CardTitle className="text-base text-slate-100">UO 生成（草稿区）</CardTitle>
-                </CardHeader>
-                <CardContent className="p-2 pt-0 grid gap-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="grid gap-2">
-                      <div>
-                        <Label className="text-slate-200">周报标题</Label>
-                        <Input
-                          defaultValue="用户运营（UO）周报 · 2026 W10"
-                          className="rounded bg-slate-950 border border-slate-700 text-slate-100 placeholder:text-slate-400 min-h-[40px]"
-                        />
+                <div className="mt-6 pb-10">
+                  <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-5 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="text-white/90 font-semibold">
+                        入口确认
                       </div>
-                      <div>
-                        <Label className="text-slate-200">核心结论</Label>
-                        <Textarea
-                          defaultValue="本周激活新增 12,480（+8.6%），7 日留存 34.2%（+1.9%）。新用户引导 2.0 A/B 进入第二阶段，Push 频控灰度中，需尽快补齐埋点以降低模型联调风险。"
-                          className="rounded bg-slate-950 border border-slate-700 text-slate-100 placeholder:text-slate-400 min-h-[120px]"
-                        />
+                      <div className="text-white/60 text-sm mt-1 whitespace-normal">
+                        你可以从「推荐区」直接阅读，或点击任意「进入列表」查看完整新闻列表。
                       </div>
                     </div>
-                    <div className="grid gap-2">
-                      <div>
-                        <Label className="text-slate-200">下周计划</Label>
-                        <Textarea
-                          defaultValue="1）完成新手任务链路埋点与告警；2）续费唤醒策略上线灰度 10%；3）Push 频控策略扩大灰度至 30%；4）输出渠道归因复盘结论并落地 2 个优化动作。"
-                          className="rounded bg-slate-950 border border-slate-700 text-slate-100 placeholder:text-slate-400 min-h-[120px]"
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <div className="flex items-center justify-between p-2 rounded border border-slate-700 bg-slate-900">
-                          <div>
-                            <div className="text-sm font-medium text-slate-100">自动同步项目进度</div>
-                            <div className="text-xs text-slate-400">将进行中/阻塞项目摘要自动写入报告。</div>
-                          </div>
-                          <Switch defaultChecked />
-                        </div>
-                        <div className="flex items-center justify-between p-2 rounded border border-slate-700 bg-slate-900">
-                          <div>
-                            <div className="text-sm font-medium text-slate-100">生成风险提示</div>
-                            <div className="text-xs text-slate-400">对阻塞项与埋点缺失自动提示关注点。</div>
-                          </div>
-                          <Switch defaultChecked />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator className="bg-slate-700" />
-
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm text-slate-400 whitespace-normal">
-                      点击「生成 UO 报告」可输出可复制的 Markdown 模版，便于同步到飞书/Confluence。
-                    </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       <Button
-                        variant="outline"
-                        className="rounded shadow border border-slate-700 bg-slate-950 text-slate-100 hover:bg-slate-800 min-h-[40px] px-4"
+                        className="min-h-[44px] rounded-2xl bg-white/90 text-gray-900 hover:bg-white transition cursor-pointer focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-0"
+                        aria-label="进入新闻列表"
                       >
-                        预览
+                        进入新闻列表
                       </Button>
-                      <Button className="rounded shadow bg-cyan-500 text-white hover:bg-cyan-600 min-h-[40px] px-4">
-                        生成 UO
+                      <Button
+                        variant="ghost"
+                        className="min-h-[44px] rounded-2xl bg-white/10 text-white hover:bg-white/20 transition cursor-pointer border border-white/20 focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-0"
+                        aria-label="返回顶部"
+                      >
+                        返回顶部
                       </Button>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </main>
             </div>
           </div>
+        </div>
 
-          <div className="border-t border-slate-700 bg-slate-950">
-            <div className="max-w-7xl mx-auto p-2 flex items-center justify-between gap-2">
-              <div className="text-xs text-slate-400">
-                数据更新时间：2026-03-05 09:30 · 指标口径：增长看板 v3.2
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge className="rounded border border-cyan-500/30 bg-cyan-500/15 text-cyan-300">
-                  UO
-                </Badge>
-                <span className="text-xs text-slate-400">个人中心 · 科技风</span>
-              </div>
+        <div className="border-t border-white/20 bg-white/10 backdrop-blur-xl">
+          <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-3">
+            <div className="text-white/70 text-sm">
+              © 2026 云镜资讯 · 玻璃拟态首页
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge className="bg-white/10 text-white/80 border border-white/20">
+                数据更新时间：今天 09:30
+              </Badge>
+              <Badge className="bg-white/10 text-white/80 border border-white/20">
+                推荐命中率：78%
+              </Badge>
             </div>
           </div>
-        </main>
+        </div>
       </div>
     </div>
   );

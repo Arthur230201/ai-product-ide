@@ -1,0 +1,19 @@
+{
+  "templateId": "list",
+  "defaultDensity": "comfortable",
+  "allowedSections": ["header", "filterBar", "results", "states", "footer"],
+  "requiredSections": ["header", "results", "states"],
+  "ctaRules": {
+    "primaryCtaLocation": "header_right",
+    "secondaryCtaLocation": "header_right"
+  },
+  "stateRules": {
+    "requireLoading": true,
+    "requireEmpty": true,
+    "requireError": true
+  },
+  "layoutRules": {
+    "requireSearchOrFilter": true,
+    "requirePrimaryResultsBinding": true
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Pagination",
+  "props": { "size": ["sm", "md"] },
+  "do": ["Place below results"],
+  "dont": []
+}

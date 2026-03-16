@@ -23,7 +23,7 @@ import type {
 } from '@/types/fractal';
 import { getLayoutedElements, DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT } from '@/lib/layout';
 import type { UIThemeConfig, StylePresetId } from '@/types/theme';
-import { defaultTheme } from '@/types/theme';
+import { defaultTheme, STYLE_PRESET_IDS } from '@/types/theme';
 import { preview } from '@/lib/safe/preview';
 import { log, logError, logWarn } from '@/lib/logger';
 
@@ -70,6 +70,8 @@ interface CanvasStore extends CanvasState {
   isDetailPanelOpen: boolean;
   /** 预览视口预设：移动端 / 桌面，用于编辑与演示 */
   viewportPreset: 'mobile' | 'desktop';
+  /** 全局锁定：用户选择移动端/Web端后不再显示切换按钮，仅用此值 */
+  viewportLocked: 'mobile' | 'desktop' | null;
   // Project Blueprint State
   isBlueprintOpen: boolean;
   blueprintInitialTab?: BlueprintTabType;
@@ -111,6 +113,8 @@ interface CanvasStore extends CanvasState {
   openBlueprint: (initialTab?: BlueprintTabType, initialData?: Partial<ProjectMeta>) => void;
   closeBlueprint: () => void;
   setViewportPreset: (preset: 'mobile' | 'desktop') => void;
+  /** 选择平台并锁定：之后全局不再显示移动/桌面切换 */
+  lockViewport: (preset: 'mobile' | 'desktop') => void;
   setStylePreset: (preset: StylePresetId) => void;
   // 对话窗口（Stitch 风格）与澄清
   conversationPanelOpen: boolean;
@@ -127,6 +131,12 @@ interface CanvasStore extends CanvasState {
   /** 建图/澄清提交进行中，供常驻对话面板禁用发送与选项 */
   isAiCreatePending: boolean;
   setAiCreatePending: (v: boolean) => void;
+  /** 首页/Stitch 入口触发生成：设置后 CommandBar 会执行建图并清空 */
+  pendingCreatePrompt: string | null;
+  setPendingCreatePrompt: (prompt: string | null) => void;
+  /** 首页触发生成时的附件（与 pendingCreatePrompt 同时使用） */
+  pendingCreateMedia: { mediaBase64: string; mediaType: 'image' | 'video' } | null;
+  setPendingCreateMedia: (v: { mediaBase64: string; mediaType: 'image' | 'video' } | null) => void;
 }
 
 /** 为节点补全 width/height，避免生产环境首帧 ResizeObserver 未就绪时边连接点错位（连线与节点视觉脱节） */
@@ -213,6 +223,7 @@ export const useCanvasStore = create<CanvasStore>()(
           selectedNodeId: null,
         isDetailPanelOpen: false,
         viewportPreset: 'mobile',
+        viewportLocked: null,
         isBlueprintOpen: false,
         blueprintInitialTab: undefined,
         blueprintInitialData: undefined,
@@ -243,8 +254,9 @@ export const useCanvasStore = create<CanvasStore>()(
           openBlueprint: () => {},
           closeBlueprint: () => {},
           setViewportPreset: () => {},
+          lockViewport: () => {},
           setStylePreset: () => {},
-          conversationPanelOpen: false,
+          conversationPanelOpen: true,
           conversationMessages: [],
           pendingClarificationContext: null,
           pendingClarificationReply: null,
@@ -256,6 +268,10 @@ export const useCanvasStore = create<CanvasStore>()(
           setPendingClarificationReply: () => {},
           clearConversation: () => {},
           isAiCreatePending: false,
+          pendingCreatePrompt: null,
+          setPendingCreatePrompt: () => {},
+          pendingCreateMedia: null,
+          setPendingCreateMedia: () => {},
           setAiCreatePending: () => {},
           currentTheme: defaultTheme,
           stylePreset: 'neutral',
@@ -381,14 +397,17 @@ export const useCanvasStore = create<CanvasStore>()(
         selectedNodeId: null,
         isDetailPanelOpen: false,
         viewportPreset: 'mobile',
+        viewportLocked: null,
         isBlueprintOpen: false,
         blueprintInitialTab: undefined,
         blueprintInitialData: undefined,
-        conversationPanelOpen: false,
+        conversationPanelOpen: true,
         conversationMessages: [],
         pendingClarificationContext: null,
         pendingClarificationReply: null,
         isAiCreatePending: false,
+        pendingCreatePrompt: null,
+        pendingCreateMedia: null,
         currentTheme: defaultTheme,
         stylePreset: 'neutral',
         projectMeta: initialProjectMeta,
@@ -1343,6 +1362,9 @@ export const useCanvasStore = create<CanvasStore>()(
   setViewportPreset: (preset: 'mobile' | 'desktop') => {
     set({ viewportPreset: preset });
   },
+  lockViewport: (preset: 'mobile' | 'desktop') => {
+    set({ viewportPreset: preset, viewportLocked: preset });
+  },
 
   setConversationPanelOpen: (open: boolean) => {
     set({ conversationPanelOpen: open });
@@ -1384,6 +1406,12 @@ export const useCanvasStore = create<CanvasStore>()(
   setAiCreatePending: (v: boolean) => {
     set({ isAiCreatePending: v });
   },
+  setPendingCreatePrompt: (prompt: string | null) => {
+    set({ pendingCreatePrompt: prompt });
+  },
+  setPendingCreateMedia: (v: { mediaBase64: string; mediaType: 'image' | 'video' } | null) => {
+    set({ pendingCreateMedia: v });
+  },
       }
     },
     {
@@ -1398,6 +1426,7 @@ export const useCanvasStore = create<CanvasStore>()(
         globalRules: state.globalRules,
         aiConfig: state.aiConfig,
         viewportPreset: state.viewportPreset,
+        viewportLocked: state.viewportLocked,
         // 不持久化 selectedNodeId，每次刷新时重置
       }) as any,
       // 跳过 SSR 时的 hydration
@@ -1520,7 +1549,7 @@ export const useCanvasStore = create<CanvasStore>()(
             persistedState.currentTheme = defaultTheme;
           }
           if (persistedState.stylePreset === 'tech') persistedState.stylePreset = 'cyberpunk';
-          if (persistedState.stylePreset === undefined || !['neutral', 'glass', 'flat', 'corporate', 'neo', 'cyberpunk', 'warm', 'brutal', 'custom'].includes(persistedState.stylePreset)) {
+          if (persistedState.stylePreset === undefined || !STYLE_PRESET_IDS.includes(persistedState.stylePreset as StylePresetId)) {
             persistedState.stylePreset = 'neutral';
           }
           if (persistedState.viewportPreset === 'tablet') {
@@ -1528,6 +1557,9 @@ export const useCanvasStore = create<CanvasStore>()(
           }
           if (persistedState.viewportPreset === undefined || !['mobile', 'desktop'].includes(persistedState.viewportPreset)) {
             persistedState.viewportPreset = 'mobile';
+          }
+          if (persistedState.viewportLocked !== undefined && persistedState.viewportLocked !== null && !['mobile', 'desktop'].includes(persistedState.viewportLocked)) {
+            persistedState.viewportLocked = null;
           }
         }
 

@@ -143,8 +143,8 @@ const NodeSchemaWithTraceability = NodeSchema.extend({
 
 // 定义输入模糊度分析 Schema (for single-call response)
 const ClaritySchema = z.object({
-  confidence: z.number().min(0).max(100).describe('输入明确度（0-100），>=60为明确，<60为模糊'),
-  isVague: z.boolean().describe('是否模糊（confidence < 60）'),
+  confidence: z.number().min(0).max(100).describe('输入明确度（0-100），>=50 或常见应用类型则视为可生成'),
+  isVague: z.boolean().describe('是否模糊（confidence < 50 且非常见应用类型）'),
   domain: z.string().optional().describe('检测到的业务领域（如：Enterprise Management、Inventory Management）'),
   object: z.string().optional().describe('检测到的业务对象（如：Paint、Reimbursement、Customer）'),
   action: z.string().optional().describe('检测到的核心动作（如：Stocktaking、Approving、Selling）'),
@@ -165,13 +165,15 @@ const ClarificationOptionSchema = z.object({
   example: z.string().describe('功能示例（如：Features: Barcode scanning...）'),
 });
 
-// 定义澄清请求 Schema
+// 定义澄清请求 Schema（与 canvas-store clarification 一致，含视口澄清）
 const ClarificationRequestSchema = z.object({
   type: z.literal('clarification_needed'),
   data: z.object({
     message: z.string().describe('澄清消息（如：To build the right "Enterprise Management" app...）'),
     options: z.array(ClarificationOptionSchema).describe('业务场景选项列表（3-4个不同的场景）'),
     question: z.string().describe('引导问题（如：Could you tell me what specific "Business Objects" you manage?）'),
+    viewportQuestion: z.string().optional().describe('视口澄清问题（如：请选择使用设备类型）'),
+    viewportOptions: z.array(z.object({ id: z.string(), label: z.string(), desc: z.string().optional(), example: z.string().optional() })).optional().describe('视口选项（桌面/移动）'),
   }),
 });
 
@@ -260,18 +262,16 @@ Ask yourself: *Do I know the specific **Business Object** (e.g., Paint, Reimburs
 
 **Important**: If the user has uploaded files (images, documents, etc.), analyze the content of those files as well. Files may contain detailed requirements, flowcharts, specifications, or other context that makes the input more specific.
 
-### Vague Input Indicators (Confidence < 60%):
-- Generic terms: "enterprise app", "management system", "tool for my team"
-- No specific business object mentioned (in text OR files)
-- No specific workflow or action described (in text OR files)
-- Too high-level or abstract
-- Uploaded files don't contain enough detail to clarify the business scenario
+### Vague Input Indicators (Confidence < 50%):
+- Truly generic terms only: "做一个软件", "帮我做个系统", "tool for my team" with no domain hint
+- No business object AND no app type AND no domain (in text OR files)
+- Purely abstract with no recognizable product category
 
-### Specific Input Indicators (Confidence >= 60%):
+### Specific Input Indicators (Confidence >= 50%): Generate graph directly, do NOT ask for clarification.
+- **Common app types (treat as specific)**: fitness/健身/运动, e-commerce/电商, social/社交, education/教育, health/医疗, content/内容, travel/出行, food/餐饮, finance/金融, productivity/效率. Examples: "健身软件", "运动APP", "电商平台", "社交应用" → confidence >= 65, isVague: false.
 - Specific business objects: "Paint inventory", "Reimbursement approval", "CRM for real estate"
 - Clear workflows: "approval process", "order management", "customer tracking"
-- Specific domain context: "material collection", "news coordination"
-- Uploaded files (images/documents) contain detailed requirements, flowcharts, or specifications that clarify the business scenario
+- Any named domain or product category (even one phrase) that implies a known type of application
 
 ## Output Requirements
 You MUST output ONLY one tagged block in this exact format:
@@ -470,7 +470,7 @@ Generate appropriate scenarios based on the detected domain.`;
     data: {
       ...clarificationData,
       viewportQuestion: VIEWPORT_CLARIFICATION.viewportQuestion,
-      viewportOptions: VIEWPORT_CLARIFICATION.viewportOptions,
+      viewportOptions: [...VIEWPORT_CLARIFICATION.viewportOptions],
     },
   };
 }
@@ -519,36 +519,7 @@ export const generateGraph = createServerAction()
       userPrompt += `\n\n注意：用户上传了${input.mediaType === 'image' ? '图片' : '视频'}文件，请结合图片/视频内容进行分析。`;
     }
 
-    // 可选：输入模糊时先返回澄清请求，供前端对话窗口展示并收集用户回复后再重试
-    const clarityAnalysis = await analyzeInputClarity(
-      input.prompt,
-      textModel,
-      input.aiConfig,
-      input.attachmentContent,
-      input.mediaBase64,
-      input.mediaType
-    );
-    const hasMediaOrAttachment = !!(input.attachmentContent || input.mediaBase64);
-    if (clarityAnalysis.isVague && clarityAnalysis.confidence < 60) {
-      const clarificationResult = await generateClarificationRequest(
-        clarityAnalysis,
-        textModel,
-        hasMediaOrAttachment
-      );
-      if (clarificationResult && typeof clarificationResult === 'object' && 'type' in clarificationResult && clarificationResult.type === 'clarification_needed') {
-        log('📋 [generateGraph] 输入较模糊，返回澄清请求', {
-          requestId,
-          confidence: clarityAnalysis.confidence,
-          optionsCount: (clarificationResult as any).data?.options?.length ?? 0,
-        });
-        return {
-          type: 'clarification_needed',
-          data: (clarificationResult as any).data,
-        };
-      }
-      // 若生成澄清失败（如 API 错误），继续走图生成
-    }
-
+    // 默认不挡：直接尝试生成图；仅当主流程返回澄清请求时，在对话框中要求用户回复澄清问题即可
     // 构建系统提示词（产品信息架构师 + 用户流程 + 业务事件建模，支持澄清/图/SingleCall 三种输出）
     const systemPrompt = GRAPH_ARCHITECTURE_SYSTEM_PROMPT;
 
@@ -685,9 +656,35 @@ export const generateGraph = createServerAction()
           cooldownSeconds: aiError.cooldownSeconds,
         };
       }
-      
-      // 其他错误：使用降级图
-      logWarn('⚠️ [generateGraph] AI 调用失败，使用降级图', {
+
+      // 非 429 的失败：先尝试返回澄清，在对话框中要求用户回复；若澄清生成失败再降级图
+      const hasMediaOrAttachment = !!(input.attachmentContent || input.mediaBase64);
+      const clarityAnalysis = await analyzeInputClarity(
+        input.prompt,
+        textModel,
+        input.aiConfig,
+        input.attachmentContent,
+        input.mediaBase64,
+        input.mediaType
+      );
+      const clarificationResult = await generateClarificationRequest(
+        clarityAnalysis,
+        textModel,
+        hasMediaOrAttachment
+      );
+      if (clarificationResult && typeof clarificationResult === 'object' && clarificationResult.type === 'clarification_needed') {
+        log('📋 [generateGraph] 生成失败，返回澄清请求（对话框中要求用户回复）', {
+          requestId,
+          errorType: aiError.type,
+        });
+        return {
+          type: 'clarification_needed',
+          data: (clarificationResult as { data: unknown }).data,
+        };
+      }
+
+      // 澄清生成失败或未返回：使用降级图
+      logWarn('⚠️ [generateGraph] AI 调用失败，澄清未可用，使用降级图', {
         requestId,
         errorType: aiError.type,
         errorMessage: aiError.message,

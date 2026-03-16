@@ -1,0 +1,6 @@
+{
+  "name": "Checkbox",
+  "props": {},
+  "do": ["Use name attribute"],
+  "dont": []
+}

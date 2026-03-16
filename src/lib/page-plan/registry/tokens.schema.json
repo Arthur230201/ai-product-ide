@@ -1,0 +1,7 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PagePlan token allowlist",
+  "description": "Only these density keys may be referenced in PagePlan.template.density",
+  "type": "string",
+  "enum": ["comfortable", "compact", "airy"]
+}

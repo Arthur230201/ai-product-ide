@@ -1,0 +1,33 @@
+{
+  "templateId": "search_results",
+  "defaultDensity": "comfortable",
+  "allowedSections": ["header", "filterBar", "results", "states", "footer"],
+  "requiredSections": ["header", "filterBar", "results", "states"],
+  "maxComponentsPerSection": {
+    "header": 3,
+    "filterBar": 6,
+    "results": 3,
+    "states": 3,
+    "footer": 2
+  },
+  "ctaRules": {
+    "primaryCtaLocation": "header_right",
+    "secondaryCtaLocation": "filterBar_right"
+  },
+  "stateRules": {
+    "requireLoading": true,
+    "requireEmpty": true,
+    "requireError": true
+  },
+  "bindingRequirements": {
+    "view": {
+      "minPrimaryDataQueries": 1,
+      "requireSearchInput": true,
+      "requireFiltering": true
+    }
+  },
+  "layoutRules": {
+    "searchIsPrimary": true,
+    "preferFacets": true
+  }
+}

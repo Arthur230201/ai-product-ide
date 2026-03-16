@@ -1,0 +1,6 @@
+{
+  "name": "Table",
+  "props": { "density": ["comfortable", "compact"] },
+  "do": ["Bind data via data-query-ref in section bindings"],
+  "dont": ["No thead without th"]
+}

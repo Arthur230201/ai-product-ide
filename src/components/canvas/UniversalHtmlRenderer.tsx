@@ -13,7 +13,7 @@
  */
 
 import React, { useMemo } from 'react';
-import { HtmlSandboxRenderer } from './HtmlSandboxRenderer';
+import { HtmlPreviewSurface } from '@/components/html-preview/HtmlPreviewSurface';
 import { extractCustomColors } from '@/utils/color-extractor';
 
 interface UniversalHtmlRendererProps {
@@ -73,8 +73,8 @@ export const UniversalHtmlRenderer: React.FC<UniversalHtmlRendererProps> = ({
         background: undefined,
       } as React.CSSProperties}
     >
-      {/* Render HTML in Shadow DOM sandbox - preserves all original behavior */}
-      <HtmlSandboxRenderer
+      {/* 统一展示入口：经 HtmlPreviewSurface → guard → HtmlSandboxRenderer */}
+      <HtmlPreviewSurface
         rawHtml={processedHtml}
         className="w-full h-full"
       />

@@ -4,13 +4,24 @@ import { InfiniteCanvas } from '@/components/canvas/InfiniteCanvas';
 import { ProjectToolbar } from '@/components/canvas/ProjectToolbar';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { StoreHydration } from '@/components/canvas/StoreHydration';
+import { useCanvasStore } from '@/store/canvas-store';
 import { useEffect, useState } from 'react';
 import { Check } from 'lucide-react';
+
+/** 是否处于 Stitch 首页（无项目）：仅进入项目后才显示工具栏与右侧对话 */
+function useShowStitchHome() {
+  const nodes = useCanvasStore((s) => s.nodes);
+  return (
+    nodes.length === 0 ||
+    (nodes.length === 1 && nodes[0].data?.label === '首页' && nodes[0].id === 'page-1')
+  );
+}
 
 export default function Home() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [loadStartTime] = useState(() => Date.now());
+  const showStitchHome = useShowStitchHome();
 
   useEffect(() => {
     // 只在客户端执行
@@ -83,7 +94,7 @@ export default function Home() {
         <StoreHydration />
         {isHydrated ? (
           <>
-            <ProjectToolbar />
+            {!showStitchHome && <ProjectToolbar />}
             <InfiniteCanvas />
             {/* 首次加载完成轻量提示：已就绪，右下角带图标、轻微上滑进入 */}
             {showSuccessMessage && (

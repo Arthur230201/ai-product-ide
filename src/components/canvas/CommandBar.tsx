@@ -53,6 +53,45 @@ function getDefaultUIPrompt(nodeLabel: string): string {
   return `请为「${nodeLabel}」页面生成完整、可用的 React 组件，界面内容与页面名称匹配，包含现代化 UI 与完整交互。`;
 }
 
+/** 从用户描述推断项目画像（行业、目标用户），用于建图成功后自动填充 */
+function inferProjectMetaFromPrompt(prompt: string): { industry?: string; targetAudience?: string } {
+  const t = prompt.toLowerCase().trim();
+  if (!t) return {};
+  const out: { industry?: string; targetAudience?: string } = {};
+  if (/音乐|歌曲|播放|歌单|听歌|音乐app/i.test(t)) {
+    out.industry = '音乐/娱乐';
+    out.targetAudience = '音乐爱好者';
+  } else if (/游戏|电竞|手游/i.test(t)) {
+    out.industry = '游戏';
+    out.targetAudience = '玩家';
+  } else if (/电商|购物|商品|订单|商城/i.test(t)) {
+    out.industry = '电商';
+    out.targetAudience = '消费者';
+  } else if (/医疗|健康|问诊|挂号/i.test(t)) {
+    out.industry = '医疗健康';
+    out.targetAudience = '患者/健康管理用户';
+  } else if (/教育|学习|课程|培训/i.test(t)) {
+    out.industry = '教育';
+    out.targetAudience = '学习者';
+  } else if (/金融|理财|支付|银行/i.test(t)) {
+    out.industry = '金融';
+    out.targetAudience = '个人/企业用户';
+  } else if (/物流|配送|快递/i.test(t)) {
+    out.industry = '物流';
+    out.targetAudience = '企业/个人';
+  } else if (/社交|社区|论坛|聊天/i.test(t)) {
+    out.industry = '社交';
+    out.targetAudience = '终端用户';
+  } else if (/管理|后台|b端|企业/i.test(t)) {
+    out.industry = '企业服务';
+    out.targetAudience = '企业用户';
+  } else {
+    out.industry = '通用互联网';
+    out.targetAudience = '通用用户';
+  }
+  return out;
+}
+
 type ViewportPreset = 'mobile' | 'desktop';
 
 export function CommandBar(props: {
@@ -78,8 +117,10 @@ export function CommandBar(props: {
     nodes,
     selectedNodeId,
     selectNode,
+    openNodeDetail,
     addNodes,
     addEdges,
+    loadProject,
     updateNodeData,
     layoutNodes,
     currentTheme,
@@ -96,6 +137,12 @@ export function CommandBar(props: {
     updateLastAssistantMessage,
     setAiCreatePending,
     setViewportPreset,
+    viewportLocked,
+    lockViewport,
+    pendingCreatePrompt,
+    setPendingCreatePrompt,
+    pendingCreateMedia,
+    setPendingCreateMedia,
   } = useCanvasStore();
   /** 最近一次建图请求的入参，用于澄清时再次调用 */
   const lastCreateInputRef = useRef<{
@@ -112,8 +159,10 @@ export function CommandBar(props: {
     ? nodes.find(node => node.id === selectedNodeId) 
     : null;
   
-  // 判断是否为编辑模式
+  // 判断是否为编辑模式（画布上选中节点时为 true；嵌入面板内不按编辑模式算，仅用于部分 UI）
   const isEditMode = embedInPanel ? false : selectedNode !== null;
+  // 是否为「为当前节点生成/更新 UI」上下文（含嵌入面板：在节点详情/生成页内也按 UI 生成展示）
+  const isUIGenerationContext = selectedNode !== null && (isEditMode || embedInPanel);
 
   // 输入框聚焦状态 - 必须在所有其他 hooks 之前定义
   const [isFocused, setIsFocused] = useState(false);
@@ -385,39 +434,25 @@ export function CommandBar(props: {
         edgesPreview: edges && Array.isArray(edges) && edges.length > 0 ? edges.slice(0, 2).map(e => ({ id: e.id, source: e.source, target: e.target })) : 'N/A',
       });
 
-      // 记录添加节点前的状态
+      // 建图成功：用返回的 nodes/edges 替换整个画布，避免与初始 mock「首页」叠加导致双首页
       const nodesBeforeAdd = useCanvasStore.getState().nodes.length;
-      log('📊 [CommandBar] 添加节点前的状态:', {
+      const hasValidGraph = nodes && Array.isArray(nodes) && nodes.length > 0;
+      log('📊 [CommandBar] 建图结果:', {
         nodesCount: nodesBeforeAdd,
-        willAddNodes: nodes && Array.isArray(nodes) && nodes.length > 0,
-        willAddEdges: edges && Array.isArray(edges),
+        willReplaceGraph: hasValidGraph,
+        newNodesCount: nodes?.length ?? 0,
+        newEdgesCount: edges?.length ?? 0,
       });
 
-      // 确保 nodes 是有效数组
-      if (nodes && Array.isArray(nodes) && nodes.length > 0) {
+      if (hasValidGraph) {
         try {
-          addNodes(nodes);
-          // 验证节点是否成功添加
-          const nodesAfterAdd = useCanvasStore.getState().nodes.length;
-          log('✅ [CommandBar] 成功添加节点:', { 
-            count: nodes.length,
-            nodesBefore: nodesBeforeAdd,
-            nodesAfter: nodesAfterAdd,
-            expectedTotal: nodesBeforeAdd + nodes.length,
-            actualTotal: nodesAfterAdd,
-            success: nodesAfterAdd === nodesBeforeAdd + nodes.length,
-          });
-          
-          // 如果节点没有成功添加，记录警告
-          if (nodesAfterAdd !== nodesBeforeAdd + nodes.length) {
-            logError('❌ [CommandBar] 节点添加失败！节点数量不匹配:', {
-              expected: nodesBeforeAdd + nodes.length,
-              actual: nodesAfterAdd,
-              nodesToAdd: (Array.isArray(nodes) ? nodes : []).map(n => ({ id: n.id, label: n.data?.label })),
-            });
-          }
+          loadProject({ nodes, edges: Array.isArray(edges) ? edges : [] });
+          const nodesAfterLoad = useCanvasStore.getState().nodes.length;
+          log('✅ [CommandBar] 已用建图结果替换画布:', { count: nodesAfterLoad });
         } catch (error) {
-          logError('❌ [CommandBar] 添加节点时发生错误:', error);
+          logError('❌ [CommandBar] loadProject 失败，回退为 addNodes:', error);
+          addNodes(nodes);
+          if (edges && Array.isArray(edges)) addEdges(edges);
         }
       } else {
         logWarn('⚠️ [CommandBar] generateGraph 返回的 nodes 无效:', {
@@ -427,15 +462,15 @@ export function CommandBar(props: {
         });
       }
 
-      // 确保 edges 是有效数组
-      if (edges && Array.isArray(edges)) {
+      // 仅当未使用 loadProject 时补充边（loadProject 已包含 edges）
+      if (!hasValidGraph && edges && Array.isArray(edges)) {
         try {
           addEdges(edges);
           log('✅ [CommandBar] 成功添加边:', { count: edges.length });
         } catch (error) {
           logError('❌ [CommandBar] 添加边时发生错误:', error);
         }
-      } else {
+      } else if (!hasValidGraph && (!edges || !Array.isArray(edges))) {
         logWarn('⚠️ [CommandBar] generateGraph 返回的 edges 无效:', {
           edges,
           isArray: Array.isArray(edges),
@@ -463,27 +498,29 @@ export function CommandBar(props: {
         return;
       }
 
-        // 添加节点后自动应用布局，避免节点重叠
-      if (nodes && Array.isArray(nodes) && nodes.length > 0) {
+        // 替换/添加节点后自动应用布局
+      if (hasValidGraph) {
         setTimeout(() => {
           layoutNodes();
-          // 再次验证节点是否还在
-          const nodesAfterLayout = useCanvasStore.getState().nodes.length;
-          log('📊 [CommandBar] 布局后的节点数量:', {
-            nodesCount: nodesAfterLayout,
-            expected: nodesBeforeAdd + nodes.length,
-          });
-        }, 100); // 延迟执行，确保节点已添加到状态中
+          log('📊 [CommandBar] 布局已应用，节点数:', useCanvasStore.getState().nodes.length);
+        }, 100);
       }
       
-      // 重置状态（在节点成功添加后）
-      // 注意：只有在节点成功添加后才重置状态
       const finalNodesCount = useCanvasStore.getState().nodes.length;
-      if (finalNodesCount > nodesBeforeAdd) {
-        log('🔄 [CommandBar] 节点已成功添加，重置状态');
-        updateLastAssistantMessage(`已根据描述生成画布并添加 ${nodes?.length ?? 0} 个节点。`, 'done');
+      const success = hasValidGraph && finalNodesCount > 0;
+      if (success) {
+        log('🔄 [CommandBar] 画布已更新，重置状态');
+        updateLastAssistantMessage(`已根据描述生成画布并添加 ${finalNodesCount} 个节点。`, 'done');
+        // 首页触发生成时：用用户描述自动填充项目名称与画像
+        const nameFromPrompt = lastPendingCreatePromptRef.current?.trim();
+        if (nameFromPrompt) {
+          const projectName = nameFromPrompt.length > 40 ? nameFromPrompt.slice(0, 40) + '…' : nameFromPrompt;
+          const inferred = inferProjectMetaFromPrompt(nameFromPrompt);
+          updateProjectMeta({ projectName, ...inferred });
+          lastPendingCreatePromptRef.current = null;
+        }
         // 移除自动生成UI的逻辑，用户需要手动在节点详情面板中生成UI
-        
+
         setPrompt('');
         setAttachment(null);
       setAttachments([]);
@@ -583,9 +620,9 @@ export function CommandBar(props: {
     setPendingClarificationReply(null);
     setPendingClarificationContext(null);
     setAiCreatePending(true);
-    // 从澄清回复中解析视口并写入 store，供后续 UI 生成与预览使用
-    if (/视口[：:]\s*桌面/.test(reply)) setViewportPreset('desktop');
-    else if (/视口[：:]\s*移动/.test(reply)) setViewportPreset('mobile');
+    // 从澄清回复中解析视口并锁定为全局设置，之后不再显示切换按钮
+    if (/视口[：:]\s*桌面/.test(reply)) lockViewport('desktop');
+    else if (/视口[：:]\s*移动/.test(reply)) lockViewport('mobile');
     const enrichedPrompt = `${ctx.initialPrompt}\n\n用户澄清: ${reply}`;
     executeCreate({
       prompt: enrichedPrompt,
@@ -604,7 +641,54 @@ export function CommandBar(props: {
         clarificationSubmitInFlightRef.current = false;
         setAiCreatePending(false);
       });
-  }, [pendingClarificationReply, pendingClarificationContext, aiConfig, executeCreate, setPendingClarificationReply, setPendingClarificationContext, updateLastAssistantMessage, setAiCreatePending, setViewportPreset]);
+  }, [pendingClarificationReply, pendingClarificationContext, aiConfig, executeCreate, setPendingClarificationReply, setPendingClarificationContext, updateLastAssistantMessage, setAiCreatePending, lockViewport]);
+
+  // 首页触发生成时用于在 onSuccess 里自动设置项目名称
+  const lastPendingCreatePromptRef = useRef<string | null>(null);
+
+  // 首页/Stitch 入口触发生成：pendingCreatePrompt 被设置后执行建图并清空（仅用 hook 取值，避免 getState 在 store 未就绪时为 null）
+  const pendingCreateInFlightRef = useRef(false);
+  useEffect(() => {
+    const promptText = (pendingCreatePrompt ?? '').trim();
+    const media = pendingCreateMedia;
+    const hasContent = promptText || media;
+    if (!hasContent || pendingCreateInFlightRef.current) return;
+    pendingCreateInFlightRef.current = true;
+    lastPendingCreatePromptRef.current = promptText || null;
+    setPendingCreatePrompt(null);
+    setPendingCreateMedia(null);
+    const userMsg: ConversationMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: promptText || (media ? '（上传的文件）' : ''),
+      status: 'done',
+    };
+    const astMsg: ConversationMessage = {
+      id: `ast-${Date.now()}`,
+      role: 'assistant',
+      content: '正在生成画布…',
+      status: 'sending',
+    };
+    appendConversationMessage(userMsg);
+    appendConversationMessage(astMsg);
+    setAiCreatePending(true);
+    setConversationPanelOpen(true);
+    executeCreate({
+      prompt: promptText || '根据上传的文件生成产品图',
+      mediaBase64: media?.mediaBase64,
+      mediaType: media?.mediaType,
+      aiConfig,
+    })
+      .catch((err) => {
+        logError('首页触发生成失败', err);
+        lastPendingCreatePromptRef.current = null;
+        updateLastAssistantMessage(err instanceof Error ? err.message : '请求失败，请重试。', 'error');
+      })
+      .finally(() => {
+        pendingCreateInFlightRef.current = false;
+        setAiCreatePending(false);
+      });
+  }, [pendingCreatePrompt, setPendingCreatePrompt, pendingCreateMedia, setPendingCreateMedia, aiConfig, appendConversationMessage, setAiCreatePending, setConversationPanelOpen, updateLastAssistantMessage, executeCreate]);
 
   // Model Relay actions（必须在所有使用它的函数之前定义）
   const { execute: executeUI, isPending: isGeneratingUI } = useServerAction(generateUIFromImage, {
@@ -1412,7 +1496,7 @@ export function CommandBar(props: {
     const astMsg: ConversationMessage = {
       id: `ast-${Date.now()}`,
       role: 'assistant',
-      content: isEditMode ? '正在生成或更新 UI…' : '正在生成画布…',
+      content: isUIGenerationContext ? '正在生成或更新 UI…' : '正在生成画布…',
       status: 'sending',
     };
     appendConversationMessage(userMsg);
@@ -1421,7 +1505,33 @@ export function CommandBar(props: {
     // 启动加载步骤动画
     startLoadingSteps();
 
-    if (isEditMode && selectedNode) {
+    const userPromptLowerForIntent = prompt.trim().toLowerCase();
+    const isRequestingUIGlobal =
+      userPromptLowerForIntent.includes('生成ui') || userPromptLowerForIntent.includes('生成 ui') ||
+      userPromptLowerForIntent.includes('生成本页面') || userPromptLowerForIntent.includes('生成页面') ||
+      userPromptLowerForIntent.includes('生成界面') || userPromptLowerForIntent.includes('生成一个') ||
+      userPromptLowerForIntent.includes('管理系统') || userPromptLowerForIntent.includes('pc端') ||
+      userPromptLowerForIntent.includes('桌面端') || userPromptLowerForIntent.includes('后台');
+
+    // 有画布节点、用户要求生成UI、但未选中节点 → 选中首个节点并提示再次发送，避免误走建图导致「输入信息不够明确」
+    // 若用户已在画布选中节点（含在节点详情/生成页里输入「生成UI」），不提示「再次发送」，直接走下方 UI 生成分支
+    const hasNoAttachment = !attachment && attachments.length === 0;
+    const canGenerateUIForSelectedNode = selectedNode !== null; // 含 embedInPanel 场景：面板内输入时仍按当前选中节点生成
+    if (!canGenerateUIForSelectedNode && nodes.length > 0 && isRequestingUIGlobal && hasNoAttachment) {
+      selectNode(nodes[0].id);
+      openNodeDetail(nodes[0].id);
+      updateLastAssistantMessage(`已选中「${nodes[0].data?.label ?? '首页'}」，请再次点击发送以生成该页面的 UI。`, 'done');
+      toast.info('已选中首个节点', {
+        description: '请再次点击发送以生成该页面的 UI',
+        duration: 4000,
+      });
+      setProgress(0);
+      setLoadingStep('');
+      clearLoadingTimers();
+      return;
+    }
+
+    if ((isEditMode || embedInPanel) && selectedNode) {
       // 检查是否有图片附件，如果有则使用 Model Relay 流程（generateUIFromImage）
       // 优先用 attachment，若无图片则从 attachments 中取第一个图片，确保「上传图片生成UI」一定走通
       const isPdf = (a: FileAttachment | null) => a?.mimeType === 'application/pdf';
@@ -2191,7 +2301,8 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                 isNull: executeUIText === null,
               });
               
-              const viewportPresetForCall = (viewportSubmitRef?.current ?? useCanvasStore.getState().viewportPreset ?? 'mobile') as ViewportPreset;
+              const state = useCanvasStore.getState();
+              const viewportPresetForCall = (state.viewportLocked ?? viewportSubmitRef?.current ?? state.viewportPreset ?? 'mobile') as ViewportPreset;
               log('📐 [CommandBar] 当前视口(HTML参考路径):', viewportPresetForCall);
               const viewportLabelForCall = viewportPresetForCall === 'desktop' ? '桌面' : '移动';
               toast.info(`正在按【${viewportLabelForCall}】视口生成…`, { duration: 3000, id: 'viewport-send' });
@@ -2499,7 +2610,8 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
           
           console.log('✅ [CommandBar] executeUIText 函数验证通过 (文本模式)，开始调用...');
 
-          const viewportPresetForCall = (viewportSubmitRef?.current ?? useCanvasStore.getState().viewportPreset ?? 'mobile') as ViewportPreset;
+          const state = useCanvasStore.getState();
+          const viewportPresetForCall = (state.viewportLocked ?? viewportSubmitRef?.current ?? state.viewportPreset ?? 'mobile') as ViewportPreset;
           log('📐 [CommandBar] 当前视口(文本模式):', viewportPresetForCall);
           const viewportLabel = viewportPresetForCall === 'desktop' ? '桌面' : '移动';
           toast.info(`正在按【${viewportLabel}】视口生成…`, { duration: 3000, id: 'viewport-send' });
@@ -3016,7 +3128,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
   const isVideo = attachment?.mimeType?.startsWith('video/');
   const isImage = attachment?.mimeType?.startsWith('image/') || (attachment?.type === 'media' && attachment.preview && !isPDF && !isVideo);
   
-  const buttonText = isEditMode
+  const buttonText = isUIGenerationContext
     ? (attachment?.type === 'text'
       ? '📄 从文档更新'
       : attachment?.type === 'media' && isPDF
@@ -3348,7 +3460,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
               placeholder={
                 waitingClarification
                   ? (embedInPanel ? '请在上方选择或输入后发送' : '请在右侧对话窗口选择或输入后发送')
-                  : isEditMode && selectedNode
+                  : isUIGenerationContext && selectedNode
                   ? `编辑 ${selectedNode.data.label}...`
                   : embedInPanel
                   ? '描述产品想法，或拖拽文件到这里'
@@ -3376,7 +3488,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                   ? "请输入内容或上传文件"
                   : isLoading
                   ? "正在处理中..."
-                  : isEditMode
+                  : isUIGenerationContext
                   ? "更新当前节点"
                   : "生成新的节点和连接"
               }

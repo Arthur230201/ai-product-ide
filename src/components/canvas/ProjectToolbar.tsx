@@ -9,9 +9,8 @@ import { exportToFullPrdHtml, exportToWord, exportTestReport, exportSystemDesign
 import { exportToEnterpriseWord } from '@/utils/wordGenerator';
 import { captureNodePreviews } from '@/utils/capture-node-preview';
 import { isHtmlCode } from '@/utils/html-body-extractor';
-
 export function ProjectToolbar() {
-  const { clearCanvas, exportProject, loadProject, addBlankNode, isDetailPanelOpen, nodes, edges, projectMeta, globalRules } = useCanvasStore();
+  const { clearCanvas, exportProject, loadProject, addBlankNode, isDetailPanelOpen, nodes, edges, projectMeta, globalRules, selectedNodeId, updateNodeData } = useCanvasStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
@@ -31,7 +30,7 @@ export function ProjectToolbar() {
       const projectData = exportProject();
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
       const filename = `project-${timestamp}.json`;
-      
+
       const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -41,7 +40,7 @@ export function ProjectToolbar() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      
+
       toast.success('项目已保存', {
         description: `已保存为 ${filename}`,
       });

@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Cosmos 积鲲宇宙：企业级知识图谱驱动智能决策平台。让系统真正理解你的业务，从问数到执行形成可信闭环。私有化部署、全链路可解释。" />
+  <meta property="og:title" content="Cosmos 积鲲宇宙 — 企业认知操作系统" />
+  <meta property="og:description" content="让系统真正理解你的业务。企业级知识图谱驱动智能决策，私有化部署、全链路可解释。" />
+  <meta name="theme-color" content="#6D5DF6" />
+  <title>Cosmos 积鲲宇宙 — 企业级知识图谱驱动智能决策平台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- 官网级动效：Shader + Bloom + GSAP（四层动画系统） -->
+  <script type="importmap">
+    { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+  </script>
+  <script src="https://unpkg.com/gsap@3.12.2/dist/gsap.min.js"></script>
+  <script src="https://unpkg.com/gsap@3.12.2/dist/ScrollTrigger.min.js"></script>
+  <script>
+    tailwind.config = {
+      dark: 'class',
+      theme: {
+        extend: {
+          colors: {
+            deep: { DEFAULT: '#0b0f19', 950: '#070a12' },
+            cosmos: {
+              400: '#22d3ee',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              glow: 'rgba(14, 165, 233, 0.25)',
+              dim: 'rgba(14, 165, 233, 0.08)',
+            },
+            violet: { 400: '#a78bfa', 500: '#8b5cf6' },
+          },
+          fontFamily: { display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'], body: ['"DM Sans"', 'system-ui', 'sans-serif'] },
+          animation: {
+            'fade-up': 'fadeUp 0.5s ease-out forwards',
+            'pulse-glow': 'pulseGlow 2.5s ease-in-out infinite',
+            'orb': 'orb 18s ease-in-out infinite',
+          },
+          keyframes: {
+            fadeUp: { '0%': { opacity: '0', transform: 'translateY(20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+            pulseGlow: { '0%, 100%': { opacity: '0.6', boxShadow: '0 0 24px rgba(14,165,233,0.2)' }, '50%': { opacity: '1', boxShadow: '0 0 32px rgba(14,165,233,0.35)' } },
+            orb: { '0%, 100%': { transform: 'translate(0,0) scale(1)' }, '33%': { transform: 'translate(8%, -5%) scale(1.05)' }, '66%': { transform: 'translate(-5%, 5%) scale(0.98)' } },
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    /* ========== Light Tech Luxury：科技奢侈品感 + 企业权威感 + 未来操作系统感 ========== */
+    :root {
+      --bg-base: #F5F7FB;
+      --bg-deep: #F5F7FB;
+      --bg-deep-2: #EEF1F6;
+      --cabin: #e2e8f0;
+      --primary: #6D5DF6;
+      --secondary: #4DA3FF;
+      --accent: #8DEBFF;
+      --text-primary: #0F172A;
+      --text-muted: #475569;
+      --glass: rgba(255,255,255,0.92);
+      --glass-border: rgba(0,0,0,0.06);
+      --glow-primary: rgba(109,93,246,0.35);
+      --glow-secondary: rgba(77,163,255,0.25);
+    }
+    html { scroll-behavior: smooth; }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .motion-reduce\:animate-none { animation: none !important; }
+      .motion-reduce\:opacity-100 { opacity: 1 !important; transform: none !important; }
+    }
+    /* 无动效 / JS 未运行时的回退：保证官网内容始终可见 */
+    .motion-reduce #hero-section .hero-wake,
+    .motion-reduce #hero-section .hero-particles-canvas { opacity: 1 !important; transform: none !important; }
+    .motion-reduce .reveal { opacity: 1 !important; transform: none !important; }
+    /* 若根元素有 .js-fallback 表示 GSAP 未加载，同样显示内容 */
+    .js-fallback #hero-section .hero-wake,
+    .js-fallback #hero-section .hero-particles-canvas { opacity: 1 !important; transform: none !important; }
+    .js-fallback .reveal { opacity: 1 !important; transform: none !important; }
+    body { font-family: 'Inter', 'DM Sans', system-ui, sans-serif; background: var(--bg-base); color: var(--text-primary); min-height: 100vh; }
+    .font-display { font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif; }
+    /* 雾状渐变背景（Apple Vision Pro 级）：base + gradient fog */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: -20%;
+      z-index: -1;
+      background:
+        radial-gradient(circle at 50% 25%, rgba(109,93,246,0.06), transparent 50%),
+        radial-gradient(circle at 85% 75%, rgba(77,163,255,0.05), transparent 50%);
+      filter: blur(100px);
+      pointer-events: none;
+    }
+    @media (prefers-reduced-motion: reduce) { body::before { filter: blur(60px); } }
+    .scanline { opacity: 0.008; }
+    .noise { opacity: 0.015; }
+
+    /* 区块分区线：中间亮两端淡（round 1） */
+    .section-divider {
+      position: relative;
+    }
+    .section-divider::before {
+      content: ''; position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+      width: 60%; max-width: 480px; height: 1px;
+      background: linear-gradient(90deg, transparent 0%, rgba(109,93,246,0.2) 50%, transparent 100%);
+    }
+    /* 第四层：CSS 渐变流动（紫→蓝→青，背景/UI 变色） */
+    .hero-gradient-flow {
+      background: linear-gradient(120deg, #7c3aed 0%, #0ea5e9 35%, #0891b2 65%, #7c3aed 100%);
+      background-size: 200% 200%;
+      animation: gradient-flow 12s ease infinite;
+    }
+    @media (prefers-reduced-motion: reduce) { .hero-gradient-flow { animation: none; } }
+    @keyframes gradient-flow {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    /* Hero 背景：分层体积雾（前景快/中景中/背景慢，呼吸感） */
+    .hero-bg { background: transparent; }
+    .hero-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(160px);
+      pointer-events: none;
+    }
+    .hero-blob-1 {
+      width: 380px; height: 380px; background: var(--primary);
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+      opacity: 0.2;
+      animation: orb 28s ease-in-out infinite, blob-breathe-mid 8s ease-in-out infinite;
+    }
+    .hero-blob-2 {
+      width: 260px; height: 260px; background: var(--secondary);
+      top: 15%; right: 10%;
+      opacity: 0.22;
+      animation: orb 18s ease-in-out infinite reverse, blob-breathe-fg 6s ease-in-out infinite 0.5s;
+    }
+    .hero-blob-3 {
+      width: 480px; height: 480px; background: var(--primary);
+      bottom: -10%; left: 50%; transform: translate(-50%, 0);
+      opacity: 0.12;
+      filter: blur(200px);
+      animation: orb 42s ease-in-out infinite, blob-breathe-bg 12s ease-in-out infinite 1s;
+    }
+    @keyframes blob-breathe-mid {
+      0%, 100% { opacity: 0.2; transform: translate(-50%, -50%) scale(1); }
+      50% { opacity: 0.14; transform: translate(-50%, -50%) scale(1.06); }
+    }
+    @keyframes blob-breathe-fg {
+      0%, 100% { opacity: 0.22; transform: scale(1); }
+      50% { opacity: 0.16; transform: scale(1.08); }
+    }
+    @keyframes blob-breathe-bg {
+      0%, 100% { opacity: 0.12; }
+      50% { opacity: 0.08; }
+    }
+
+    /* 从提问到执行：轨道节点，滚动点亮 */
+    .flow-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: rgba(109,93,246,0.25);
+      border: 2px solid rgba(109,93,246,0.4);
+      transition: background 0.3s ease, box-shadow 0.3s ease;
+    }
+    .flow-node.is-visible .flow-dot {
+      background: var(--primary);
+      box-shadow: 0 0 20px var(--glow-primary);
+    }
+    .flow-node.is-visible .flow-dot::after {
+      content: '';
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      border: 2px solid rgba(109,93,246,0.5);
+      animation: flow-pulse-ring 1.8s ease-out infinite;
+      pointer-events: none;
+    }
+    .flow-dot { position: relative; }
+    @keyframes flow-pulse-ring {
+      0% { transform: scale(0.6); opacity: 1; }
+      100% { transform: scale(1.4); opacity: 0; }
+    }
+    /* Why：中心根因 + 四角卡片 + 连线 hover 点亮 */
+    .why-matrix { position: relative; }
+    .why-card { position: absolute; transition: box-shadow 0.25s ease; }
+    .why-card:hover { box-shadow: 0 12px 32px -12px var(--glow-primary), 0 0 0 1px rgba(109,93,246,0.2); }
+    .why-connector {
+      background: linear-gradient(90deg, transparent, rgba(109,93,246,0.2));
+      transition: background 0.25s ease;
+    }
+    .why-card[data-role="it"] .why-connector,
+    .why-card[data-role="audit"] .why-connector { left: auto; right: 100%; background: linear-gradient(90deg, rgba(109,93,246,0.2), transparent); }
+    .why-card:hover .why-connector { background: linear-gradient(90deg, transparent, var(--primary)); }
+    .why-card[data-role="it"]:hover .why-connector,
+    .why-card[data-role="audit"]:hover .why-connector { background: linear-gradient(90deg, var(--primary), transparent); }
+    .case-tab.is-active { color: var(--primary); background: rgba(109,93,246,0.08); border-color: rgba(109,93,246,0.3); }
+
+    /* CTA 第五幕：冷光呼吸 + 按钮区极淡扫描线 */
+    .cta-glow {
+      animation: cta-glow-breathe 6s ease-in-out infinite;
+    }
+    @keyframes cta-glow-breathe {
+      0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scaleX(1); }
+      50% { opacity: 1; transform: translate(-50%, -50%) scaleX(1.02); }
+    }
+    .cta-scan::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 50%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(109,93,246,0.06), transparent);
+      animation: cta-scan-sweep 4s ease-in-out infinite;
+    }
+    @keyframes cta-scan-sweep {
+      0% { left: -100%; }
+      100% { left: 150%; }
+    }
+    html.motion-reduce .cta-glow { animation: none; }
+    html.motion-reduce .cta-scan::after { animation: none; }
+
+    /* Glass cards */
+    .glass-card {
+      background: var(--glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    }
+    .glass-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 40px -20px var(--glow-secondary), 0 0 0 1px rgba(109,93,246,0.2);
+      border-color: rgba(109,93,246,0.25);
+      background: rgba(255,255,255,0.95);
+    }
+
+    /* Five-layer architecture: orbit blocks（浅色） */
+    .arch-layer {
+      position: relative;
+      background: rgba(255,255,255,0.9);
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 10px;
+      padding: 16px 20px;
+      min-height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+      cursor: default;
+    }
+    .arch-layer:hover {
+      background: rgba(255,255,255,1);
+      border-color: rgba(109,93,246,0.4);
+      box-shadow: 0 8px 28px -8px var(--glow-primary), 0 0 0 1px rgba(109,93,246,0.15);
+    }
+    .arch-connector {
+      width: 2px;
+      height: 12px;
+      margin-left: 24px;
+      background: linear-gradient(180deg, rgba(109,93,246,0.35) 0%, transparent 100%);
+      flex-shrink: 0;
+      transition: opacity 0.25s ease, background 0.25s ease;
+    }
+    .arch-layer:hover + .arch-connector,
+    .arch-layer.is-hovered + .arch-connector { background: linear-gradient(180deg, var(--accent) 0%, rgba(8,145,178,0.35) 100%); opacity: 1; }
+    .arch-layer .layer-name { font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 600; color: var(--primary); font-size: 0.95rem; }
+    .arch-layer .layer-mods { color: var(--text-muted); font-size: 0.85rem; }
+
+    /* Reveal on scroll */
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.5s ease, transform 0.5s ease; }
+    .reveal.revealed { opacity: 1; transform: translateY(0); }
+    .reveal-delay-1 { transition-delay: 0.05s; }
+    .reveal-delay-2 { transition-delay: 0.1s; }
+    .reveal-delay-3 { transition-delay: 0.15s; }
+    .reveal-delay-4 { transition-delay: 0.2s; }
+    .reveal-delay-5 { transition-delay: 0.25s; }
+    .reveal-delay-6 { transition-delay: 0.3s; }
+
+    .focus-ring:focus { outline: 2px solid var(--primary); outline-offset: 2px; }
+    /* CTA：实体冷光（发光稀缺） */
+    .btn-primary {
+      padding: 16px 32px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #6D5DF6, #4DA3FF);
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 10px 40px var(--glow-primary);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 16px 48px var(--glow-primary);
+    }
+    .btn-secondary {
+      border: 1px solid rgba(15,23,42,0.15);
+      color: var(--text-primary);
+      background: rgba(255,255,255,0.7);
+      backdrop-filter: blur(8px);
+      transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+    }
+    .btn-secondary:hover { border-color: var(--secondary); background: rgba(59,130,246,0.08); transform: translateY(-2px); color: var(--secondary); }
+
+    /* ========== Logo：仅简单悬停（不做复杂动效） ========== */
+    header a.logo-wrap {
+      position: relative; display: inline-flex; align-items: center; gap: 0.5rem;
+      transition: opacity 0.25s ease;
+    }
+    header a.logo-wrap:hover { opacity: 0.9; }
+    header .logo-dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--primary);
+      box-shadow: 0 0 8px var(--glow-primary);
+      transition: box-shadow 0.25s ease;
+    }
+    .logo-dot-pulse { animation: logo-pulse 2.2s ease-in-out infinite; }
+    @keyframes logo-pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--glow-primary); }
+      50% { opacity: 0.85; box-shadow: 0 0 14px var(--glow-primary), 0 0 24px rgba(109,93,246,0.2); }
+    }
+    header a.logo-wrap:hover .logo-dot { box-shadow: 0 0 12px var(--glow-primary), 0 0 20px rgba(109,93,246,0.25); }
+    /* 当前 section 激活：导航底部极细冷辉线 */
+    .nav-link { position: relative; }
+    .nav-link.is-active::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: 4px;
+      width: 24px;
+      height: 2px;
+      margin-left: -12px;
+      background: linear-gradient(90deg, transparent, var(--primary), transparent);
+      border-radius: 1px;
+      opacity: 1;
+    }
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      bottom: 4px;
+      width: 0;
+      height: 2px;
+      margin-left: 0;
+      background: var(--primary);
+      border-radius: 1px;
+      opacity: 0;
+      transition: width 0.2s ease, margin-left 0.2s ease, opacity 0.2s ease;
+    }
+    .nav-link:hover::after { width: 24px; margin-left: -12px; opacity: 1; }
+    .nav-link.is-active::after { width: 24px; margin-left: -12px; opacity: 1; }
+    /* 滚动后 Header 冰层感 */
+    .header-control.is-scrolled { background: rgba(255,255,255,0.78); border-color: rgba(0,0,0,0.06); }
+    header .logo-text { color: var(--text-primary); }
+
+    .nav-link { transition: color 0.2s ease; }
+    .nav-link:hover { color: var(--primary) !important; }
+
+    /* 区块标题：悬停发光下划线 */
+    .section-title { position: relative; display: inline-block; transition: text-shadow 0.3s ease; }
+    .section-title:hover { text-shadow: 0 0 20px var(--glow-primary); }
+    .section-title::after {
+      content: ''; position: absolute; left: 50%; bottom: -8px; width: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--primary), transparent);
+      transition: width 0.35s ease, left 0.35s ease;
+    }
+    .section-title:hover::after { width: 100%; left: 0; }
+
+    /* 玻璃卡片：悬停时边框光晕扫过 + 内光晕 */
+    .glass-card { position: relative; overflow: hidden; }
+    .glass-card::before {
+      content: ''; position: absolute; inset: -1px; border-radius: 13px; padding: 1px;
+      background: linear-gradient(120deg, transparent 30%, rgba(8,145,178,0.2) 50%, transparent 70%);
+      background-size: 200% 200%; -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+      opacity: 0; transition: opacity 0.4s ease, background-position 0.6s ease; pointer-events: none;
+    }
+    .glass-card:hover::before { opacity: 1; background-position: 100% 0; }
+    .glass-card::after {
+      content: ''; position: absolute; inset: 0; border-radius: 12px;
+      background: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(8,145,178,0.06), transparent 40%);
+      opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
+    }
+    .glass-card:hover::after { opacity: 1; }
+
+    /* 主按钮：光泽扫过 */
+    .btn-primary { position: relative; overflow: hidden; }
+    .btn-primary::after {
+      content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+      transition: left 0.5s ease; pointer-events: none;
+    }
+    .btn-primary:hover::after { left: 100%; }
+    .btn-secondary::after {
+      content: ''; position: absolute; inset: 0; border-radius: inherit;
+      background: linear-gradient(120deg, transparent, rgba(34,211,238,0.08), transparent);
+      background-size: 200% 200%; opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
+    }
+    .btn-secondary { position: relative; overflow: hidden; }
+    .btn-secondary:hover::after { opacity: 1; animation: btn-shine 1.2s ease infinite; }
+    @keyframes btn-shine { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+
+    /* 架构连接线：数据流动画 */
+    .arch-connector { position: relative; overflow: visible; }
+    .arch-connector .flow-dot {
+      position: absolute; left: 50%; top: -4px; width: 4px; height: 4px; margin-left: -2px;
+      background: #0891b2; border-radius: 50%; box-shadow: 0 0 8px rgba(8,145,178,0.6);
+      opacity: 0; transition: opacity 0.25s ease;
+      animation: flow-down 1.2s ease-in-out infinite;
+    }
+    .arch-layer:hover + .arch-connector .flow-dot,
+    .arch-layer.is-hovered + .arch-connector .flow-dot { opacity: 1; }
+    @keyframes flow-down {
+      0% { top: -4px; opacity: 0; }
+      20% { opacity: 1; }
+      80% { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    /* 页脚：微妙渐变呼吸 */
+    .footer-brand { transition: text-shadow 0.5s ease; }
+    .footer:hover .footer-brand { text-shadow: 0 0 16px rgba(8,145,178,0.2); }
+    /* 鼠标跟随光晕显示态 */
+    #cursor-glow.cursor-glow-visible { opacity: 0.35; }
+    /* ========== Hero：纯 CSS 双技术点（无 WebGL）========== */
+    /* Hero 巨型渐变标题（120–140px 级）+ 柔光：方案规范 */
+    /* 液态标题：渐变 + 鼠标驱动高光位 + 极淡外缘色散 */
+    #hero-section .hero-title {
+      letter-spacing: -0.03em;
+      font-weight: 800;
+      font-size: clamp(72px, 12vw, 168px);
+      line-height: 0.95;
+      background: linear-gradient(90deg, #8b7cf8, #6D5DF6, #4DA3FF, #8DEBFF);
+      background-size: 220% auto;
+      background-position: calc(var(--hero-mouse-x, 50) * 0.4% + 10%) 50%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: hero-gradient-flow 12s ease-in-out infinite;
+      filter: drop-shadow(0 0 28px var(--glow-primary)) drop-shadow(0 0 48px rgba(77,163,255,0.15)) drop-shadow(1px 0 0 rgba(109,93,246,0.1)) drop-shadow(-1px 0 0 rgba(77,163,255,0.08));
+      transition: background-position 0.4s ease-out;
+    }
+    html.motion-reduce #hero-section .hero-title { animation: none !important; }
+    @keyframes hero-gradient-flow {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    /* Hero 区雾状层（与 body 雾呼应） */
+    #hero-section::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      background: radial-gradient(circle at 50% 45%, rgba(109,93,246,0.05), transparent 50%);
+      filter: blur(60px);
+      pointer-events: none;
+    }
+    /* 认知引擎核心体：玻璃环 + 轨道节点 + 中央脉冲（品牌专属，非通用几何） */
+    .hero-core {
+      width: 160px; height: 160px;
+      position: relative;
+      margin: 2rem auto;
+    }
+    .hero-core-ring {
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(109,93,246,0.35);
+      border-radius: 50%;
+      animation: hero-core-rotate 20s linear infinite;
+    }
+    .hero-core-ring:nth-child(2) { inset: 12px; border-color: rgba(77,163,255,0.25); animation-duration: 28s; animation-direction: reverse; }
+    .hero-core-ring:nth-child(3) { inset: 28px; border-color: rgba(141,235,255,0.2); animation-duration: 16s; }
+    .hero-core-node {
+      position: absolute;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 12px var(--glow-primary);
+      top: 0; left: 50%; margin-left: -3px;
+    }
+    .hero-core-ring:nth-child(1) .hero-core-node { top: 0; }
+    .hero-core-ring:nth-child(2) .hero-core-node { top: 0; left: 50%; background: var(--secondary); }
+    .hero-core-ring:nth-child(3) .hero-core-node { top: 0; left: 50%; background: var(--accent); }
+    .hero-core-pulse {
+      position: absolute;
+      inset: 50%;
+      width: 24px; height: 24px;
+      margin: -12px 0 0 -12px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(109,93,246,0.9) 0%, rgba(109,93,246,0.2) 70%, transparent 100%);
+      box-shadow: 0 0 24px var(--glow-primary), 0 0 48px rgba(109,93,246,0.2);
+      animation: hero-core-pulse 2.5s ease-in-out infinite;
+    }
+    @keyframes hero-core-rotate { to { transform: rotate(360deg); } }
+    @keyframes hero-core-pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.08); opacity: 0.85; }
+    }
+    html.motion-reduce .hero-core-ring { animation: none; }
+    html.motion-reduce .hero-core-pulse { animation: none; }
+    /* 凝视响应：核心体极轻朝向鼠标 */
+    #hero-section .hero-core {
+      transform: translate(calc((var(--hero-mouse-x, 50) - 50) * 0.12px), calc((var(--hero-mouse-y, 50) - 50) * 0.12px));
+      transition: transform 0.25s ease-out;
+    }
+    /* 第一幕：入场由 GSAP 控制，初始隐藏 */
+    #hero-section .hero-wake { opacity: 0; }
+    #hero-section .hero-particles-canvas { opacity: 0; }
+    /* 副标题：像 XCode 的蓝色 CTA，悬停变深蓝 + 轻微上浮 */
+    #hero-section .hero-tagline {
+      color: #0e7490;
+      transition: color 0.2s ease, transform 0.2s ease;
+    }
+    #hero-section .hero-tagline:hover {
+      color: #155e75;
+      transform: translateY(-2px);
+    }
+    /* 描述：灰字，悬停略深 + 轻微上浮 */
+    #hero-section .hero-subtitle {
+      transition: color 0.2s ease, transform 0.2s ease;
+    }
+    #hero-section .hero-subtitle:hover {
+      color: #475569;
+      transform: translateY(-2px);
+    }
+    /* Hero 副信息行：极简文案，无重动效 */
+    #hero-section .hero-pill {
+      transition: color 0.2s ease;
+    }
+    #hero-section .hero-pill:hover {
+      color: var(--primary);
+    }
+    /* 主按钮：XCode 蓝按钮 — 悬停略深 + 轻微上浮 */
+    #hero-section .btn-primary {
+      transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    }
+    #hero-section .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(14,165,233,0.35);
+      filter: brightness(0.97);
+    }
+    /* 次按钮：描边 — 悬停填淡蓝 + 轻微上浮 */
+    #hero-section .btn-secondary {
+      transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+    }
+    #hero-section .btn-secondary:hover {
+      transform: translateY(-2px);
+      border-color: #0891b2;
+      background: #ecfeff;
+      color: #0e7490;
+    }
+    /* Three.js 画布填满 Hero 容器 */
+    #hero-three canvas { width: 100%; height: 100%; display: block; }
+
+    /* 卡片舱体感：左上角 L 形高光（浅色主题） */
+    .glass-card .card-corner {
+      position: absolute; left: 0; top: 0; width: 20px; height: 20px;
+      border-left: 2px solid rgba(109,93,246,0.5); border-top: 2px solid rgba(109,93,246,0.5);
+      border-radius: 12px 0 0 0; opacity: 0; transition: opacity 0.3s ease;
+    }
+    .glass-card:hover .card-corner { opacity: 1; }
+    /* 实施与信任区：收束 — 背景干净、弱化阴影与装饰 */
+    .trust-section { background: #fafbfc !important; }
+    .trust-section .trust-card {
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      border: 1px solid rgba(0,0,0,0.06);
+    }
+    .trust-section .trust-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .trust-section .card-corner { display: none; }
+    /* 企业级：焦点可见性，键盘与辅助技术友好 */
+    .focus-ring:focus { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .focus-ring:focus:not(:focus-visible) { outline: none; }
+    .focus-ring:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+    .btn-primary:focus-visible, .btn-secondary:focus-visible { box-shadow: 0 0 0 3px rgba(109,93,246,0.35); }
+    @media print {
+      .hero-blob, .hero-particles-canvas, #hero-three, .cta-glow, .cta-scan, #cursor-glow, .scanline, .noise { display: none !important; }
+      body::before { filter: none; opacity: 0.5; }
+    }
+  </style>
+</head>
+<body class="antialiased" style="padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right);">
+  <noscript>
+    <style>#hero-section .hero-wake,#hero-section .hero-particles-canvas,.reveal{opacity:1 !important;transform:none !important;}</style>
+  </noscript>
+  <div class="scanline motion-reduce:animate-none" aria-hidden="true"></div>
+  <div class="noise" aria-hidden="true"></div>
+  <!-- 跟随鼠标的全局光晕（仅桌面、非 reduced-motion） -->
+  <div id="cursor-glow" class="fixed w-96 h-96 rounded-full pointer-events-none opacity-0 motion-reduce:opacity-0 transition-opacity duration-300 -translate-x-1/2 -translate-y-1/2" style="background: radial-gradient(circle, rgba(8,145,178,0.08) 0%, transparent 70%); filter: blur(40px);" aria-hidden="true"></div>
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-cosmos-500 focus:text-white focus:rounded-lg focus-ring">跳到主内容</a>
+
+  <!-- Nav: control bar -->
+  <header id="site-header" class="header-control sticky top-0 z-50 border-b border-slate-200/60 bg-white/85 backdrop-blur-xl transition-colors duration-300">
+    <nav class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-14" aria-label="主导航">
+      <a href="#" class="logo-wrap font-display font-bold text-lg text-white focus-ring rounded-lg px-2 py-1 flex items-center gap-2" aria-label="Cosmos 积鲲宇宙 首页">
+        <span class="logo-dot logo-dot-pulse" aria-hidden="true"></span>
+        <span class="logo-text">Cosmos 积鲲宇宙</span>
+      </a>
+      <div class="flex items-center gap-1 sm:gap-2">
+        <a href="#why" class="nav-link js-nav-link text-slate-600 hover:text-slate-900 px-3 py-2 rounded-lg text-sm font-medium focus-ring min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors" data-section="why">为什么需要</a>
+        <a href="#product" class="nav-link js-nav-link text-slate-600 hover:text-slate-900 px-3 py-2 rounded-lg text-sm font-medium focus-ring min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors" data-section="product">产品能力</a>
+        <a href="#flow" class="nav-link js-nav-link text-slate-600 hover:text-slate-900 px-3 py-2 rounded-lg text-sm font-medium focus-ring min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors" data-section="flow">演算</a>
+        <a href="#cases" class="nav-link js-nav-link text-slate-600 hover:text-slate-900 px-3 py-2 rounded-lg text-sm font-medium focus-ring min-h-[44px] min-w-[44px] inline-flex items-center justify-center transition-colors" data-section="cases">行业案例</a>
+        <a href="#cta" class="btn-primary px-4 py-2.5 rounded-lg text-sm font-semibold min-h-[44px] inline-flex items-center justify-center focus-ring">预约 Demo</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="main" role="main" style="min-height: 80vh;">
+    <!-- Hero v2：产品宇宙入口 — 巨型标题 + 认知核心装置 + 一句价值主张 + 单 CTA -->
+    <section class="relative min-h-[92vh] flex flex-col items-center justify-center overflow-hidden hero-bg py-20" id="hero-section" aria-labelledby="hero-title">
+      <div id="hero-parallax" class="absolute inset-0 pointer-events-none" aria-hidden="true" style="z-index: 0;">
+        <div class="hero-blob hero-blob-1 motion-reduce:animate-none" aria-hidden="true"></div>
+        <div class="hero-blob hero-blob-2 motion-reduce:animate-none" aria-hidden="true"></div>
+        <div class="hero-blob hero-blob-3 motion-reduce:animate-none" aria-hidden="true"></div>
+        <canvas id="hero-particles" class="hero-particles-canvas absolute inset-0 w-full h-full pointer-events-none motion-reduce:opacity-0" style="z-index: 1;" aria-hidden="true"></canvas>
+        <div id="hero-three" class="absolute inset-0 w-full h-full pointer-events-none opacity-0" aria-hidden="true" style="z-index: 0;"></div>
+      </div>
+      <div class="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 text-center">
+        <h1 class="hero-title font-display tracking-tight hero-wake" id="hero-title">Cosmos</h1>
+        <p class="hero-subtitle mt-2 text-slate-500 font-medium text-lg sm:text-xl tracking-wide hero-wake">积鲲宇宙 · 企业认知操作系统</p>
+        <div class="hero-core hero-wake" aria-hidden="true">
+          <div class="hero-core-ring"><span class="hero-core-node"></span></div>
+          <div class="hero-core-ring"><span class="hero-core-node"></span></div>
+          <div class="hero-core-ring"><span class="hero-core-node"></span></div>
+          <div class="hero-core-pulse"></div>
+        </div>
+        <p class="hero-tagline mt-4 text-slate-600 text-xl sm:text-2xl font-medium max-w-xl mx-auto hero-wake">让系统真正理解你的业务</p>
+        <p class="hero-tagline-sub mt-1 text-slate-500 text-sm hero-wake">企业级知识图谱驱动智能决策 · 私有化部署、全链路可解释</p>
+        <div class="mt-10 hero-wake">
+          <a href="#cta" class="btn-primary inline-flex items-center justify-center focus-ring" id="hero-cta">预约 Demo</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- 从提问到执行：5 步滚动叙事（半沉浸式演示段） -->
+    <section id="flow" class="section-divider py-24 sm:py-32 border-t border-slate-200/50 bg-white" aria-labelledby="flow-title">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 id="flow-title" class="section-title font-display font-bold text-3xl sm:text-4xl text-slate-900 text-center reveal">从一个问题，到一个可执行决策</h2>
+        <p class="mt-3 text-slate-500 text-center text-sm reveal reveal-delay-1">滚动查看系统如何支配复杂性</p>
+        <div class="flow-track mt-16 relative reveal reveal-delay-2">
+          <div class="absolute left-0 right-0 top-1/2 h-px -translate-y-1/2 bg-gradient-to-r from-transparent via-[var(--primary)]/40 to-transparent" aria-hidden="true"></div>
+          <div class="relative flex flex-wrap justify-between gap-y-12 sm:gap-y-0">
+            <div class="flow-node w-full sm:w-[18%] text-center" data-step="1">
+              <div class="flow-dot mx-auto mb-3"></div>
+              <p class="text-xs font-semibold text-[var(--primary)] uppercase tracking-wider">提问</p>
+              <p class="mt-1 text-slate-600 text-sm">自然语言</p>
+            </div>
+            <div class="flow-node w-full sm:w-[18%] text-center" data-step="2">
+              <div class="flow-dot mx-auto mb-3"></div>
+              <p class="text-xs font-semibold text-[var(--primary)] uppercase tracking-wider">语义解析</p>
+              <p class="mt-1 text-slate-600 text-sm">知识图谱</p>
+            </div>
+            <div class="flow-node w-full sm:w-[18%] text-center" data-step="3">
+              <div class="flow-dot mx-auto mb-3"></div>
+              <p class="text-xs font-semibold text-[var(--primary)] uppercase tracking-wider">图谱寻径</p>
+              <p class="mt-1 text-slate-600 text-sm">路径与口径</p>
+            </div>
+            <div class="flow-node w-full sm:w-[18%] text-center" data-step="4">
+              <div class="flow-dot mx-auto mb-3"></div>
+              <p class="text-xs font-semibold text-[var(--primary)] uppercase tracking-wider">规则校验</p>
+              <p class="mt-1 text-slate-600 text-sm">合规与审批</p>
+            </div>
+            <div class="flow-node w-full sm:w-[18%] text-center" data-step="5">
+              <div class="flow-dot mx-auto mb-3"></div>
+              <p class="text-xs font-semibold text-[var(--primary)] uppercase tracking-wider">执行留痕</p>
+              <p class="mt-1 text-slate-600 text-sm">答案 + 证据 + 动作</p>
+            </div>
+          </div>
+          <div class="flow-end-card mt-12 mx-auto max-w-md rounded-2xl border border-slate-200/80 bg-white/90 backdrop-blur-sm p-6 text-center shadow-lg reveal" aria-label="演算终局">
+            <p class="text-xs font-semibold text-[var(--primary)] uppercase tracking-wider mb-2">系统输出</p>
+            <p class="text-slate-800 font-medium">结果 · 证据 · 可执行动作</p>
+            <p class="mt-2 text-slate-500 text-sm">一个问题，完成从语义到决策的闭环。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Why Cosmos：一句大判断 + 中心根因式痛点矩阵 -->
+    <section id="why" class="section-divider py-24 sm:py-32 border-t border-slate-200/50 bg-[var(--bg-base)]" aria-labelledby="why-statement">
+      <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <p id="why-statement" class="why-statement font-display font-bold text-2xl sm:text-3xl lg:text-4xl text-slate-900 text-center leading-tight reveal">
+          企业不是缺数据，而是缺一套能理解业务的系统。
+        </p>
+        <div class="why-matrix mt-20 relative min-h-[420px]">
+          <div class="why-root absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-white border-2 border-[var(--primary)] flex items-center justify-center shadow-[0_0_32px_var(--glow-primary)] z-10 reveal" aria-hidden="true">
+            <span class="text-xs font-semibold text-[var(--primary)]">根因</span>
+          </div>
+          <article class="why-card glass-card p-5 absolute left-0 top-0 w-52 reveal reveal-delay-1" data-role="ceo">
+            <div class="why-connector absolute right-0 top-1/2 w-1/2 h-px -translate-y-1/2 pointer-events-none" aria-hidden="true"></div>
+            <h3 class="font-display font-semibold text-slate-900">CEO / 管理层</h3>
+            <p class="mt-2 text-slate-600 text-sm">要个数等两周，拿到了还不敢信。</p>
+            <p class="mt-2 text-slate-500 text-xs">需要：问一句话就拿答案，可解释口径与来源。</p>
+          </article>
+          <article class="why-card glass-card p-5 absolute right-0 top-0 w-52 reveal reveal-delay-2" data-role="it">
+            <div class="why-connector absolute left-0 top-1/2 w-1/2 h-px -translate-y-1/2 pointer-events-none" aria-hidden="true"></div>
+            <h3 class="font-display font-semibold text-slate-900">IT 负责人</h3>
+            <p class="mt-2 text-slate-600 text-sm">报表需求排到明年，口径沟通成本巨大。</p>
+            <p class="mt-2 text-slate-500 text-xs">需要：业务自助取数，IT 从翻译工中解放。</p>
+          </article>
+          <article class="why-card glass-card p-5 absolute left-0 bottom-0 w-52 reveal reveal-delay-3" data-role="analyst">
+            <div class="why-connector absolute right-0 top-1/2 w-1/2 h-px -translate-y-1/2 pointer-events-none" aria-hidden="true"></div>
+            <h3 class="font-display font-semibold text-slate-900">数据分析师</h3>
+            <p class="mt-2 text-slate-600 text-sm">80% 时间在取数清洗，简单需求 3–5 工作日。</p>
+            <p class="mt-2 text-slate-500 text-xs">需要：语义理解，自动完成问题到结果翻译。</p>
+          </article>
+          <article class="why-card glass-card p-5 absolute right-0 bottom-0 w-52 reveal reveal-delay-4" data-role="audit">
+            <div class="why-connector absolute left-0 top-1/2 w-1/2 h-px -translate-y-1/2 pointer-events-none" aria-hidden="true"></div>
+            <h3 class="font-display font-semibold text-slate-900">合规 / 审计</h3>
+            <p class="mt-2 text-slate-600 text-sm">年底翻三周材料，证据链断了就补不回来。</p>
+            <p class="mt-2 text-slate-500 text-xs">需要：决策与执行自动留痕，一键回溯。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- What is Cosmos -->
+    <section id="product" class="section-divider py-20 sm:py-28 border-t border-slate-200/60 bg-slate-50/50" aria-labelledby="product-title">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 id="product-title" class="section-title font-display font-bold text-3xl sm:text-4xl text-slate-900 text-center reveal">一套企业认知操作系统</h2>
+        <p class="mt-4 text-slate-600 text-center max-w-2xl mx-auto reveal reveal-delay-1">企业私有化部署的知识图谱驱动智能决策平台。语义驱动、闭环决策、可信可控。</p>
+        <p class="mt-4 text-center text-slate-500 text-sm max-w-3xl mx-auto reveal reveal-delay-1 border-b border-slate-200/60 pb-4">Cosmos 不是传统 BI 替代品，也不是套壳问答 —— 补上企业语义层、与中台协同，从问数到执行形成可信闭环。</p>
+
+        <!-- Cosmos Stack：旗舰堆栈交互体 -->
+        <h3 class="font-display font-bold text-3xl sm:text-4xl text-slate-900 mt-20 mb-6 reveal">Cosmos Stack</h3>
+        <p class="text-slate-600 text-base mb-10 max-w-xl reveal reveal-delay-1">从统一入口到业务应用，端到端闭环。悬停层可高亮数据流。</p>
+        <div class="space-y-0 reveal reveal-delay-2">
+          <div class="arch-layer" data-layer="1" tabindex="0">
+            <span class="layer-name">入口层</span>
+            <span class="layer-mods">Genesis — 统一登录 / 工作区 / 通知 / 全局上下文</span>
+          </div>
+          <div class="arch-connector" aria-hidden="true"><span class="flow-dot"></span></div>
+          <div class="arch-layer" data-layer="2" tabindex="0">
+            <span class="layer-name">智能层</span>
+            <span class="layer-mods">Codex（语义权威） · Oracle（智能问答） · Emissary（智能编排）</span>
+          </div>
+          <div class="arch-connector" aria-hidden="true"><span class="flow-dot"></span></div>
+          <div class="arch-layer" data-layer="3" tabindex="0">
+            <span class="layer-name">数据层</span>
+            <span class="layer-mods">Port（结构化） · Chronicle（文档证据） · Ledger（审计） · Dock（IoT）</span>
+          </div>
+          <div class="arch-connector" aria-hidden="true"><span class="flow-dot"></span></div>
+          <div class="arch-layer" data-layer="4" tabindex="0">
+            <span class="layer-name">执行层</span>
+            <span class="layer-mods">Command（受控执行） · Forge（模型工坊）</span>
+          </div>
+          <div class="arch-connector" aria-hidden="true"><span class="flow-dot"></span></div>
+          <div class="arch-layer" data-layer="5" tabindex="0">
+            <span class="layer-name">应用层</span>
+            <span class="layer-mods">Covenant · Deck · Pulse · Bazaar</span>
+          </div>
+        </div>
+
+        <!-- 六大能力：3+3 旗舰分级（上排主能力、下排底座） -->
+        <h3 class="font-display font-bold text-3xl sm:text-4xl text-slate-900 mt-20 mb-6 reveal">核心能力</h3>
+        <div class="grid sm:grid-cols-3 gap-6 reveal reveal-delay-1">
+          <div class="glass-card cap-hero p-6 relative">
+            <span class="card-corner" aria-hidden="true"></span>
+            <div class="cap-visual h-1 w-12 rounded-full bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] mb-4 animate-pulse" aria-hidden="true"></div>
+            <h4 class="font-display font-semibold text-[var(--primary)] text-lg">智能问数</h4>
+            <p class="mt-2 text-slate-600 text-sm">自然语言 → 图谱路径 → 确定性 SQL，秒级返回结果+证据，99%+ 准确率。</p>
+          </div>
+          <div class="glass-card cap-hero p-6 relative">
+            <span class="card-corner" aria-hidden="true"></span>
+            <div class="cap-visual h-1 w-12 rounded-full bg-[var(--primary)]/60 mb-4 rounded-full" style="box-shadow: 0 0 12px var(--glow-primary);" aria-hidden="true"></div>
+            <h4 class="font-display font-semibold text-[var(--primary)] text-lg">知识图谱（Codex）</h4>
+            <p class="mt-2 text-slate-600 text-sm">企业权威字典，四层语义架构，口径族治理，三轨合流自动生长。</p>
+          </div>
+          <div class="glass-card cap-hero p-6 relative">
+            <span class="card-corner" aria-hidden="true"></span>
+            <div class="cap-visual h-1 w-12 rounded-full bg-[var(--secondary)]/70 mb-4" aria-hidden="true"></div>
+            <h4 class="font-display font-semibold text-[var(--primary)] text-lg">智能决策与执行</h4>
+            <p class="mt-2 text-slate-600 text-sm">多步任务编排、规则校验、受控执行与分级审批，与 ERP/OA 协作。</p>
+          </div>
+        </div>
+        <div class="grid sm:grid-cols-3 gap-4 mt-6 reveal reveal-delay-2">
+          <div class="glass-card cap-base p-5 relative">
+            <span class="card-corner" aria-hidden="true"></span>
+            <h4 class="font-display font-semibold text-slate-800 text-base">全链路审计</h4>
+            <p class="mt-1 text-slate-600 text-sm">Ledger 不可篡改审计总账，trace_id 一键回放与导出。</p>
+          </div>
+          <div class="glass-card cap-base p-5 relative">
+            <span class="card-corner" aria-hidden="true"></span>
+            <h4 class="font-display font-semibold text-slate-800 text-base">IoT 闭环</h4>
+            <p class="mt-1 text-slate-600 text-sm">多协议接入，告警→评估→通知→执行四连动作。</p>
+          </div>
+          <div class="glass-card cap-base p-5 relative">
+            <span class="card-corner" aria-hidden="true"></span>
+            <h4 class="font-display font-semibold text-slate-800 text-base">成熟度评估（Pulse）</h4>
+            <p class="mt-1 text-slate-600 text-sm">六维成熟度模型，自动诊断缺口，生成建设方案。</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 行业案例：横向切换式演示台（左文案 + 右示意区） -->
+    <section id="cases" class="section-divider py-24 sm:py-32 border-t border-slate-200/50 bg-white" aria-labelledby="cases-title">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 id="cases-title" class="section-title font-display font-bold text-3xl sm:text-4xl text-slate-900 text-center reveal">在复杂行业中，验证系统的判断力</h2>
+        <div class="cases-stage mt-14 flex flex-col lg:flex-row gap-10 lg:gap-16 items-stretch reveal reveal-delay-1">
+          <div class="cases-tabs flex lg:flex-col gap-2 lg:w-56 shrink-0" role="tablist" aria-label="行业案例">
+            <button type="button" role="tab" aria-selected="true" aria-controls="case-panel" id="tab-energy" class="case-tab px-4 py-3 rounded-xl text-left font-medium text-slate-600 hover:text-slate-900 hover:bg-white/80 border border-transparent hover:border-slate-200/80 transition-all js-case-tab is-active focus-ring" data-case="energy">能源电力</button>
+            <button type="button" role="tab" aria-selected="false" aria-controls="case-panel" id="tab-fb" class="case-tab px-4 py-3 rounded-xl text-left font-medium text-slate-600 hover:text-slate-900 hover:bg-white/80 border border-transparent hover:border-slate-200/80 transition-all js-case-tab focus-ring" data-case="f&B">连锁餐饮</button>
+            <button type="button" role="tab" aria-selected="false" aria-controls="case-panel" id="tab-retail" class="case-tab px-4 py-3 rounded-xl text-left font-medium text-slate-600 hover:text-slate-900 hover:bg-white/80 border border-transparent hover:border-slate-200/80 transition-all js-case-tab focus-ring" data-case="retail">品牌零售</button>
+          </div>
+          <div id="case-panel" class="flex-1 min-w-0 grid md:grid-cols-2 gap-8 items-start" role="tabpanel" aria-labelledby="tab-energy">
+            <div class="cases-copy">
+              <h3 class="case-title font-display font-bold text-xl text-slate-900 js-case-title">能源电力</h3>
+              <p class="mt-2 text-slate-600 text-sm js-case-desc">设备风险排查从 3–4 周缩短至 &lt;1 天；IoT 异常自动处置，凌晨无人值守也可四连动作。</p>
+              <p class="mt-3 text-xs text-slate-500 js-case-metrics">典型：省级电网，8 万+ 变压器，15 万公里线路。</p>
+            </div>
+            <div class="cases-viz rounded-2xl border border-slate-200/80 bg-[var(--bg-base)] min-h-[220px] flex items-center justify-center p-8">
+              <div class="case-viz-placeholder text-slate-400 text-sm text-center js-case-viz">决策闭环 · 设备拓扑 · 告警处置</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 实施与信任：庄严可信区，少炫技、多沉稳 -->
+    <section id="trust" class="trust-section section-divider py-20 sm:py-28 border-t border-slate-200/60 bg-white" aria-labelledby="trust-title">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <h2 id="trust-title" class="section-title font-display font-bold text-3xl text-slate-900 text-center reveal">实施与信任</h2>
+        <div class="mt-12 grid md:grid-cols-2 gap-8">
+          <div class="glass-card trust-card p-6 reveal reveal-delay-1 relative">
+            <h3 class="font-display font-semibold text-slate-900 text-lg">三阶段实施</h3>
+            <ul class="mt-4 space-y-2 text-slate-600 text-sm">
+              <li><strong class="text-slate-800">第一阶段（4–8 周）：</strong>智能问数，1–2 数据源，30–50 实体与指标。</li>
+              <li><strong class="text-slate-800">第二阶段（8–16 周）：</strong>智能决策，50–100 条规则，审批流与 Dry Run。</li>
+              <li><strong class="text-slate-800">第三阶段（持续）：</strong>IoT、成熟度评估、行业域包复制。</li>
+            </ul>
+          </div>
+          <div class="glass-card trust-card p-6 reveal reveal-delay-2 relative">
+            <h3 class="font-display font-semibold text-slate-900 text-lg">安全与合规</h3>
+            <ul class="mt-4 space-y-2 text-slate-600 text-sm">
+              <li>私有化部署，数据不出客户网络。</li>
+              <li>Workspace 隔离，RBAC+ABAC，字段级脱敏。</li>
+              <li>等保 2.0 三级，信创适配（TuGraph、GaussDB 等可替换）。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA：第五幕能量归一 — 中央冷光、扫描线、呼吸感 -->
+    <section id="cta" class="section-divider py-28 sm:py-36 border-t border-slate-200/50 relative overflow-hidden bg-[var(--bg-base)] cta-sanctuary" aria-labelledby="cta-title">
+      <div class="cta-glow absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl h-px bg-gradient-to-r from-transparent via-[var(--primary)]/50 to-transparent pointer-events-none" aria-hidden="true"></div>
+      <div class="relative z-10 max-w-2xl mx-auto px-4 sm:px-6 text-center">
+        <h2 id="cta-title" class="font-display font-bold text-2xl sm:text-3xl lg:text-4xl text-slate-900 reveal">从一个问题开始，验证你的下一代决策系统</h2>
+        <div class="cta-buttons-wrap relative inline-block mt-10 reveal reveal-delay-1">
+          <div class="cta-scan absolute inset-0 rounded-2xl pointer-events-none overflow-hidden" aria-hidden="true"></div>
+          <div class="relative z-10 flex flex-wrap items-center justify-center gap-4">
+            <a href="#cta" class="btn-primary inline-flex items-center justify-center focus-ring">预约 Demo</a>
+            <a href="#cta" class="btn-secondary inline-flex items-center justify-center px-6 py-3 rounded-xl font-semibold focus-ring">获取 POC 方案</a>
+          </div>
+        </div>
+        <p class="mt-6 text-slate-500 text-sm font-medium reveal reveal-delay-2">4 周内完成首个业务闭环验证</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer border-t border-slate-200 py-8 bg-slate-100/80" role="contentinfo">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-slate-600 text-sm">
+      <p class="footer-brand font-display font-semibold text-slate-700">Cosmos 积鲲宇宙</p>
+      <p class="mt-1">让企业数据开口说话，让每一个决策都有据可依</p>
+      <p class="mt-4 text-slate-400 text-xs">© 2025 Cosmos 积鲲宇宙</p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (reduced) document.documentElement.classList.add('motion-reduce');
+      if (!reduced) {
+        var observer = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              var children = entry.target.querySelectorAll('.reveal');
+              children.forEach(function (el) { el.classList.add('revealed'); });
+            }
+          });
+        }, { rootMargin: '0px 0px -80px 0px', threshold: 0 });
+        document.querySelectorAll('section').forEach(function (section) { observer.observe(section); });
+        var flowObserver = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) entry.target.classList.add('is-visible');
+          });
+        }, { rootMargin: '0px 0px -30% 0px', threshold: 0 });
+        document.querySelectorAll('.flow-node').forEach(function (node) { flowObserver.observe(node); });
+      }
+      document.querySelectorAll('.arch-layer').forEach(function (layer) {
+        layer.addEventListener('mouseenter', function () { layer.classList.add('is-hovered'); });
+        layer.addEventListener('mouseleave', function () { layer.classList.remove('is-hovered'); });
+        layer.addEventListener('focus', function () { layer.classList.add('is-hovered'); });
+        layer.addEventListener('blur', function () { layer.classList.remove('is-hovered'); });
+      });
+      // 卡片内鼠标位置 → --mouse-x / --mouse-y（用于光晕跟随）
+      document.querySelectorAll('.glass-card').forEach(function (card) {
+        card.addEventListener('mousemove', function (e) {
+          var rect = card.getBoundingClientRect();
+          var x = ((e.clientX - rect.left) / rect.width) * 100;
+          var y = ((e.clientY - rect.top) / rect.height) * 100;
+          card.style.setProperty('--mouse-x', x + '%');
+          card.style.setProperty('--mouse-y', y + '%');
+        });
+      });
+      // Header 控制条：滚动后冰层 + 当前 section 冷辉
+      (function () {
+        var header = document.getElementById('site-header');
+        var links = document.querySelectorAll('.js-nav-link');
+        var sections = [];
+        links.forEach(function (a) {
+          var id = a.getAttribute('data-section');
+          if (id) sections.push({ id: id, link: a });
+        });
+        function update() {
+          if (window.scrollY > 60 && header) header.classList.add('is-scrolled'); else if (header) header.classList.remove('is-scrolled');
+          var y = window.scrollY + window.innerHeight * 0.35;
+          var active = null;
+          sections.forEach(function (s) {
+            var el = document.getElementById(s.id);
+            if (!el) return;
+            var top = el.getBoundingClientRect().top + window.scrollY;
+            if (top <= y) active = s.id;
+          });
+          links.forEach(function (a) {
+            var isActive = a.getAttribute('data-section') === active;
+            a.classList.toggle('is-active', isActive);
+            a.setAttribute('aria-current', isActive ? 'true' : 'false');
+          });
+        }
+        window.addEventListener('scroll', function () { requestAnimationFrame(update); });
+        window.addEventListener('load', update);
+      })();
+      var caseData = {
+        energy: { title: '能源电力', desc: '设备风险排查从 3–4 周缩短至 <1 天；IoT 异常自动处置，凌晨无人值守也可四连动作。', metrics: '典型：省级电网，8 万+ 变压器，15 万公里线路。', viz: '决策闭环 · 设备拓扑 · 告警处置' },
+        'f&B': { title: '连锁餐饮', desc: '食安实时监控 100% 门店，异常处置 <10 分钟；端午备货与排产 <30 分钟决策。', metrics: '典型：600+ 门店，5 座中央厨房，日均 30 万桌。', viz: '食安监控 · 供应链 · 排产决策' },
+        retail: { title: '品牌零售', desc: '新品铺货决策 <30 分钟；供应商品控追溯与一键处置，Command 可控执行。', metrics: '直营+加盟，口径统一，决策提速。', viz: '铺货决策 · 品控追溯 · 执行闭环' }
+      };
+      document.querySelectorAll('.js-case-tab').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('.js-case-tab').forEach(function (b) { b.classList.remove('is-active'); b.setAttribute('aria-selected', 'false'); });
+          btn.classList.add('is-active');
+          btn.setAttribute('aria-selected', 'true');
+          var panel = document.getElementById('case-panel');
+          if (panel) panel.setAttribute('aria-labelledby', btn.id || 'tab-energy');
+          var id = btn.getAttribute('data-case');
+          var d = caseData[id];
+          if (d) {
+            var titleEl = document.querySelector('.js-case-title');
+            var descEl = document.querySelector('.js-case-desc');
+            var metricsEl = document.querySelector('.js-case-metrics');
+            var vizEl = document.querySelector('.js-case-viz');
+            if (titleEl) titleEl.textContent = d.title;
+            if (descEl) descEl.innerHTML = d.desc;
+            if (metricsEl) metricsEl.textContent = d.metrics;
+            if (vizEl) vizEl.textContent = d.viz;
+          }
+        });
+      });
+    })();
+
+    // 反重力粒子系统（类 Google 粒子特效：鼠标斥力/引力）
+    (function () {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      var COLORS = ['rgba(139,92,246,0.18)', 'rgba(59,130,246,0.15)', 'rgba(6,182,212,0.12)', 'rgba(15,23,42,0.08)'];
+      function runParticles(canvasId, options) {
+        var canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        var ctx = canvas.getContext('2d');
+        var mouse = { x: null, y: null };
+        var particles = [];
+        var count = options.count || 80;
+        var radius = options.radius !== undefined ? options.radius : 2;
+        var repelRadius = options.repelRadius || 120;
+        var repelStrength = options.repelStrength || 0.08;
+        var connectDist = options.connectDist || 140;
+        var container = canvas.parentElement;
+
+        function resize() {
+          canvas.width = container.offsetWidth;
+          canvas.height = container.offsetHeight;
+          if (particles.length === 0) initParticles();
+        }
+        function initParticles() {
+          particles = [];
+          for (var i = 0; i < count; i++) {
+            particles.push({
+              x: Math.random() * canvas.width,
+              y: Math.random() * canvas.height,
+              vx: (Math.random() - 0.5) * 0.5,
+              vy: (Math.random() - 0.5) * 0.5,
+              r: radius,
+              color: COLORS[Math.floor(Math.random() * COLORS.length)]
+            });
+          }
+        }
+        function draw() {
+          if (!ctx || !canvas.width) return;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          var mx = mouse.x; var my = mouse.y;
+          for (var i = 0; i < particles.length; i++) {
+            var p = particles[i];
+            if (mx != null && my != null) {
+              var dx = p.x - mx; var dy = p.y - my;
+              var d = Math.sqrt(dx * dx + dy * dy);
+              if (d < repelRadius && d > 0) {
+                var f = (1 - d / repelRadius) * repelStrength;
+                p.vx += (dx / d) * f;
+                p.vy += (dy / d) * f;
+              }
+            }
+            p.x += p.vx; p.y += p.vy;
+            p.vx *= 0.99; p.vy *= 0.99;
+            if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+            if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+            p.x = Math.max(0, Math.min(canvas.width, p.x));
+            p.y = Math.max(0, Math.min(canvas.height, p.y));
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = p.color;
+            ctx.fill();
+          }
+          ctx.strokeStyle = 'rgba(109,93,246,0.15)';
+          ctx.lineWidth = 0.8;
+          for (var i = 0; i < particles.length; i++) {
+            for (var j = i + 1; j < particles.length; j++) {
+              var a = particles[i]; var b = particles[j];
+              var dx = a.x - b.x; var dy = a.y - b.y;
+              if (dx * dx + dy * dy < connectDist * connectDist) {
+                ctx.beginPath();
+                ctx.moveTo(a.x, a.y);
+                ctx.lineTo(b.x, b.y);
+                ctx.stroke();
+              }
+            }
+          }
+        }
+        function loop() {
+          draw();
+          requestAnimationFrame(loop);
+        }
+        container.addEventListener('mousemove', function (e) {
+          var rect = container.getBoundingClientRect();
+          mouse.x = e.clientX - rect.left;
+          mouse.y = e.clientY - rect.top;
+        });
+        container.addEventListener('mouseleave', function () { mouse.x = null; mouse.y = null; });
+        window.addEventListener('resize', resize);
+        resize();
+        loop();
+      }
+      runParticles('hero-particles', { count: 32, repelRadius: 90, repelStrength: 0.05, connectDist: 100 });
+    })();
+
+    // 跟随鼠标的全局光晕（仅非触摸设备、非 reduced-motion）
+    (function () {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      var el = document.getElementById('cursor-glow');
+      if (!el) return;
+      var x = 0; var y = 0; var raf = null;
+      function update() {
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        raf = null;
+      }
+      document.addEventListener('mousemove', function (e) {
+        x = e.clientX;
+        y = e.clientY;
+        el.classList.add('cursor-glow-visible');
+        if (!raf) raf = requestAnimationFrame(update);
+      });
+      document.addEventListener('mouseleave', function () { el.classList.remove('cursor-glow-visible'); });
+      if ('ontouchstart' in window) el.style.display = 'none';
+    })();
+
+    // 轻微视差：鼠标移动 → 背景层微移，离开后平滑回位（方案规范）
+    (function () {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      var layer = document.getElementById('hero-parallax');
+      if (!layer) return;
+      var x = 0, y = 0, tx = 0, ty = 0;
+      function update() {
+        tx += (x - tx) * 0.08;
+        ty += (y - ty) * 0.08;
+        layer.style.transform = 'translate(' + (tx * 10) + 'px, ' + (ty * 10) + 'px)';
+        requestAnimationFrame(update);
+      }
+      document.addEventListener('mousemove', function (e) {
+        x = (e.clientX / window.innerWidth - 0.5) * 2;
+        y = (e.clientY / window.innerHeight - 0.5) * 2;
+      });
+      document.addEventListener('mouseleave', function () { x = 0; y = 0; });
+      requestAnimationFrame(update);
+    })();
+
+    // 凝视响应：Hero 内 --hero-mouse-x/y 驱动标题高光与核心体微倾
+    (function () {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      var hero = document.getElementById('hero-section');
+      if (!hero) return;
+      document.addEventListener('mousemove', function (e) {
+        var rect = hero.getBoundingClientRect();
+        if (e.clientY < rect.top || e.clientY > rect.bottom) return;
+        var x = ((e.clientX - rect.left) / rect.width) * 100;
+        var y = ((e.clientY - rect.top) / rect.height) * 100;
+        hero.style.setProperty('--hero-mouse-x', x);
+        hero.style.setProperty('--hero-mouse-y', y);
+      });
+    })();
+
+    // ========== 电影级五幕编排：GSAP 时间线 + ScrollTrigger ==========
+    (function () {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      if (typeof gsap === 'undefined') {
+        document.documentElement.classList.add('js-fallback');
+        return;
+      }
+      gsap.registerPlugin(ScrollTrigger);
+
+      // 第一幕：静默唤醒 — blob 已在，标题 0.4s 显影 → 副标题 → 核心体 → 价值句 → CTA → 粒子最后接入
+      var heroSection = document.getElementById('hero-section');
+      if (heroSection) {
+        var title = heroSection.querySelector('.hero-title');
+        var subtitle = heroSection.querySelector('.hero-subtitle');
+        var core = heroSection.querySelector('.hero-core');
+        var tagline = heroSection.querySelector('.hero-tagline');
+        var ctaWrap = heroSection.querySelector('.mt-10.hero-wake');
+        var particlesCanvas = document.getElementById('hero-particles');
+        var tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+        if (title) tl.fromTo(title, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.7 }, 0.4);
+        if (subtitle) tl.fromTo(subtitle, { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.5 }, 0.65);
+        if (core) tl.fromTo(core, { opacity: 0, scale: 0.96 }, { opacity: 1, scale: 1, duration: 0.6 }, 0.9);
+        if (tagline) tl.fromTo(tagline, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5 }, 1.1);
+        if (ctaWrap) tl.fromTo(ctaWrap, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.5 }, 1.3);
+        if (particlesCanvas) tl.to(particlesCanvas, { opacity: 0.32, duration: 0.8 }, 1.5);
+      }
+
+      // Scroll：Hero Three 淡出
+      var heroContainer = document.getElementById('hero-three');
+      if (heroContainer) {
+        gsap.to(heroContainer, {
+          opacity: 0,
+          scrollTrigger: { trigger: '#hero-section', start: 'top top', end: 'bottom top', scrub: 1.2 }
+        });
+      }
+
+      // 各 section 通用 reveal（排除 hero）
+      document.querySelectorAll('section[id]').forEach(function (section) {
+        if (section.id === 'hero-section') return;
+        var reveals = section.querySelectorAll('.reveal');
+        if (reveals.length === 0) return;
+        gsap.fromTo(reveals, { opacity: 0, y: 28 }, {
+          opacity: 1, y: 0, duration: 0.6, stagger: 0.06, ease: 'power2.out',
+          scrollTrigger: { trigger: section, start: 'top 82%', end: 'top 55%', toggleActions: 'play none none none' }
+        });
+      });
+
+      // 第三幕：产品区堆栈通电 — 进入视口时从下往上依次点亮
+      var stackWrap = document.querySelector('#product .space-y-0');
+      if (stackWrap) {
+        var layers = stackWrap.querySelectorAll('.arch-layer');
+        var connectors = stackWrap.querySelectorAll('.arch-connector');
+        var els = [];
+        for (var i = 0; i < layers.length; i++) {
+          els.push(layers[i]);
+          if (connectors[i]) els.push(connectors[i]);
+        }
+        gsap.set(els, { opacity: 0, y: 10 });
+        gsap.to(els, {
+          opacity: 1,
+          y: 0,
+          duration: 0.4,
+          stagger: 0.12,
+          ease: 'power2.out',
+          scrollTrigger: { trigger: stackWrap, start: 'top 88%', toggleActions: 'play none none none' }
+        });
+      }
+
+      // Why 区：根因先亮，再四周角色卡依次唤醒
+      var whyRoot = document.querySelector('.why-root');
+      var whyCards = document.querySelectorAll('.why-card');
+      if (whyRoot && whyCards.length) {
+        gsap.set(whyRoot, { opacity: 0, scale: 0.95 });
+        gsap.set(whyCards, { opacity: 0, y: 12 });
+        ScrollTrigger.create({
+          trigger: '#why',
+          start: 'top 80%',
+          onEnter: function () {
+            gsap.to(whyRoot, { opacity: 1, scale: 1, duration: 0.5, ease: 'power2.out' });
+            gsap.to(whyCards, { opacity: 1, y: 0, duration: 0.45, stagger: 0.12, ease: 'power2.out', delay: 0.25 });
+          },
+          once: true
+        });
+      }
+    })();
+  </script>
+  <script type="module">
+    (async function () {
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      var g = window.gsap;
+      if (!g) return;
+      var THREE = await import('three');
+      var { EffectComposer } = await import('https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/EffectComposer.js');
+      var { RenderPass } = await import('https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/RenderPass.js');
+      var { UnrealBloomPass } = await import('https://unpkg.com/three@0.160.0/examples/jsm/postprocessing/UnrealBloomPass.js');
+
+      var heroContainer = document.getElementById('hero-three');
+      if (!heroContainer) return;
+
+      var scene, camera, renderer;
+      try {
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(28, 1, 0.1, 1000);
+        camera.position.set(0, 0, 12);
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      } catch (e) {
+        return;
+      }
+      if (!renderer) return;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setClearColor(0x000000, 0);
+      heroContainer.appendChild(renderer.domElement);
+
+      // ---------- 第一层：Shader 流动色（GPU 逐帧计算颜色） ----------
+      var shaderVs = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+      var shaderFs = [
+        'uniform float uTime;',
+        'varying vec2 vUv;',
+        'void main() {',
+        '  float t = uTime * 0.2;',
+        '  float r = 0.35 + 0.2 * sin(vUv.x + t) + 0.15 * sin(vUv.y - t * 0.7);',
+        '  float g = 0.55 + 0.2 * sin(vUv.y + t * 0.5) + 0.1 * cos(vUv.x - t);',
+        '  float b = 0.9 + 0.1 * sin(vUv.x + vUv.y + t * 0.3);',
+        '  gl_FragColor = vec4(r, g, b, 0.2);',
+        '}'
+      ].join('\n');
+      var shaderMat = new THREE.ShaderMaterial({
+        uniforms: { uTime: { value: 0 } },
+        vertexShader: shaderVs,
+        fragmentShader: shaderFs,
+        depthWrite: false,
+        transparent: true
+      });
+      var quadGeo = new THREE.PlaneGeometry(20, 20);
+      var quad = new THREE.Mesh(quadGeo, shaderMat);
+      quad.position.z = -8;
+      scene.add(quad);
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.85));
+      var pl = new THREE.PointLight(0x89c9e8, 0.6, 30);
+      pl.position.set(4, 4, 8);
+      scene.add(pl);
+      var pl2 = new THREE.PointLight(0xb4a7f5, 0.35, 25);
+      pl2.position.set(-5, 2, 6);
+      scene.add(pl2);
+
+      // 几何体：带 emissive 便于 Bloom 发光
+      var cyan = new THREE.MeshStandardMaterial({ color: 0x0891b2, emissive: 0x0891b2, emissiveIntensity: 0.25, metalness: 0.1, roughness: 0.7 });
+      var violet = new THREE.MeshStandardMaterial({ color: 0x7c3aed, emissive: 0x5b21b6, emissiveIntensity: 0.2, metalness: 0.05, roughness: 0.8 });
+      var blue = new THREE.MeshStandardMaterial({ color: 0x0ea5e9, emissive: 0x0284c7, emissiveIntensity: 0.22, metalness: 0.1, roughness: 0.75 });
+
+      var box = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), cyan);
+      box.position.set(-2.2, 0.8, -2);
+      scene.add(box);
+      var torus = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.25, 16, 32), violet);
+      torus.position.set(2, -0.5, -3);
+      scene.add(torus);
+      var icosa = new THREE.Mesh(new THREE.IcosahedronGeometry(0.85, 0), blue);
+      icosa.position.set(0.3, 1.2, -4);
+      scene.add(icosa);
+      var smallBox = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), cyan);
+      smallBox.position.set(1.8, 1, -2.5);
+      scene.add(smallBox);
+
+      var clock = new THREE.Clock();
+      var w = heroContainer.offsetWidth;
+      var h = heroContainer.offsetHeight;
+      var composer = new EffectComposer(renderer);
+      composer.addPass(new RenderPass(scene, camera));
+      var bloomPass = new UnrealBloomPass(new THREE.Vector2(w, h), 0.45, 0.35, 0.55);
+      composer.addPass(bloomPass);
+
+      function resizeThree() {
+        w = heroContainer.offsetWidth;
+        h = heroContainer.offsetHeight;
+        if (!w || !h) return;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        composer.setSize(w, h);
+        composer.setPixelRatio(renderer.getPixelRatio());
+      }
+      window.addEventListener('resize', resizeThree);
+      resizeThree();
+
+      function animateThree() {
+        requestAnimationFrame(animateThree);
+        var t = clock.getElapsedTime() * 0.35;
+        shaderMat.uniforms.uTime.value = clock.getElapsedTime();
+        box.rotation.y = t * 0.4;
+        box.rotation.x = t * 0.15;
+        torus.rotation.x = t * 0.3;
+        torus.rotation.y = t * 0.5;
+        icosa.rotation.y = t * 0.35;
+        icosa.rotation.x = t * 0.2;
+        smallBox.rotation.y = t * 0.6;
+        composer.render();
+      }
+      animateThree();
+
+      g.to(camera.position, {
+        z: 18,
+        scrollTrigger: { trigger: '#hero-section', start: 'top top', end: 'bottom top', scrub: 1 }
+      });
+    })();
+  </script>
+</body>
+</html>

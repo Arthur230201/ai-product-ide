@@ -1,12 +1,12 @@
 # Error Hotspots 分析
 
-生成时间: 2026-03-05T16:12:26.489Z
+生成时间: 2026-03-10T05:00:02.071Z
 
 ## 429 / Rate Limit 错误处理
 
 共找到 239 处：
 
-1. **app/actions/generate-graph.ts:677**
+1. **app/actions/generate-graph.ts:679**
    - 匹配: `429`
    - 上下文: `generateGraph] t2_end: LLM call completed', {
       requestId,
@@ -14,14 +14,14 @@
       success: aiCallSuccess,
       errorType: aiError?.t...`
 
-2. **app/actions/generate-graph.ts:565**
+2. **app/actions/generate-graph.ts:567**
    - 匹配: `RATE_LIMIT`
    - 上下文: `单次 LLM 调用 - 通过 callText 和 runQueued
     const t2 = Date.now();
     let singleCallResult: z.infer<typeof SingleCallResultSchema> | null = null;
     let...`
 
-3. **app/actions/generate-graph.ts:598**
+3. **app/actions/generate-graph.ts:600**
    - 匹配: `RATE_LIMIT`
    - 上下文: `        errorMessage: llmResult.message,
         llmMetrics,
@@ -30,7 +30,7 @@
         type: llmResult.type,
         message: llmResult.mess...`
 
-4. **app/actions/generate-graph.ts:679**
+4. **app/actions/generate-graph.ts:681**
    - 匹配: `Rate Limit`
    - 上下文: `      elapsedMs: t2_end - t2,
       success: aiCallSuccess,
@@ -40,7 +40,7 @@
 
     // 如果 AI 调用失败（429/网络错误/解析错误...`
 
-5. **app/actions/generate-graph.ts:680**
+5. **app/actions/generate-graph.ts:682**
    - 匹配: `RATE_LIMIT`
    - 上下文: `ss,
       errorType: aiError?.type,
@@ -51,7 +51,7 @@
     if (!aiCallSuccess && aiError) {
       // ✅ Rate L...`
 
-6. **app/actions/generate-graph.ts:683**
+6. **app/actions/generate-graph.ts:685**
    - 匹配: `rate_limit`
    - 上下文: `/网络错误/解析错误）
     if (!aiCallSuccess && aiError) {
@@ -59,7 +59,7 @@
       if (aiError.type === 'RATE_LIMIT') {
         const t2_en...`
 
-7. **app/actions/generate-graph.ts:462**
+7. **app/actions/generate-graph.ts:464**
    - 匹配: `cooldown`
    - 上下文: `ation',
     mode: 'clarification',
@@ -71,7 +71,7 @@
       ok: false,
       type: ...`
 
-8. **app/actions/generate-graph.ts:462**
+8. **app/actions/generate-graph.ts:464**
    - 匹配: `cooldown`
    - 上下文: `fication',
   });
@@ -83,13 +83,13 @@
       type: result.type,
       messa...`
 
-9. **app/actions/generate-graph.ts:565**
+9. **app/actions/generate-graph.ts:567**
    - 匹配: `cooldown`
    - 上下文: `  let singleCallResult: z.infer<typeof SingleCallResultSchema> | null = null;
     let aiCallSuccess = false;
     let aiError: { type: 'RATE_LIMIT' | '...`
 
-10. **app/actions/generate-graph.ts:598**
+10. **app/actions/generate-graph.ts:600**
    - 匹配: `cooldown`
    - 上下文: `,
         errorType: llmResult.type,
@@ -99,7 +99,7 @@
       aiError = {
         type: llmResult....`
 
-11. **app/actions/generate-graph.ts:598**
+11. **app/actions/generate-graph.ts:600**
    - 匹配: `cooldown`
    - 上下文: `mResult.message,
         llmMetrics,
@@ -109,7 +109,7 @@
         message: llmResult.message,
         cooldownSec...`
 
-12. **app/actions/generate-graph.ts:685**
+12. **app/actions/generate-graph.ts:687**
    - 匹配: `cooldown`
    - 上下文: ` Rate Limit 错误：直接返回错误，不使用降级图
       if (aiError.type === 'RATE_LIMIT') {
@@ -117,7 +117,7 @@
         return {
           type: 'rate_limi...`
 
-13. **app/actions/generate-graph.ts:685**
+13. **app/actions/generate-graph.ts:687**
    - 匹配: `cooldown`
    - 上下文: `降级图
       if (aiError.type === 'RATE_LIMIT') {
@@ -2328,14 +2328,14 @@ test('normalizeUIPipelineResponse: zsa-react tuple [null, Error] ...`
 
 共找到 76 处：
 
-1. **app/actions/generate-graph.ts:328**
+1. **app/actions/generate-graph.ts:330**
    - 匹配: `.substring(`
    - 有类型检查: 否
    - 上下文: `onst block = extractTaggedBlock(result.data, 'AI_JSON');
   if (!block) {
     logError('❌ [analyzeInputClarity] Tagged block not found, using fallback'...`
 
-2. **app/actions/generate-graph.ts:362**
+2. **app/actions/generate-graph.ts:364**
    - 匹配: `.substring(`
    - 有类型检查: 否
    - 上下文: `
@@ -2345,7 +2345,7 @@ test('normalizeUIPipelineResponse: zsa-react tuple [null, Error] ...`
       requestId,
       error: parseResult.err...`
 
-3. **app/actions/generate-graph.ts:490**
+3. **app/actions/generate-graph.ts:492**
    - 匹配: `.substring(`
    - 有类型检查: 否
    - 上下文: `trics = { queuedMs: 0, dedupHit: false, totalMs: 0 };
@@ -2354,7 +2354,7 @@ test('normalizeUIPipelineResponse: zsa-react tuple [null, Error] ...`
       requestId,
         promptLength: input....`
 
-4. **app/actions/generate-graph.ts:656**
+4. **app/actions/generate-graph.ts:658**
    - 匹配: `.substring(`
    - 有类型检查: 否
    - 上下文: `         } else {

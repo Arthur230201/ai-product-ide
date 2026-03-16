@@ -1,0 +1,6 @@
+{
+  "name": "Card",
+  "props": { "variant": ["default", "outline"] },
+  "do": ["Wrap grouped content"],
+  "dont": ["No rawHtml in children"]
+}

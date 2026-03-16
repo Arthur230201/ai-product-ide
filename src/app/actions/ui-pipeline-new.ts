@@ -9,6 +9,7 @@ import type { AIResult } from '@/lib/ai/llm';
 import type { UIPipelineResponse } from './ui-pipeline-response';
 import { cleanHTML, validateHTML, getStageMarker } from '@/lib/ui/html-validator';
 import { mapAIResultToUIPipelineResponse } from './ui-pipeline-response';
+import { STYLE_PRESET_IDS } from '@/types/theme';
 
 /**
  * 三段式 UI 生成 Pipeline
@@ -33,8 +34,8 @@ const getOutputFooter = (stage: 'STATIC' | 'BEAUTIFY' | 'INTERACT') => {
 - Append this marker at the end: ${marker}`;
 };
 
-/** 风格预设：按视觉气质分类，默认极简中性（仅 pipeline 内部使用） */
-const STYLE_PRESETS = ['neutral', 'glass', 'flat', 'corporate', 'neo', 'cyberpunk', 'warm', 'brutal', 'custom'] as const;
+/** 风格预设：与 theme 保持一致，pipeline 接受全部预设 */
+const STYLE_PRESETS = STYLE_PRESET_IDS;
 
 /** 极简中性：留白、灰阶、无强烈色 */
 const NEUTRAL_STYLE_FRAGMENT = `
@@ -112,6 +113,17 @@ const NEO_STYLE_FRAGMENT = `
 - **圆角**：大圆角（12–16px）；无边框或极淡边框。
 - **组件**：按钮/输入框用凸起或凹陷的 box-shadow 表现。
 `.trim();
+
+/** Bento 网格 / 极光 / 深色 / 可访问 / 黏土 / 液态玻璃 / 柔和进化 / 复古未来 / Y2K（扩展风格） */
+const BENTO_STYLE_FRAGMENT = `## 视觉风格：Bento 网格\n- 网格分区、信息块卡片、留白清晰；背景白/浅灰；主色 indigo/violet；圆角 12–16px。`.trim();
+const AURORA_STYLE_FRAGMENT = `## 视觉风格：极光 UI\n- 深色渐变背景、半透明卡片、青/紫光晕；主色 cyan/violet；大圆角、backdrop-blur。`.trim();
+const DARK_STYLE_FRAGMENT = `## 视觉风格：深色模式\n- 纯黑/深灰底、高对比；主色 sky/violet；卡片 bg-neutral-900；护眼。`.trim();
+const ACCESSIBLE_STYLE_FRAGMENT = `## 视觉风格：可访问优先\n- 高对比、焦点环可见、语义化；背景白、主色 blue/emerald；WCAG 适用。`.trim();
+const CLAY_STYLE_FRAGMENT = `## 视觉风格：黏土拟态\n- 大圆角、暖色、柔和立体；背景 amber/orange-50；主色 orange/yellow；圆角 24px+。`.trim();
+const LIQUID_STYLE_FRAGMENT = `## 视觉风格：液态玻璃\n- 深色渐变、半透明卡片、backdrop-blur；主色 sky/indigo；高端精致。`.trim();
+const SOFT_STYLE_FRAGMENT = `## 视觉风格：柔和进化\n- 轻阴影、紫/青主色；背景 violet-50；主色 violet/cyan；现代企业。`.trim();
+const RETRO_STYLE_FRAGMENT = `## 视觉风格：复古未来\n- 深色底、琥珀/红强调、等宽字体；主色 amber/red；复古科技。`.trim();
+const Y2K_STYLE_FRAGMENT = `## 视觉风格：Y2K 美学\n- 高饱和粉/青、直角；主色 pink/teal；千禧年潮流。`.trim();
 
 // ==================== Stage 1: 静态 HTML 生成 ====================
 
@@ -194,6 +206,15 @@ QUALITY TARGET:
       if (input.stylePreset === 'flat') systemPrompt += `\n\n${FLAT_STYLE_FRAGMENT}`;
       if (input.stylePreset === 'corporate') systemPrompt += `\n\n${CORPORATE_STYLE_FRAGMENT}`;
       if (input.stylePreset === 'neo') systemPrompt += `\n\n${NEO_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'bento') systemPrompt += `\n\n${BENTO_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'aurora') systemPrompt += `\n\n${AURORA_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'dark') systemPrompt += `\n\n${DARK_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'accessible') systemPrompt += `\n\n${ACCESSIBLE_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'clay') systemPrompt += `\n\n${CLAY_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'liquid') systemPrompt += `\n\n${LIQUID_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'soft') systemPrompt += `\n\n${SOFT_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'retro') systemPrompt += `\n\n${RETRO_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'y2k') systemPrompt += `\n\n${Y2K_STYLE_FRAGMENT}`;
 
       const viewportInstruction =
         input.viewportPreset === 'desktop'
@@ -400,6 +421,15 @@ CSS CONCISENESS:
       if (input.stylePreset === 'flat') systemPrompt += `\n\n${FLAT_STYLE_FRAGMENT}`;
       if (input.stylePreset === 'corporate') systemPrompt += `\n\n${CORPORATE_STYLE_FRAGMENT}`;
       if (input.stylePreset === 'neo') systemPrompt += `\n\n${NEO_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'bento') systemPrompt += `\n\n${BENTO_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'aurora') systemPrompt += `\n\n${AURORA_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'dark') systemPrompt += `\n\n${DARK_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'accessible') systemPrompt += `\n\n${ACCESSIBLE_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'clay') systemPrompt += `\n\n${CLAY_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'liquid') systemPrompt += `\n\n${LIQUID_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'soft') systemPrompt += `\n\n${SOFT_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'retro') systemPrompt += `\n\n${RETRO_STYLE_FRAGMENT}`;
+      if (input.stylePreset === 'y2k') systemPrompt += `\n\n${Y2K_STYLE_FRAGMENT}`;
 
       const userPrompt = input.prompt 
         ? `美化要求：${input.prompt}\n\n[CURRENT HTML]\n${input.html}`

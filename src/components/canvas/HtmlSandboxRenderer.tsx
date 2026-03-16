@@ -15,6 +15,8 @@ interface HtmlSandboxRendererProps {
   onReady?: () => void;
   /** Expose iframe ref for external access (e.g., edit mode) */
   iframeRef?: React.RefObject<HTMLIFrameElement>;
+  /** 导航回调：点击 data-nav / data-edge-ref 时调用，宿主据此切换节点 */
+  onNav?: (target: string) => void;
 }
 
 /**
@@ -164,17 +166,23 @@ class RenderGuard {
  * - All click, filter, tab, and state logic attached here
  * - Exposes unified API for AI to query/modify DOM
  */
+export interface BehaviorInjectorOptions {
+  onNav?: (target: string) => void;
+}
+
 class BehaviorInjector {
   private iframe: HTMLIFrameElement | null = null;
   private injected = false;
+  private onNavCallback: ((target: string) => void) | null = null;
   private eventHandlers: Map<string, Array<{ element: Element; event: string; handler: (e: Event) => void }>> = new Map();
 
   /**
-   * Initialize the injector with an iframe
+   * Initialize the injector with an iframe and optional callbacks
    */
-  init(iframe: HTMLIFrameElement) {
+  init(iframe: HTMLIFrameElement, options?: BehaviorInjectorOptions) {
     this.iframe = iframe;
     this.injected = false;
+    this.onNavCallback = options?.onNav ?? null;
     this.eventHandlers.clear();
   }
 
@@ -225,6 +233,9 @@ class BehaviorInjector {
 
       // Step 2: Inject event handlers for interactive elements
       this.attachEventHandlers(body);
+
+      // Step 2b: Fill tables/lists bound by data-data-query-runtime JSON (mock or embedded)
+      this.injectDataQueryRuntime(body);
       
       // Step 3: Inject data/state management
       this.injectStateManagement(body);
@@ -356,6 +367,21 @@ class BehaviorInjector {
       }
     });
 
+    // Handle navigation: [data-nav] and [data-edge-ref] → onNav(target)
+    const navSelectors = ['[data-nav]', '[data-edge-ref]'];
+    navSelectors.forEach((selector) => {
+      doc.querySelectorAll(selector).forEach((el) => {
+        if (el.hasAttribute('data-injected')) return;
+        const ref = el.getAttribute('data-nav') ?? el.getAttribute('data-edge-ref');
+        if (!ref || !this.onNavCallback) return;
+        el.setAttribute('data-injected', 'true');
+        el.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.onNavCallback?.(ref);
+        });
+      });
+    });
+
     // Handle buttons with actions
     const actionButtons = doc.querySelectorAll('button[data-action], [class*="action-button"]');
     actionButtons.forEach((button) => {
@@ -431,8 +457,92 @@ class BehaviorInjector {
   /**
    * Inject state management for dynamic content
    */
-  private injectStateManagement(container: Element | Document) {
-    const doc = container instanceof Document ? container : container.ownerDocument || (container as any).ownerDocument;
+  /**
+   * Read #data-query-runtime JSON and fill tbody for each table[data-data-query-ref].
+   * Class names on new cells use same tokens as page-plan recipes (plain utilities, no arbitrary []).
+   */
+  private injectDataQueryRuntime(rootEl: Element | Document) {
+    const doc = rootEl instanceof Document ? rootEl : rootEl.ownerDocument ?? (rootEl as Element & { ownerDocument?: Document }).ownerDocument;
+    if (!doc || !doc.body) return;
+    const script = doc.getElementById('data-query-runtime');
+    if (!script || !script.textContent) return;
+    let payload: { byRef?: Record<string, { columns?: string[]; rows?: string[][] }> };
+    try {
+      payload = JSON.parse(script.textContent);
+    } catch {
+      return;
+    }
+    const byRef = payload.byRef || {};
+    const cellClass = 'border-b border-slate-100 px-4 py-3';
+    let hasAnyRows = false;
+    doc.querySelectorAll('table[data-data-query-ref]').forEach((table) => {
+      const ref = table.getAttribute('data-data-query-ref');
+      if (!ref || !byRef[ref]) return;
+      const spec = byRef[ref];
+      const columns = spec.columns || ['名称', '状态'];
+      const rows = spec.rows || [];
+      if (rows.length > 0) hasAnyRows = true;
+      const thead = table.querySelector('thead');
+      if (thead && columns.length > 0) {
+        const tr = doc.createElement('tr');
+        columns.forEach((col) => {
+          const th = doc.createElement('th');
+          th.className = 'px-4 py-3';
+          th.textContent = col;
+          tr.appendChild(th);
+        });
+        thead.innerHTML = '';
+        thead.appendChild(tr);
+        thead.className = 'border-b border-slate-200 bg-slate-50 text-slate-700';
+      }
+      let tbody = table.querySelector('tbody');
+      if (!tbody) {
+        tbody = doc.createElement('tbody');
+        table.appendChild(tbody);
+      }
+      tbody.innerHTML = '';
+      rows.forEach((cells) => {
+        const tr = doc.createElement('tr');
+        tr.className = 'data-item';
+        tr.setAttribute('data-filter', 'active');
+        cells.forEach((text) => {
+          const td = doc.createElement('td');
+          td.className = cellClass;
+          td.textContent = text;
+          tr.appendChild(td);
+        });
+        tbody!.appendChild(tr);
+      });
+      if (rows.length === 0) {
+        const tr = doc.createElement('tr');
+        const td = doc.createElement('td');
+        td.className = cellClass;
+        td.colSpan = Math.max(columns.length, 1);
+        td.textContent = '暂无数据';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+      }
+    });
+
+    const viewStateRoot = doc.querySelector<HTMLElement>('[data-view-state-container]');
+    if (viewStateRoot) {
+      const viewState: 'loading' | 'empty' | 'error' | 'content' = hasAnyRows ? 'content' : 'empty';
+      viewStateRoot.setAttribute('data-view-state', viewState);
+      ['loading', 'empty', 'error', 'content'].forEach((block) => {
+        const el = viewStateRoot.querySelector(`[data-state-block="${block}"]`);
+        if (el) {
+          const isShow = block === viewState;
+          (el as HTMLElement).classList.toggle('hidden', !isShow);
+          if ((el as HTMLElement).style) {
+            (el as HTMLElement).style.display = isShow ? '' : 'none';
+          }
+        }
+      });
+    }
+  }
+
+  private injectStateManagement(rootEl: Element | Document) {
+    const doc = rootEl instanceof Document ? rootEl : rootEl.ownerDocument ?? (rootEl as Element & { ownerDocument?: Document }).ownerDocument;
     if (!doc) return;
 
     // Create a simple state store
@@ -755,6 +865,7 @@ export const HtmlSandboxRenderer: React.FC<HtmlSandboxRendererProps> = ({
   className = '',
   onReady,
   iframeRef: externalIframeRef,
+  onNav,
 }) => {
   const internalIframeRef = useRef<HTMLIFrameElement>(null);
   const iframeRef = externalIframeRef || internalIframeRef;
@@ -771,7 +882,7 @@ export const HtmlSandboxRenderer: React.FC<HtmlSandboxRendererProps> = ({
     }
 
     try {
-      globalInjector.init(iframe);
+      globalInjector.init(iframe, { onNav });
       globalRenderGuard.init(iframe);
 
       // Extract and preserve Tailwind config if present
@@ -923,7 +1034,7 @@ export const HtmlSandboxRenderer: React.FC<HtmlSandboxRendererProps> = ({
       setError(err instanceof Error ? err : new Error(String(err)));
       setIsLoading(false);
     }
-  }, [rawHtml, onReady, iframeRef]);
+  }, [rawHtml, onReady, iframeRef, onNav]);
 
   if (error) {
     return (

@@ -21,6 +21,8 @@
 - **导出与部署**：[EXPORT_AND_FEATURES_ROADMAP.md](docs/EXPORT_AND_FEATURES_ROADMAP.md)、[DEPLOYMENT_REQUIREMENTS.md](docs/DEPLOYMENT_REQUIREMENTS.md)、[E2E_TESTING.md](docs/E2E_TESTING.md)
 - **AI 对话与流程**：[AI_DIALOG_EXPERT_WORKSHOP.md](docs/AI_DIALOG_EXPERT_WORKSHOP.md)、[AI_DIALOG_STITCH_PERSISTENT_PLAN.md](docs/AI_DIALOG_STITCH_PERSISTENT_PLAN.md)
 - **UI/UX**：[UI_UX_FULL_REDESIGN_10_ROUNDS.md](docs/UI_UX_FULL_REDESIGN_10_ROUNDS.md)、[COMPONENT_LIBRARY_AND_PAGE_DESCRIPTION.md](docs/COMPONENT_LIBRARY_AND_PAGE_DESCRIPTION.md)
+- **View 生成（PagePlan）**：[src/lib/page-plan/README.md](src/lib/page-plan/README.md)、[PAGE_PLAN_AUDIT_GAPS.md](docs/page-plan/PAGE_PLAN_AUDIT_GAPS.md)
+- **展示/Tokens/Registry 收敛**：[docs/adr/README.md](docs/adr/README.md)（ADR-001 单一展示路径、ADR-002 按模板注入、ADR-003 Tokens 单一真源）
 - **专家与自检**：[docs/expert-team/README.md](docs/expert-team/README.md)、[docs/self-check/](docs/self-check/)
 
 ## 架构边界（与智能体约定）

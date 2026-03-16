@@ -1,0 +1,34 @@
+{
+  "templateId": "wizard",
+  "defaultDensity": "comfortable",
+  "allowedSections": ["header", "content", "formBody", "actions", "states", "footer"],
+  "requiredSections": ["header", "formBody", "actions", "states"],
+  "maxComponentsPerSection": {
+    "header": 3,
+    "content": 2,
+    "formBody": 8,
+    "actions": 3,
+    "states": 3,
+    "footer": 2
+  },
+  "ctaRules": {
+    "primaryCtaLocation": "actions_right",
+    "secondaryCtaLocation": "actions_left",
+    "stickyActions": true
+  },
+  "stateRules": {
+    "requireLoading": true,
+    "requireEmpty": false,
+    "requireError": true
+  },
+  "bindingRequirements": {
+    "action": {
+      "minSubmitEvents": 1,
+      "allowStepProgression": true
+    }
+  },
+  "layoutRules": {
+    "requireStepper": true,
+    "preferProgressiveDisclosure": true
+  }
+}

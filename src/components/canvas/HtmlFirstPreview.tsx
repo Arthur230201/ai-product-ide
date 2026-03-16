@@ -26,6 +26,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { HtmlSandbox } from './HtmlSandbox';
+import { HtmlPreviewSurface } from '@/components/html-preview/HtmlPreviewSurface';
 import { Eye, Edit2, Wand2, Download, ChevronDown, FileCode, Image as ImageIcon } from 'lucide-react';
 import { clsx } from 'clsx';
 import { toast } from 'sonner';
@@ -604,34 +605,13 @@ export const HtmlFirstPreview: React.FC<HtmlFirstPreviewProps> = ({
             />
           </div>
         ) : (
-          // Preview Mode: Standard HTML rendering using HtmlSandbox
-          // ⚠️ 重要：使用 htmlSource prop 而不是 ref，确保响应式更新
+          // Preview Mode: 统一经 HtmlPreviewSurface → guard → HtmlSandboxRenderer
           <div className="w-full h-full relative">
-            <HtmlSandbox
-              key={`preview-${htmlSource.substring(0, 50)}`} // 使用 key 强制重新渲染
-              html={htmlSource}
-              mode="preview"
-              injectorScript={buildInjectorScript({})}
-              heightMode="auto"
+            <HtmlPreviewSurface
+              key={`preview-${htmlSource.substring(0, 50)}`}
+              rawHtml={htmlSource}
               className="w-full h-full"
-              onMessage={(msg) => {
-                handleDomEvent({ type: msg.type, data: msg });
-                // Handle navigation events
-                if (msg.type === 'NAV') {
-                  console.log('[HtmlFirstPreview] Navigation event:', msg.to);
-                  // Navigation can be handled by parent component if needed
-                }
-              }}
-              ref={(ref) => {
-                sandboxRef.current = ref;
-                if (ref && ref.getIframe) {
-                  const iframe = ref.getIframe();
-                  if (iframe) {
-                    // Use a mutable ref pattern to update iframeRef
-                    (iframeRef as React.MutableRefObject<HTMLIFrameElement | null>).current = iframe;
-                  }
-                }
-              }}
+              iframeRef={iframeRef}
             />
           </div>
         )}

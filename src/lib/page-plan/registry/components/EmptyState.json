@@ -1,0 +1,6 @@
+{
+  "name": "EmptyState",
+  "props": {},
+  "do": ["Include primary CTA button"],
+  "dont": []
+}

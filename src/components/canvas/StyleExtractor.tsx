@@ -181,7 +181,8 @@ export function StyleExtractor({ onClose }: StyleExtractorProps) {
         <div className="mb-6">
           <h3 className="text-sm font-medium text-zinc-400 mb-3">选择风格</h3>
           <div className="grid grid-cols-2 gap-3">
-            {NAMED_STYLES.filter((s) => s.id !== 'custom').map(({ id, label, theme: styleTheme }) => {
+            {NAMED_STYLES.filter((s) => s.id !== 'custom').map((style) => {
+              const { id, label, theme: styleTheme } = style;
               const p = STYLE_PREVIEW[id];
               const isSelected = stylePreset === id;
               const accent = p.secondary ?? p.primary;
@@ -253,8 +254,14 @@ export function StyleExtractor({ onClose }: StyleExtractorProps) {
                       </div>
                     </div>
                   </div>
-                  <div className="px-2.5 py-2 border-t border-zinc-700/50">
+                  <div className="px-2.5 py-2 border-t border-zinc-700/50 space-y-1">
                     <span className="text-sm font-medium text-zinc-200">{label}</span>
+                    {'example' in style && style.example && (
+                      <p className="text-[10px] text-zinc-500 leading-tight">示例：{style.example}</p>
+                    )}
+                    {'bestFor' in style && Array.isArray(style.bestFor) && style.bestFor.length > 0 && (
+                      <p className="text-[10px] text-zinc-500 leading-tight">适用：{style.bestFor.join('、')}</p>
+                    )}
                   </div>
                 </button>
               );

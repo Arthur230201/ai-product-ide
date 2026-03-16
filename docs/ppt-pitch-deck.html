@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1365, height=768" />
+  <title>AI-Native Product IDE — 产品与方案概览</title>
+  <style>
+    :root {
+      --primary: #1F5EFF;
+      --primary-06: rgba(31, 94, 255, 0.06);
+      --primary-08: rgba(31, 94, 255, 0.08);
+      --primary-20: rgba(31, 94, 255, 0.2);
+      --accent: #00A870;
+      --n900: #0B1220;
+      --n700: #334155;
+      --n500: #64748B;
+      --n200: #E2E8F0;
+      --n100: #F1F5F9;
+      --n050: #F8FAFC;
+      --n000: #FFFFFF;
+      --shadow-soft: 0 8px 24px rgba(2, 6, 23, 0.06);
+      --slide-w: 1365px;
+      --slide-h: 768px;
+      --safe: 64px;
+      --gutter: 24px;
+      --font-zh: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+      --font-en: Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-zh), var(--font-en);
+      background: var(--n100);
+      color: var(--n700);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 0 48px;
+    }
+    .slide {
+      width: var(--slide-w);
+      height: var(--slide-h);
+      background: linear-gradient(180deg, #FFFFFF 0%, #F7FAFF 100%);
+      position: relative;
+      margin-bottom: 24px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow-soft);
+      border-radius: 8px;
+    }
+    .slide .grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: var(--gutter);
+      padding: 0 var(--safe);
+      align-content: start;
+      padding-top: 24px;
+    }
+    .titlebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 var(--safe);
+      height: 64px;
+      border-bottom: 1px solid var(--n200);
+      flex-shrink: 0;
+    }
+    .titlebar .chapter {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--n500);
+      letter-spacing: 0.02em;
+    }
+    .titlebar .pagetitle {
+      font-size: 42px;
+      font-weight: 700;
+      line-height: 1.15;
+      letter-spacing: -0.5px;
+      color: var(--n900);
+    }
+    .titlebar .tag {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--primary);
+      background: var(--primary-08);
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--primary-20);
+    }
+    .takeaway {
+      background: var(--primary-06);
+      border-left: 4px solid var(--primary);
+      padding: 16px 24px;
+      font-size: 19px;
+      font-weight: 600;
+      line-height: 1.2;
+      color: var(--n900);
+      margin-bottom: 24px;
+    }
+    .card {
+      border-radius: 16px;
+      border: 1px solid var(--n200);
+      box-shadow: var(--shadow-soft);
+      padding: 28px 32px;
+      background: var(--n000);
+    }
+    .card .card-title { font-size: 18px; font-weight: 600; color: var(--n900); margin-bottom: 12px; }
+    .card .card-body { font-size: 18px; font-weight: 400; line-height: 1.55; color: var(--n700); }
+    .chips {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chip {
+      height: 28px;
+      padding: 0 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--primary-08);
+      border: 1px solid var(--primary-20);
+      color: var(--primary);
+      display: inline-flex;
+      align-items: center;
+    }
+    .table-wrap {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 18px;
+      break-inside: avoid;
+    }
+    .table-wrap th {
+      background: var(--n100);
+      text-align: left;
+      padding: 14px 20px;
+      font-weight: 600;
+      color: var(--n900);
+      border-bottom: 1px solid var(--n200);
+    }
+    .table-wrap td {
+      padding: 14px 20px;
+      min-height: 44px;
+      border-bottom: 1px solid var(--n200);
+      line-height: 1.4;
+    }
+    .table-wrap tr:nth-child(even) { background: var(--n050); }
+    .table-wrap tr:nth-child(odd) { background: var(--n000); }
+    .table-wrap .col-highlight { background: var(--primary-06); font-weight: 600; }
+    .story-panel {
+      display: flex;
+      gap: 24px;
+      padding: 24px 28px;
+      background: var(--n050);
+      border-radius: 16px;
+      border: 1px solid var(--n200);
+    }
+    .story-panel .icon { flex-shrink: 0; width: 40px; height: 40px; }
+    .story-panel ul { list-style: none; font-size: 18px; line-height: 1.55; color: var(--n700); }
+    .story-panel li { margin-bottom: 8px; padding-left: 0; }
+    .story-panel li::before { content: "• "; color: var(--primary); font-weight: 600; }
+    h1.slide-h1 { font-size: 44px; font-weight: 700; line-height: 1.15; letter-spacing: -0.5px; color: var(--n900); }
+    h2.slide-h2 { font-size: 20px; font-weight: 600; line-height: 1.2; color: var(--n900); margin-bottom: 16px; }
+    .body { font-size: 18px; font-weight: 400; line-height: 1.55; color: var(--n700); }
+    .small { font-size: 12px; line-height: 1.3; color: var(--n500); }
+    .metric { font-size: 64px; font-weight: 700; line-height: 1; color: var(--primary); }
+    @media print {
+      body { background: #fff; padding: 0; }
+      .slide {
+        width: 100%;
+        max-width: 297mm;
+        height: auto;
+        min-height: 210mm;
+        margin: 0;
+        box-shadow: none;
+        border: 1px solid var(--n200);
+        page-break-after: always;
+      }
+      .slide::after {
+        content: "AI-Native Product IDE · 产品与方案概览 — " counter(slide) " / 8";
+        counter-increment: slide;
+        position: absolute;
+        bottom: 24px;
+        left: var(--safe);
+        font-size: 11px;
+        color: var(--n500);
+      }
+      body { counter-reset: slide; }
+      .slide:last-child { page-break-after: auto; }
+      @page { size: A4 landscape; margin: 10mm; }
+      * { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Template A: 封面 -->
+  <section class="slide" id="cover">
+    <div class="grid" style="align-items: center; justify-items: center; text-align: center;">
+      <div style="grid-column: 1 / -1;">
+        <h1 class="slide-h1" style="margin-bottom: 24px;">AI-Native Product IDE</h1>
+        <p class="body" style="font-size: 22px; color: var(--n500); max-width: 640px; margin: 0 auto 32px;">Fractal 无限画布 · 统一 UI、PRD 与代码为单一事实来源</p>
+        <p class="small" style="margin-top: 48px;">产品与方案概览 · 基于架构与导出路线图</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Template B: 目录 -->
+  <section class="slide">
+    <div class="titlebar">
+      <span class="chapter">目录</span>
+      <span class="pagetitle">本汇报结构</span>
+      <span class="tag">概览</span>
+    </div>
+    <div class="grid">
+      <div class="takeaway" style="grid-column: 1 / -1;">最强大脑裁决：一页一结论；先问题再方案，最后能力锚点。</div>
+      <div class="card" style="grid-column: span 6;">
+        <div class="card-title">1. 核心主张</div>
+        <div class="card-body">UI-Driven Development：Map → UI → Doc → Code</div>
+      </div>
+      <div class="card" style="grid-column: span 6;">
+        <div class="card-title">2. 问题与方案</div>
+        <div class="card-body">痛点 vs 我们提供的能力与交付物</div>
+      </div>
+      <div class="card" style="grid-column: span 6;">
+        <div class="card-title">3. 场景与交付画面</div>
+        <div class="card-body">三重输入、四维节点、PagePlan 与导出体系</div>
+      </div>
+      <div class="card" style="grid-column: span 6;">
+        <div class="card-title">4. 路线图与总结</div>
+        <div class="card-body">短期 / 中期 / 长期；客户要解决 · 我们提供 · 能力锚点</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Template C: 概述/对比 -->
+  <section class="slide">
+    <div class="titlebar">
+      <span class="chapter">核心主张</span>
+      <span class="pagetitle">问题与方案</span>
+      <span class="tag">解决方案</span>
+    </div>
+    <div class="grid">
+      <div class="takeaway" style="grid-column: 1 / -1;">乔布斯原则：用户只关心「看到什么、得到什么」。我们让设计、文档、实现同一源、零偏差。</div>
+      <div class="card" style="grid-column: span 6;">
+        <div class="card-title">典型痛点</div>
+        <div class="card-body">UI 稿、PRD、接口文档与实现四处漂移；评审靠人工对照；交付物散落 Word/Confluence/代码库，难以单一事实来源。</div>
+      </div>
+      <div class="card" style="grid-column: span 6;">
+        <div class="card-title">我们提供</div>
+        <div class="card-body">Fractal 画布上一节点四维：View / Spec / Impl / Test。描述即建图，建图即出 UI 与 PRD；导出 Word / HTML / 测试报告 / 系统设计说明，一键可达。</div>
+      </div>
+      <div class="chips" style="grid-column: 1 / -1; margin-top: 16px;">
+        <span class="chip">Map → UI → Doc → Code</span>
+        <span class="chip">单一事实来源</span>
+        <span class="chip">企业级导出</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Template D: 场景页 - 三重输入 -->
+  <section class="slide">
+    <div class="titlebar">
+      <span class="chapter">能力场景</span>
+      <span class="pagetitle">三重输入引擎</span>
+      <span class="tag">产品</span>
+    </div>
+    <div class="grid">
+      <div class="takeaway" style="grid-column: 1 / -1;">马斯克第一性：从「想法 / 文档 / 视觉」任一入口都能收敛到同一张图与同一套交付物，减少重复与歧义。</div>
+      <div class="story-panel" style="grid-column: 1 / -1;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        <ul>
+          <li>想法 → 图：文本描述或上传文件，AI 生成产品结构图与节点，自动布局。</li>
+          <li>文档 → 图：PRD 上传解析为画布节点，需求与页面一一对应。</li>
+          <li>视觉 → 图：Figma/截图上传，识别界面与流程并落成节点与边。</li>
+        </ul>
+      </div>
+      <div class="chips" style="grid-column: 1 / -1;">
+        <span class="chip">Idea-to-Graph</span>
+        <span class="chip">Doc-to-Graph</span>
+        <span class="chip">Vision-to-Graph</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Template D: 场景页 - 四维节点与 PagePlan -->
+  <section class="slide">
+    <div class="titlebar">
+      <span class="chapter">能力场景</span>
+      <span class="pagetitle">四维节点与 View 生成</span>
+      <span class="tag">产品</span>
+    </div>
+    <div class="grid">
+      <div class="takeaway" style="grid-column: 1 / -1;">专家共识：每个节点即一个「页面/模块」的完整快照；View 由 PagePlan 规则或 LLM 合成，保证可读、可交付、可打印。</div>
+      <div class="story-panel" style="grid-column: 1 / -1;">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+        <ul>
+          <li>View：可运行 React/Tailwind 或单文件 HTML，沙箱预览；PagePlan 流水线：选模板 → 校验 → 渲染 → 写入节点。</li>
+          <li>Spec：从 View 反推或人工维护的结构化需求，支撑 PRD/SRS 导出。</li>
+          <li>Impl：接口与数据规格，支撑系统设计说明与 API 文档导出。</li>
+          <li>Test：用例与结果列，支撑测试报告导出。</li>
+        </ul>
+      </div>
+      <div class="chips" style="grid-column: 1 / -1;">
+        <span class="chip">PagePlan</span>
+        <span class="chip">HtmlSandboxRenderer</span>
+        <span class="chip">Tokens 单一真源</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Template E: 表格页 - 导出能力 -->
+  <section class="slide">
+    <div class="titlebar">
+      <span class="chapter">交付物</span>
+      <span class="pagetitle">当前导出能力</span>
+      <span class="tag">案例</span>
+    </div>
+    <div class="grid">
+      <div class="takeaway" style="grid-column: 1 / -1;">裁决结论：五类文档已落地；拓展顺序为 API 文档、验收清单、发布说明、批量导出与元数据在蓝图落地。</div>
+      <div style="grid-column: 1 / -1; overflow: auto;">
+        <table class="table-wrap">
+          <thead>
+            <tr><th>导出物</th><th>格式</th><th>数据来源</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="col-highlight">PRD</td><td>HTML / Word / Markdown</td><td>projectMeta、nodes(spec/view)、拓扑与泳道图</td></tr>
+            <tr><td>需求规格说明书（SRS）</td><td>Word</td><td>同上，企业级版式</td></tr>
+            <tr><td>测试报告</td><td>Word</td><td>nodes(test.cases)、TestReportMeta</td></tr>
+            <tr><td>系统设计说明</td><td>Word</td><td>nodes(impl)、SystemDesignMeta</td></tr>
+            <tr><td>使用说明书</td><td>Word</td><td>nodes(spec)、UserManualMeta</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Template F: 路线图页 -->
+  <section class="slide">
+    <div class="titlebar">
+      <span class="chapter">路线图</span>
+      <span class="pagetitle">导出与功能增强</span>
+      <span class="tag">路线图</span>
+    </div>
+    <div class="grid">
+      <div class="takeaway" style="grid-column: 1 / -1;">两轮讨论后裁决：短期做「API 文档、验收清单、发布说明、批量 zip、蓝图元数据」；中期做 RTM、一页纸、PDF、导出前配置；长期做 Confluence/Git、ER 图、模板与多语言。</div>
+      <div class="card" style="grid-column: span 4;">
+        <div class="card-title">短期</div>
+        <div class="card-body">API/接口文档、验收清单、Release Notes、批量导出 zip、蓝图内测试/系统设计/使用说明元数据表单。</div>
+      </div>
+      <div class="card" style="grid-column: span 4;">
+        <div class="card-title">中期</div>
+        <div class="card-body">需求追踪矩阵（RTM）、项目一页纸、PDF 导出、导出前配置弹窗、测试用例执行状态与报告汇总。</div>
+      </div>
+      <div class="card" style="grid-column: span 4;">
+        <div class="card-title">长期</div>
+        <div class="card-body">Confluence/Git 同步、ER 图/数据模型图、Postman 集合、模板定制与多语言导出、AI 补充占位内容。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Template G: 总结页 -->
+  <section class="slide">
+    <div class="titlebar">
+      <span class="chapter">总结</span>
+      <span class="pagetitle">客户要解决 · 我们提供 · 能力锚点</span>
+      <span class="tag">总结</span>
+    </div>
+    <div class="grid">
+      <div class="takeaway" style="grid-column: 1 / -1;">最强大脑最终裁决：用「一张画布、四维节点、五类导出」把产品从想法到交付锁在单一事实来源上；优先可落地、可打印、可汇报。</div>
+      <div class="card" style="grid-column: span 4;">
+        <div class="card-title">客户要解决</div>
+        <div class="card-body">UI、PRD、实现与测试多处漂移；交付物散、评审重、版本难对齐。</div>
+      </div>
+      <div class="card" style="grid-column: span 4;">
+        <div class="card-title">我们提供</div>
+        <div class="card-body">Fractal IDE：想法/文档/视觉三重输入 → 画布 → View/Spec/Impl/Test 四维一体；PRD/SRS/测试报告/系统设计/使用说明书一键导出。</div>
+      </div>
+      <div class="card" style="grid-column: span 4;">
+        <div class="card-title">能力锚点</div>
+        <div class="card-body">Next.js 14、React Flow、Zustand、Tailwind、Vercel AI SDK；PagePlan HTML-first；设计系统与 Tokens 单一真源；企业级打印与 PDF 友好。</div>
+      </div>
+      <div class="chips" style="grid-column: 1 / -1; margin-top: 24px;">
+        <span class="chip">Map → UI → Doc → Code</span>
+        <span class="chip">单一事实来源</span>
+        <span class="chip">企业级导出</span>
+      </div>
+    </div>
+  </section>
+
+</body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "name": "Tabs",
+  "props": {},
+  "do": ["Use role=tab + data-tab + tabpanel id match for BehaviorInjector"],
+  "dont": ["No inline onclick"]
+}

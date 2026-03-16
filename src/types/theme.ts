@@ -78,9 +78,21 @@ export const defaultTheme: UIThemeConfig = {
   vibe: 'Modern Professional',
 };
 
-/** 内置风格 ID：按视觉/气质分类，参考网络常见设计风格 */
-export const STYLE_PRESET_IDS = ['neutral', 'glass', 'flat', 'corporate', 'neo', 'cyberpunk', 'warm', 'brutal', 'custom'] as const;
+/** 内置风格 ID：按视觉/气质分类，参考 UIUXProMax 等设计系统 */
+export const STYLE_PRESET_IDS = [
+  'neutral', 'glass', 'flat', 'corporate', 'neo', 'cyberpunk', 'warm', 'brutal',
+  'bento', 'aurora', 'dark', 'accessible', 'clay', 'liquid', 'soft', 'retro', 'y2k',
+  'custom',
+] as const;
 export type StylePresetId = (typeof STYLE_PRESET_IDS)[number];
+
+/** 风格示例与适用场景（用于选择器展示） */
+export interface StyleExample {
+  /** 一句话示例描述，如「网格卡片、信息块分区」 */
+  example?: string;
+  /** 适用场景标签，如 ["企业后台", "数据大屏"] */
+  bestFor?: string[];
+}
 
 /** 各风格用于展示的预览配置（区分度强、预览内容多） */
 export interface StylePreviewConfig {
@@ -195,13 +207,119 @@ export const STYLE_PREVIEW: Record<StylePresetId, StylePreviewConfig> = {
     cardRadius: '8px',
     isDark: true,
   },
+  // UIUXProMax 扩展风格
+  bento: {
+    primary: '#4f46e5',
+    secondary: '#818cf8',
+    bg: '#f8fafc',
+    cardBg: '#ffffff',
+    text: '#0f172a',
+    textSecondary: '#64748b',
+    radius: '12px',
+    cardRadius: '16px',
+    shadow: '0 1px 3px rgba(0,0,0,0.08)',
+  },
+  aurora: {
+    primary: '#06b6d4',
+    secondary: '#8b5cf6',
+    bg: 'linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0c4a6e 100%)',
+    cardBg: 'rgba(255,255,255,0.08)',
+    text: '#f0fdfa',
+    textSecondary: '#a5f3fc',
+    radius: '16px',
+    cardRadius: '20px',
+    shadow: '0 0 40px rgba(6,182,212,0.15)',
+    isDark: true,
+  },
+  dark: {
+    primary: '#38bdf8',
+    secondary: '#a78bfa',
+    bg: '#0a0a0a',
+    cardBg: '#171717',
+    text: '#fafafa',
+    textSecondary: '#a3a3a3',
+    radius: '8px',
+    cardRadius: '12px',
+    shadow: '0 4px 12px rgba(0,0,0,0.4)',
+    isDark: true,
+  },
+  accessible: {
+    primary: '#2563eb',
+    secondary: '#059669',
+    bg: '#ffffff',
+    cardBg: '#f8fafc',
+    text: '#0f172a',
+    textSecondary: '#475569',
+    radius: '8px',
+    cardRadius: '8px',
+    shadow: '0 1px 2px rgba(0,0,0,0.06)',
+  },
+  clay: {
+    primary: '#ea580c',
+    secondary: '#ca8a04',
+    bg: '#fef3c7',
+    cardBg: '#fffbeb',
+    text: '#78350f',
+    textSecondary: '#a16207',
+    radius: '24px',
+    cardRadius: '28px',
+    shadow: '0 4px 14px rgba(234,88,12,0.12)',
+  },
+  liquid: {
+    primary: '#0ea5e9',
+    secondary: '#6366f1',
+    bg: 'linear-gradient(160deg, #0c4a6e 0%, #1e3a5f 100%)',
+    cardBg: 'rgba(255,255,255,0.12)',
+    text: '#ffffff',
+    textSecondary: '#bae6fd',
+    radius: '20px',
+    cardRadius: '24px',
+    shadow: '0 8px 32px rgba(0,0,0,0.2)',
+    isDark: true,
+  },
+  soft: {
+    primary: '#7c3aed',
+    secondary: '#06b6d4',
+    bg: '#f5f3ff',
+    cardBg: '#ffffff',
+    text: '#1e1b4b',
+    textSecondary: '#6d28d9',
+    radius: '12px',
+    cardRadius: '14px',
+    shadow: '0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05)',
+  },
+  retro: {
+    primary: '#f59e0b',
+    secondary: '#ef4444',
+    bg: '#1c1917',
+    cardBg: '#292524',
+    text: '#fef3c7',
+    textSecondary: '#fcd34d',
+    radius: '4px',
+    cardRadius: '6px',
+    shadow: '0 0 0 2px #f59e0b',
+    isDark: true,
+  },
+  y2k: {
+    primary: '#ec4899',
+    secondary: '#14b8a6',
+    bg: '#fdf2f8',
+    cardBg: '#ffffff',
+    text: '#831843',
+    textSecondary: '#9d174d',
+    radius: '0',
+    cardRadius: '0',
+    shadow: 'none',
+  },
 };
 
-/** 对用户展示的命名风格（按视觉气质分类，非品牌） */
-export const NAMED_STYLES: { id: StylePresetId; label: string; theme: UIThemeConfig }[] = [
+/** 对用户展示的命名风格（按视觉气质分类，含示例与适用场景） */
+export const NAMED_STYLES: ({ id: StylePresetId; label: string; theme: UIThemeConfig } & StyleExample)[] = [
   {
     id: 'neutral',
     label: '极简中性',
+    example: '留白与排版优先、灰阶主色',
+    bestFor: ['企业后台', '文档与内容', '通用产品'],
     theme: {
       ...defaultTheme,
       colors: {
@@ -224,6 +342,8 @@ export const NAMED_STYLES: { id: StylePresetId; label: string; theme: UIThemeCon
   {
     id: 'glass',
     label: '玻璃拟态',
+    example: '半透明毛玻璃、渐变底、大圆角',
+    bestFor: ['现代 SaaS', '运营活动', 'C 端产品'],
     theme: {
       ...defaultTheme,
       colors: {
@@ -246,6 +366,8 @@ export const NAMED_STYLES: { id: StylePresetId; label: string; theme: UIThemeCon
   {
     id: 'flat',
     label: '扁平鲜明',
+    example: '高饱和色块、少阴影、清晰边界',
+    bestFor: ['活动页', '年轻向产品', '营销落地页'],
     theme: {
       ...defaultTheme,
       colors: {
@@ -268,6 +390,8 @@ export const NAMED_STYLES: { id: StylePresetId; label: string; theme: UIThemeCon
   {
     id: 'corporate',
     label: '企业稳重',
+    example: '深蓝灰主色、小圆角、适度阴影',
+    bestFor: ['B 端后台', '企业服务', '专业可信'],
     theme: {
       ...defaultTheme,
       colors: {
@@ -290,6 +414,8 @@ export const NAMED_STYLES: { id: StylePresetId; label: string; theme: UIThemeCon
   {
     id: 'neo',
     label: '柔和拟态',
+    example: '同色系双阴影浮雕、大圆角',
+    bestFor: ['健康/冥想', '教育应用', '柔和品牌'],
     theme: {
       ...defaultTheme,
       colors: {
@@ -312,6 +438,8 @@ export const NAMED_STYLES: { id: StylePresetId; label: string; theme: UIThemeCon
   {
     id: 'cyberpunk',
     label: '赛博朋克',
+    example: '深黑底、霓虹粉/青发光、等宽字体',
+    bestFor: ['游戏', '科技/加密', '科幻感产品'],
     theme: {
       ...defaultTheme,
       colors: {
@@ -334,6 +462,8 @@ export const NAMED_STYLES: { id: StylePresetId; label: string; theme: UIThemeCon
   {
     id: 'warm',
     label: '温暖极简',
+    example: '奶油/米色底、单一暖色点缀',
+    bestFor: ['生活服务', '美业/疗愈', '2025 流行'],
     theme: {
       ...defaultTheme,
       colors: {
@@ -356,6 +486,8 @@ export const NAMED_STYLES: { id: StylePresetId; label: string; theme: UIThemeCon
   {
     id: 'brutal',
     label: '新粗野主义',
+    example: '粗黑描边、厚实阴影、直角',
+    bestFor: ['设计作品集', '创意品牌', '反精致'],
     theme: {
       ...defaultTheme,
       colors: {
@@ -373,6 +505,223 @@ export const NAMED_STYLES: { id: StylePresetId; label: string; theme: UIThemeCon
       typography: { fontFamily: 'system-ui, sans-serif', baseSize: 'text-base', density: 'normal' },
       shadows: { cardShadow: 'shadow-[4px_4px_0_0_#1c1917]', buttonShadow: 'shadow-[4px_4px_0_0_#1c1917]' },
       vibe: '新粗野主义：粗黑描边、厚实阴影、高对比色块、直角、反精致',
+    },
+  },
+  // ---------- UIUXProMax 扩展风格 ----------
+  {
+    id: 'bento',
+    label: 'Bento 网格',
+    example: '网格卡片分区、信息块错落排布',
+    bestFor: ['仪表盘', '产品页', '个人主页'],
+    theme: {
+      ...defaultTheme,
+      colors: {
+        primary: 'indigo-600',
+        secondary: 'violet-500',
+        background: { light: 'slate-50', dark: 'slate-900' },
+        surface: 'white',
+        text: { primary: 'slate-900', secondary: 'slate-600' },
+        border: 'slate-200',
+      },
+      shape: {
+        ...defaultTheme.shape,
+        borderRadius: { sm: 'rounded-lg', md: 'rounded-xl', lg: 'rounded-2xl', full: 'rounded-full' },
+      },
+      typography: { fontFamily: 'system-ui, sans-serif', baseSize: 'text-base', density: 'normal' },
+      shadows: { cardShadow: 'shadow-sm', buttonShadow: 'shadow' },
+      vibe: 'Bento 网格：规则或不规则网格分区、卡片信息块、清晰留白与层级',
+    },
+  },
+  {
+    id: 'aurora',
+    label: '极光 UI',
+    example: '深色渐变底、柔和光晕、现代 SaaS 感',
+    bestFor: ['现代 SaaS', '创意机构', '产品官网'],
+    theme: {
+      ...defaultTheme,
+      colors: {
+        primary: 'cyan-400',
+        secondary: 'violet-400',
+        background: { light: 'slate-900', dark: 'slate-950' },
+        surface: 'white/10',
+        text: { primary: 'slate-50', secondary: 'cyan-100' },
+        border: 'cyan-500/20',
+      },
+      shape: {
+        ...defaultTheme.shape,
+        borderRadius: { sm: 'rounded-xl', md: 'rounded-2xl', lg: 'rounded-3xl', full: 'rounded-full' },
+      },
+      typography: { fontFamily: 'system-ui, sans-serif', baseSize: 'text-base', density: 'normal' },
+      shadows: { cardShadow: 'shadow-xl', buttonShadow: 'shadow-lg' },
+      vibe: '极光 UI：深色渐变背景、半透明卡片、青/紫光晕、现代高端',
+    },
+  },
+  {
+    id: 'dark',
+    label: '深色模式',
+    example: '纯黑/深灰底、高对比、护眼',
+    bestFor: ['夜间模式', '代码/开发工具', '阅读类'],
+    theme: {
+      ...defaultTheme,
+      colors: {
+        primary: 'sky-400',
+        secondary: 'violet-400',
+        background: { light: '#0a0a0a', dark: '#0a0a0a' },
+        surface: 'neutral-900',
+        text: { primary: 'neutral-50', secondary: 'neutral-400' },
+        border: 'neutral-700',
+      },
+      shape: {
+        ...defaultTheme.shape,
+        borderRadius: { sm: 'rounded', md: 'rounded-lg', lg: 'rounded-xl', full: 'rounded-full' },
+      },
+      typography: { fontFamily: 'system-ui, sans-serif', baseSize: 'text-base', density: 'normal' },
+      shadows: { cardShadow: 'shadow-lg', buttonShadow: 'shadow-md' },
+      vibe: '深色模式：OLED 友好深黑、高对比文字、护眼适合长时间使用',
+    },
+  },
+  {
+    id: 'accessible',
+    label: '可访问优先',
+    example: '高对比、焦点可见、语义化结构',
+    bestFor: ['政府/公共', '医疗/教育', '无障碍产品'],
+    theme: {
+      ...defaultTheme,
+      colors: {
+        primary: 'blue-600',
+        secondary: 'emerald-600',
+        background: { light: 'white', dark: 'slate-900' },
+        surface: 'slate-50',
+        text: { primary: 'slate-900', secondary: 'slate-600' },
+        border: 'slate-300',
+      },
+      shape: {
+        ...defaultTheme.shape,
+        borderRadius: { sm: 'rounded-md', md: 'rounded-md', lg: 'rounded-lg', full: 'rounded-full' },
+      },
+      typography: { fontFamily: 'system-ui, sans-serif', baseSize: 'text-base', density: 'normal' },
+      shadows: { cardShadow: 'shadow', buttonShadow: 'shadow-md' },
+      vibe: '可访问优先：WCAG 对比度、焦点环可见、语义化、政府/医疗/教育适用',
+    },
+  },
+  {
+    id: 'clay',
+    label: '黏土拟态',
+    example: '柔和圆角、暖色、立体感',
+    bestFor: ['教育/儿童', '生活应用', '亲和品牌'],
+    theme: {
+      ...defaultTheme,
+      colors: {
+        primary: 'orange-600',
+        secondary: 'yellow-600',
+        background: { light: 'amber-50', dark: 'amber-950' },
+        surface: 'orange-50',
+        text: { primary: 'amber-900', secondary: 'amber-700' },
+        border: 'amber-200',
+      },
+      shape: {
+        ...defaultTheme.shape,
+        borderRadius: { sm: 'rounded-2xl', md: 'rounded-3xl', lg: 'rounded-[28px]', full: 'rounded-full' },
+      },
+      typography: { fontFamily: 'system-ui, sans-serif', baseSize: 'text-base', density: 'normal' },
+      shadows: { cardShadow: 'shadow-md', buttonShadow: 'shadow-lg' },
+      vibe: '黏土拟态：大圆角、暖色、柔和立体阴影、亲和友好',
+    },
+  },
+  {
+    id: 'liquid',
+    label: '液态玻璃',
+    example: '高端半透明、深色渐变底',
+    bestFor: ['高端 SaaS', '电商精选', '品牌首屏'],
+    theme: {
+      ...defaultTheme,
+      colors: {
+        primary: 'sky-400',
+        secondary: 'indigo-400',
+        background: { light: 'sky-950', dark: 'slate-950' },
+        surface: 'white/12',
+        text: { primary: 'white', secondary: 'sky-200' },
+        border: 'white/20',
+      },
+      shape: {
+        ...defaultTheme.shape,
+        borderRadius: { sm: 'rounded-2xl', md: 'rounded-3xl', lg: 'rounded-[24px]', full: 'rounded-full' },
+      },
+      typography: { fontFamily: 'system-ui, sans-serif', baseSize: 'text-base', density: 'normal' },
+      shadows: { cardShadow: 'shadow-2xl', buttonShadow: 'shadow-xl' },
+      vibe: '液态玻璃：深色渐变、半透明卡片、backdrop-blur、高端精致',
+    },
+  },
+  {
+    id: 'soft',
+    label: '柔和进化',
+    example: '轻阴影、紫/青主色、现代企业',
+    bestFor: ['现代企业', 'SaaS 后台', '协作工具'],
+    theme: {
+      ...defaultTheme,
+      colors: {
+        primary: 'violet-600',
+        secondary: 'cyan-500',
+        background: { light: 'violet-50', dark: 'violet-950' },
+        surface: 'white',
+        text: { primary: 'violet-950', secondary: 'violet-700' },
+        border: 'violet-200',
+      },
+      shape: {
+        ...defaultTheme.shape,
+        borderRadius: { sm: 'rounded-lg', md: 'rounded-xl', lg: 'rounded-2xl', full: 'rounded-full' },
+      },
+      typography: { fontFamily: 'system-ui, sans-serif', baseSize: 'text-base', density: 'normal' },
+      shadows: { cardShadow: 'shadow-md', buttonShadow: 'shadow' },
+      vibe: '柔和进化：轻阴影、紫/青主色、现代企业 SaaS 感',
+    },
+  },
+  {
+    id: 'retro',
+    label: '复古未来',
+    example: '深色底、琥珀/红强调、复古科技',
+    bestFor: ['游戏', '音乐/娱乐', '复古品牌'],
+    theme: {
+      ...defaultTheme,
+      colors: {
+        primary: 'amber-500',
+        secondary: 'red-500',
+        background: { light: 'stone-900', dark: 'stone-950' },
+        surface: 'stone-800',
+        text: { primary: 'amber-50', secondary: 'amber-200' },
+        border: 'amber-600',
+      },
+      shape: {
+        ...defaultTheme.shape,
+        borderRadius: { sm: 'rounded-sm', md: 'rounded', lg: 'rounded-md', full: 'rounded-full' },
+      },
+      typography: { fontFamily: '"JetBrains Mono", monospace', baseSize: 'text-base', density: 'compact' },
+      shadows: { cardShadow: 'shadow-none', buttonShadow: '0 0 0 2px var(--amber)' },
+      vibe: '复古未来：深色底、琥珀/红强调、等宽字体、复古科技感',
+    },
+  },
+  {
+    id: 'y2k',
+    label: 'Y2K 美学',
+    example: '高饱和粉/青、直角、千禧年',
+    bestFor: ['时尚/美妆', '音乐/潮流', 'Z 世代'],
+    theme: {
+      ...defaultTheme,
+      colors: {
+        primary: 'pink-500',
+        secondary: 'teal-400',
+        background: { light: 'pink-50', dark: 'pink-950' },
+        surface: 'white',
+        text: { primary: 'pink-900', secondary: 'pink-700' },
+        border: 'pink-300',
+      },
+      shape: {
+        ...defaultTheme.shape,
+        borderRadius: { sm: 'rounded-none', md: 'rounded-none', lg: 'rounded-none', full: 'rounded-full' },
+      },
+      typography: { fontFamily: 'system-ui, sans-serif', baseSize: 'text-base', density: 'normal' },
+      shadows: { cardShadow: 'shadow-none', buttonShadow: 'shadow-none' },
+      vibe: 'Y2K 美学：高饱和粉/青、直角或几何、千禧年复古潮流',
     },
   },
 ];

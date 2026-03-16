@@ -26,7 +26,9 @@ import { NodeDetailPanel } from './NodeDetailPanel';
 import { PresentationMode } from './PresentationMode';
 import { ConversationPanel } from './ConversationPanel';
 import { CONVERSATION_PANEL_WIDTH_PX } from '@/lib/layout-constants';
+import { clsx } from 'clsx';
 import { MessageCircle } from 'lucide-react';
+import { StitchHomepage } from './StitchHomepage';
 import { ContextMenu } from './ContextMenu';
 import { Play, Palette } from 'lucide-react';
 
@@ -497,10 +499,10 @@ function TopButtons({
   if (isDetailPanelOpen) return null;
 
   return (
-    <>
+    <React.Fragment>
       <div 
         ref={menuRef}
-        className="fixed top-4 right-4 pointer-events-auto" 
+        className="fixed top-4 left-4 pointer-events-auto ml-[30rem]" 
         style={{ 
           zIndex: 9999,
           position: 'fixed',
@@ -558,7 +560,7 @@ function TopButtons({
           onClose={() => setIsStyleExtractorOpen(false)}
         />
       )}
-    </>
+    </React.Fragment>
   );
 }
 
@@ -577,23 +579,29 @@ export function InfiniteCanvas() {
     setIsPresentationMode(isOpen);
   }, []);
 
-  // 画布模式与编辑模式均展示右侧对话区（固定宽度，不收进）；仅演示模式不展示
-  const showConversationArea = !isPresentationMode;
+  /** 与 Stitch 一致的首页：无节点或仅默认「首页」节点时展示 */
+  const showStitchHome =
+    nodes.length === 0 ||
+    (nodes.length === 1 && nodes[0].data?.label === '首页' && nodes[0].id === 'page-1');
 
   return (
     <div className="fixed inset-0 w-full h-full bg-zinc-950 overflow-hidden flex flex-col">
-      {/* 画布区域：占满剩余空间；有对话轨/面板时右侧被预留 */}
+      {/* 画布区域：空态为 Stitch 首页，否则为 ReactFlow */}
       <div className="flex-1 min-h-0 relative">
-        <ReactFlowProvider>
-          <CanvasContent />
-          {!isPresentationMode && (
-            <TopButtons
-              isDetailPanelOpen={isDetailPanelOpen}
-              onPresentationModeChange={handlePresentationModeChange}
-            />
-          )}
-          {!isPresentationMode && <RefreshButton isDetailPanelOpen={isDetailPanelOpen} />}
-        </ReactFlowProvider>
+        {showStitchHome ? (
+          <StitchHomepage />
+        ) : (
+          <ReactFlowProvider>
+            <CanvasContent />
+            {!isPresentationMode && (
+              <TopButtons
+                isDetailPanelOpen={isDetailPanelOpen}
+                onPresentationModeChange={handlePresentationModeChange}
+              />
+            )}
+            {!isPresentationMode && <RefreshButton isDetailPanelOpen={isDetailPanelOpen} />}
+          </ReactFlowProvider>
+        )}
       </div>
       {isPresentationMode && (
         <PresentationMode
@@ -602,12 +610,16 @@ export function InfiniteCanvas() {
         />
       )}
       <NodeDetailPanel />
-      {/* 右侧对话区：固定宽度、不收进，画布与编辑模式均展示 */}
-      {showConversationArea && (
+      {/* 右侧 AI 对话区：始终挂载以便首页「开始设计」触发的 effect 能运行；首页时隐藏，进入项目后展示 */}
+      {!isPresentationMode && (
         <aside
-          className="fixed top-0 bottom-0 right-0 flex flex-col bg-zinc-900 border-l border-zinc-800 z-30"
-          style={{ width: CONVERSATION_PANEL_WIDTH_PX }}
+          className={clsx(
+            'fixed top-0 bottom-0 right-0 flex flex-col bg-zinc-900 border-l border-zinc-800 z-30 transition-[width] duration-200 overflow-hidden',
+            showStitchHome && 'w-0 border-0 opacity-0 pointer-events-none'
+          )}
+          style={{ width: showStitchHome ? 0 : CONVERSATION_PANEL_WIDTH_PX }}
           aria-label="AI 对话"
+          aria-hidden={showStitchHome}
         >
           <ConversationPanel isSubmitting={isAiCreatePending} />
         </aside>

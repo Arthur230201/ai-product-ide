@@ -1,0 +1,9 @@
+{
+  "name": "Button",
+  "props": {
+    "variant": ["default", "secondary", "outline", "ghost", "destructive", "link"],
+    "size": ["sm", "md", "lg", "icon"]
+  },
+  "do": ["Primary CTA use default + lg", "Submit use data-action submit"],
+  "dont": ["No inline style", "No arbitrary color classes"]
+}

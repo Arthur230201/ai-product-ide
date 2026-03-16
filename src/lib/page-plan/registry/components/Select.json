@@ -1,0 +1,6 @@
+{
+  "name": "Select",
+  "props": {},
+  "do": ["Native select or role=combobox for injector"],
+  "dont": ["No custom props beyond name"]
+}

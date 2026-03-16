@@ -1,0 +1,6 @@
+{
+  "name": "Input",
+  "props": { "type": ["text", "email", "password", "number", "search"] },
+  "do": ["Always pair with label or aria-label"],
+  "dont": ["No style attribute"]
+}

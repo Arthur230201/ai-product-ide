@@ -1,0 +1,19 @@
+{
+  "templateId": "form",
+  "defaultDensity": "comfortable",
+  "allowedSections": ["header", "formBody", "actions", "states", "footer"],
+  "requiredSections": ["header", "formBody", "actions", "states"],
+  "ctaRules": {
+    "primaryCtaLocation": "actions_right",
+    "secondaryCtaLocation": "actions_left",
+    "stickyActions": true
+  },
+  "stateRules": {
+    "requireLoading": true,
+    "requireEmpty": false,
+    "requireError": true
+  },
+  "layoutRules": {
+    "requireSubmitEventBinding": true
+  }
+}

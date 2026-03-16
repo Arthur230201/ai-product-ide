@@ -1,0 +1,31 @@
+{
+  "density": {
+    "comfortable": { "container": "p-8", "gap": "gap-6", "card": "p-6", "title": "text-2xl font-semibold", "body": "text-sm text-slate-600" },
+    "compact": { "container": "p-4", "gap": "gap-4", "card": "p-4", "title": "text-xl font-semibold", "body": "text-sm text-slate-600" },
+    "airy": { "container": "p-10", "gap": "gap-8", "card": "p-8", "title": "text-3xl font-semibold", "body": "text-base text-slate-600" }
+  },
+  "radius": { "default": "rounded-md", "lg": "rounded-lg", "xl": "rounded-xl" },
+  "shadow": { "sm": "shadow-sm", "md": "shadow-md" },
+  "recipes": {
+    "pageShell": "min-h-screen bg-slate-50",
+    "headerRow": "flex items-center justify-between border-b border-slate-200 bg-white",
+    "buttonPrimary": "inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800",
+    "buttonSecondary": "inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50",
+    "buttonOutline": "inline-flex items-center justify-center rounded-md border border-slate-300 bg-transparent px-4 py-2 text-sm font-medium hover:bg-slate-50",
+    "card": "rounded-xl border border-slate-200 bg-white shadow-sm",
+    "input": "h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400",
+    "table": "w-full text-sm text-left",
+    "tableHead": "border-b border-slate-200 bg-slate-50 text-slate-700",
+    "tableCell": "border-b border-slate-100 px-4 py-3",
+    "skeleton": "animate-pulse rounded-md bg-slate-200",
+    "emptyBox": "flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 py-12",
+    "alertError": "rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800",
+    "tabList": "flex gap-2 border-b border-slate-200",
+    "tabActive": "active border-b-2 border-slate-900 bg-white px-3 py-2 text-sm font-medium text-slate-900",
+    "tabInactive": "px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900",
+    "tabPanelHidden": "hidden",
+    "tabPanel": "p-4",
+    "textarea": "min-h-20 resize-y",
+    "tableHeaderCell": "px-4 py-3"
+  }
+}

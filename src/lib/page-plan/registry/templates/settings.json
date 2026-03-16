@@ -1,0 +1,34 @@
+{
+  "templateId": "settings",
+  "defaultDensity": "comfortable",
+  "allowedSections": ["header", "content", "formBody", "actions", "states", "footer"],
+  "requiredSections": ["header", "formBody", "actions", "states"],
+  "maxComponentsPerSection": {
+    "header": 3,
+    "content": 3,
+    "formBody": 10,
+    "actions": 3,
+    "states": 3,
+    "footer": 2
+  },
+  "ctaRules": {
+    "primaryCtaLocation": "actions_right",
+    "secondaryCtaLocation": "actions_left",
+    "stickyActions": true
+  },
+  "stateRules": {
+    "requireLoading": true,
+    "requireEmpty": false,
+    "requireError": true
+  },
+  "bindingRequirements": {
+    "action": {
+      "minSubmitEvents": 1,
+      "allowSaveDraft": true
+    }
+  },
+  "layoutRules": {
+    "preferGroupedSections": true,
+    "preferSideNav": true
+  }
+}

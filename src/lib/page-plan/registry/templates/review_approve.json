@@ -1,0 +1,34 @@
+{
+  "templateId": "review_approve",
+  "defaultDensity": "comfortable",
+  "allowedSections": ["header", "summary", "content", "actions", "states", "footer"],
+  "requiredSections": ["header", "summary", "actions", "states"],
+  "maxComponentsPerSection": {
+    "header": 3,
+    "summary": 5,
+    "content": 5,
+    "actions": 4,
+    "states": 3,
+    "footer": 2
+  },
+  "ctaRules": {
+    "primaryCtaLocation": "actions_right",
+    "secondaryCtaLocation": "actions_left",
+    "stickyActions": true
+  },
+  "stateRules": {
+    "requireLoading": true,
+    "requireEmpty": false,
+    "requireError": true
+  },
+  "bindingRequirements": {
+    "action": {
+      "minSubmitEvents": 1,
+      "preferTwoActionsApproveReject": true
+    }
+  },
+  "layoutRules": {
+    "focusOnDecision": true,
+    "showKeyFieldsFirst": true
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "templateId": "dashboard",
+  "defaultDensity": "comfortable",
+  "allowedSections": ["header", "subheader", "content", "results", "states", "footer"],
+  "requiredSections": ["header", "content", "states"],
+  "maxComponentsPerSection": {
+    "header": 4,
+    "subheader": 2,
+    "content": 6,
+    "results": 3,
+    "states": 3,
+    "footer": 2
+  },
+  "ctaRules": {
+    "primaryCtaLocation": "header_right",
+    "secondaryCtaLocation": "header_right"
+  },
+  "stateRules": {
+    "requireLoading": true,
+    "requireEmpty": false,
+    "requireError": true
+  },
+  "bindingRequirements": {
+    "view": {
+      "minPrimaryDataQueries": 1,
+      "maxPrimaryDataQueries": 3,
+      "requireAtLeastOneDataBindingInContent": true
+    }
+  },
+  "layoutRules": {
+    "preferCardsForKPIs": true,
+    "preferRecentActivityBlock": true
+  }
+}

@@ -29,7 +29,7 @@ const EditorSection = ({ value, onChange, onBlur, placeholder }: { value: string
 };
 
 export function NodeDetailPanel() {
-  const { selectedNodeId, nodes, isDetailPanelOpen, closeNodeDetail, updateNodeData, projectMeta, aiConfig, viewportPreset, setViewportPreset } = useCanvasStore();
+  const { selectedNodeId, nodes, isDetailPanelOpen, closeNodeDetail, updateNodeData, projectMeta, aiConfig, viewportPreset, viewportLocked, lockViewport } = useCanvasStore();
   const { execute: executeAnalysis, isPending: isGeneratingPrd } = useServerAction(generateAnalysisFromCode);
   const [activeTab, setActiveTab] = useState<'view' | 'spec' | 'impl' | 'test'>('view');
   const [isLoading, setIsLoading] = useState(false);
@@ -41,11 +41,13 @@ export function NodeDetailPanel() {
   // PRD 配置对话框状态
   const [showPrdConfig, setShowPrdConfig] = useState(false);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  /** 已锁定时用 viewportLocked，否则用 viewportPreset；提交时优先读 ref */
+  const effectiveViewport = viewportLocked ?? viewportPreset;
   /** 与视口按钮同步的 ref，提交时优先读取，避免 store 未刷新的边界情况 */
-  const viewportSubmitRef = useRef<'mobile' | 'desktop'>(viewportPreset);
+  const viewportSubmitRef = useRef<'mobile' | 'desktop'>(effectiveViewport);
   useEffect(() => {
-    viewportSubmitRef.current = viewportPreset;
-  }, [viewportPreset]);
+    viewportSubmitRef.current = effectiveViewport;
+  }, [effectiveViewport]);
   const [previewContainerSize, setPreviewContainerSize] = useState({ w: 0, h: 0 });
 
   // 测量预览容器尺寸；切回「界面」Tab 时需重新测量，否则容器被卸载后尺寸会失效导致预览超出范围
@@ -61,7 +63,7 @@ export function NodeDetailPanel() {
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [viewportPreset, activeTab]);
+  }, [effectiveViewport, activeTab]);
 
   // 获取选中的节点（使用 useMemo 稳定引用，避免无限循环）
   const selectedNode = useMemo(() => {
@@ -581,14 +583,14 @@ export function NodeDetailPanel() {
       </div>
 
       {/* 2. Main Body（P3：左侧四维 Tab + 节点树 + 入口，右侧预览） */}
-      <div className="flex-1 grid grid-cols-[minmax(96px,10%)_1fr] overflow-hidden h-full">
+      <div className="flex-1 min-h-0 grid grid-cols-[minmax(96px,10%)_1fr] overflow-hidden">
         {/* LEFT COLUMN: 仅节点列表 */}
-        <div className="flex flex-col h-full overflow-hidden border-r border-zinc-800">
+        <div className="flex flex-col min-h-0 overflow-hidden border-r border-zinc-800">
           <NodeTree />
         </div>
 
-        {/* 中间主内容区：单行（进度步骤 + 当前 Tab 操作）+ 下方全为关键内容区 */}
-        <div className="flex flex-col flex-1 min-h-0 bg-zinc-950 relative overflow-hidden min-w-0">
+        {/* 中间主内容区：单行（进度步骤 + 当前 Tab 操作）+ 下方全为关键内容区；pr-4 与右侧 AI 对话留出外边距 */}
+        <div className="flex flex-col flex-1 min-h-0 bg-zinc-950 relative overflow-hidden min-w-0 pr-4">
           {/* 单行：左侧进度步骤（界面→需求→实现→测试用例）+ 右侧当前步骤操作，尽量压缩高度 */}
           <div className="shrink-0 h-10 border-b border-zinc-800 flex items-center justify-between gap-3 px-3 bg-zinc-900/40">
             <nav className="flex items-center gap-0 min-w-0" aria-label="节点进度">
@@ -641,37 +643,37 @@ export function NodeDetailPanel() {
             <div className="flex items-center gap-2 shrink-0">
               {activeTab === 'view' && (
                 <>
-                  <div className="flex rounded border border-zinc-700 overflow-hidden" role="group" aria-label="视口预设">
-                    {[
-                      { id: 'mobile', label: '移动', icon: Smartphone, title: '移动端 375px' },
-                      { id: 'desktop', label: '桌面', icon: Monitor, title: '桌面 1280px' },
-                    ].map(({ id, label, icon: Icon, title }) => {
-                      const viewCode = selectedNode?.data?.artifacts?.view?.code;
-                      const hasGeneratedUi = !!viewCode?.trim() && !isPlaceholderUiCode(viewCode);
-                      return (
+                  {viewportLocked !== null ? (
+                    <div className="inline-flex items-center gap-1.5 px-2 py-1 text-xs text-zinc-400 border border-zinc-700 rounded" role="status" aria-label="平台已锁定">
+                      {viewportLocked === 'mobile' ? <Smartphone size={12} className="shrink-0" /> : <Monitor size={12} className="shrink-0" />}
+                      <span>已锁定：{viewportLocked === 'mobile' ? '移动端' : '桌面端'}</span>
+                    </div>
+                  ) : (
+                    <div className="flex rounded border border-zinc-700 overflow-hidden" role="group" aria-label="视口预设">
+                      {[
+                        { id: 'mobile', label: '移动', icon: Smartphone, title: '移动端 375px' },
+                        { id: 'desktop', label: '桌面', icon: Monitor, title: '桌面 1280px' },
+                      ].map(({ id, label, icon: Icon, title }) => (
                         <button
                           key={id}
                           type="button"
                           data-testid={id === 'desktop' ? 'viewport-desktop' : 'viewport-mobile'}
-                          disabled={hasGeneratedUi}
                           onClick={() => {
-                            if (hasGeneratedUi) return;
-                            setViewportPreset(id as 'mobile' | 'desktop');
+                            lockViewport(id as 'mobile' | 'desktop');
                             viewportSubmitRef.current = id as 'mobile' | 'desktop';
                           }}
-                          title={hasGeneratedUi ? '已锁定' : title}
+                          title={title}
                           className={clsx(
                             'inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium transition-colors whitespace-nowrap shrink-0',
-                            hasGeneratedUi && 'cursor-not-allowed opacity-70',
-                            viewportPreset === id ? 'bg-cyan-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'
+                            effectiveViewport === id ? 'bg-cyan-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'
                           )}
                         >
                           <Icon size={12} className="shrink-0" />
                           <span>{label}</span>
                         </button>
-                      );
-                    })}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                   <button
                     onClick={handleAddInteractions}
                     disabled={isLoading}
@@ -736,34 +738,50 @@ export function NodeDetailPanel() {
             </div>
           </div>
 
-          {/* 界面：UI 预览（无额外工具栏，全给预览区） */}
+          {/* 界面：UI 预览；与左侧节点列表、上方进度栏、右侧 AI 对话保持外边距，避免被遮挡 */}
           {activeTab === 'view' && (
             <div
               ref={previewContainerRef}
-              className="flex-1 min-w-0 w-full overflow-hidden flex justify-center items-start pt-2 pb-2 px-2 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] relative"
+              className="flex-1 min-h-0 min-w-0 w-full overflow-hidden flex justify-center items-start pt-5 pb-5 pl-5 pr-5 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] relative"
             >
                 {(() => {
-                  const presetSize = getViewportSize(viewportPreset);
+                  const presetSize = getViewportSize(effectiveViewport);
                   const { w: cw, h: ch } = previewContainerSize;
                   const fitScale = cw > 0 && ch > 0 ? Math.min(1, cw / presetSize.w, ch / presetSize.h) : 1;
+                  // 包装器仅占缩放后的尺寸，避免 1280px 布局宽度溢出导致预览右侧被裁切或压到 AI 对话下
+                  const wrapperW = presetSize.w * fitScale;
+                  const wrapperH = presetSize.h * fitScale;
                   return (
                     <div
                       style={{
-                        width: presetSize.w,
-                        height: presetSize.h,
-                        transform: `scale(${fitScale})`,
-                        transformOrigin: 'top center',
-                        transition: 'transform 0.2s ease',
+                        width: wrapperW,
+                        height: wrapperH,
                         flexShrink: 0,
+                        position: 'relative',
+                        overflow: 'hidden',
+                        transition: 'width 0.2s ease, height 0.2s ease',
                       }}
                     >
-                      <MobileDevicePreview
-                        imageUrl={data.artifacts.view.previewUrl}
-                        zoom={1}
-                        width={presetSize.w}
-                        height={presetSize.h}
-                        viewportPreset={viewportPreset}
-                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          width: presetSize.w,
+                          height: presetSize.h,
+                          transform: `scale(${fitScale})`,
+                          transformOrigin: 'top center',
+                          transition: 'transform 0.2s ease',
+                        }}
+                      >
+                        <MobileDevicePreview
+                          imageUrl={data.artifacts.view.previewUrl}
+                          zoom={1}
+                          width={presetSize.w}
+                          height={presetSize.h}
+                          viewportPreset={effectiveViewport}
+                        />
+                      </div>
                     </div>
                   );
                 })()}

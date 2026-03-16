@@ -1,0 +1,6 @@
+{
+  "name": "Toast",
+  "props": { "variant": ["success", "error", "info"] },
+  "do": ["Submit action shows success via injector"],
+  "dont": []
+}

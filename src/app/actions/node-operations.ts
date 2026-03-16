@@ -13,6 +13,8 @@ import {
   shouldUseEditMode,
   buildUIEditUserPrompt,
 } from '@/lib/prompts/ui-generation-prompt';
+import { UI_UX_PRO_MAX_GUIDANCE } from '@/lib/prompts/ui-ux-pro-max-guidance';
+import { STYLE_PRESET_IDS } from '@/types/theme';
 import { callText, callObject } from '@/lib/ai/llm';
 import type { AIResult } from '@/lib/ai/llm';
 
@@ -605,6 +607,60 @@ const NEO_STYLE_ENFORCEMENT = `
 4. **文字**：\`text-indigo-900\`、\`text-indigo-700\`。
 `;
 
+/** Bento 网格：规则/不规则网格分区、卡片块、清晰留白 */
+const BENTO_STYLE_ENFORCEMENT = `
+[Bento 网格 - 必须严格遵循]
+当前为「Bento 网格」：主内容区使用网格布局（\`grid grid-cols-2 md:grid-cols-3\` 或不等分），每个信息块为独立卡片；卡片 \`rounded-xl\` \`shadow-sm\`，背景 \`bg-white\` 或 \`bg-slate-50\`；主色 \`text-indigo-600\`、\`bg-indigo-600\`；文字 \`text-slate-900\`、\`text-slate-600\`。禁止整页单列或无网格。
+`;
+
+/** 极光 UI：深色渐变、半透明卡片、青/紫光晕 */
+const AURORA_STYLE_ENFORCEMENT = `
+[极光 UI - 必须严格遵循]
+当前为「极光 UI」：页面根背景 \`bg-gradient-to-br from-slate-900 via-indigo-950 to-sky-950\` 或类似深色渐变；卡片 \`bg-white/10 backdrop-blur-xl rounded-2xl border border-cyan-500/20\`；主色 \`text-cyan-400\`、\`bg-cyan-400\`；文字 \`text-slate-50\`、\`text-cyan-100\`。
+`;
+
+/** 深色模式：纯黑/深灰底、高对比 */
+const DARK_STYLE_ENFORCEMENT = `
+[深色模式 - 必须严格遵循]
+当前为「深色模式」：页面根背景 \`bg-black\` 或 \`bg-neutral-950\`；卡片 \`bg-neutral-900\` \`rounded-lg\`；主色 \`text-sky-400\`、\`bg-sky-400\`；文字 \`text-neutral-50\`、\`text-neutral-400\`。整体深色、高对比、护眼。
+`;
+
+/** 可访问优先：高对比、焦点环、语义化 */
+const ACCESSIBLE_STYLE_ENFORCEMENT = `
+[可访问优先 - 必须严格遵循]
+当前为「可访问优先」：背景 \`bg-white\`，文字 \`text-slate-900\`、\`text-slate-600\`（对比度 ≥4.5:1）；所有可点击元素须有 \`focus:ring-2 focus:ring-blue-500 focus:ring-offset-2\`；主色 \`bg-blue-600\`、\`text-blue-600\`；圆角 \`rounded-md\`，阴影适度。禁止低对比、禁止仅靠颜色传达信息。
+`;
+
+/** 黏土拟态：大圆角、暖色、柔和立体 */
+const CLAY_STYLE_ENFORCEMENT = `
+[黏土拟态 - 必须严格遵循]
+当前为「黏土拟态」：页面根背景 \`bg-amber-50\` 或 \`bg-orange-50\`；卡片 \`bg-orange-50\` 或 \`bg-amber-50\` \`rounded-3xl\` \`shadow-md\`；主色 \`bg-orange-600\`、\`text-orange-600\`；文字 \`text-amber-900\`、\`text-amber-700\`。大圆角、暖色、柔和立体感。
+`;
+
+/** 液态玻璃：深色渐变、半透明、backdrop-blur */
+const LIQUID_STYLE_ENFORCEMENT = `
+[液态玻璃 - 必须严格遵循]
+当前为「液态玻璃」：页面根背景 \`bg-gradient-to-br from-sky-950 to-slate-900\`；卡片 \`bg-white/10 backdrop-blur-xl rounded-3xl border border-white/20\`；主色 \`text-sky-400\`、\`bg-sky-400\`；文字 \`text-white\`、\`text-sky-200\`。高端半透明、深色底。
+`;
+
+/** 柔和进化：轻阴影、紫/青主色 */
+const SOFT_STYLE_ENFORCEMENT = `
+[柔和进化 - 必须严格遵循]
+当前为「柔和进化」：页面根背景 \`bg-violet-50\` 或 \`bg-slate-50\`；卡片 \`bg-white\` \`rounded-xl\` \`shadow-md\`；主色 \`bg-violet-600\`、\`text-violet-600\` 或 \`bg-cyan-500\`；文字 \`text-violet-950\`、\`text-violet-700\`。轻阴影、现代企业感。
+`;
+
+/** 复古未来：深色底、琥珀/红强调、等宽字体 */
+const RETRO_STYLE_ENFORCEMENT = `
+[复古未来 - 必须严格遵循]
+当前为「复古未来」：页面根背景 \`bg-stone-900\` 或 \`bg-stone-950\`；卡片 \`bg-stone-800\` \`rounded\` \`border border-amber-500/50\`；主色 \`text-amber-500\`、\`bg-amber-500\` 或 \`text-red-500\`；文字 \`text-amber-50\`、\`text-amber-200\`；可用 \`font-mono\`。复古科技感。
+`;
+
+/** Y2K 美学：高饱和粉/青、直角 */
+const Y2K_STYLE_ENFORCEMENT = `
+[Y2K 美学 - 必须严格遵循]
+当前为「Y2K 美学」：页面根背景 \`bg-pink-50\` 或 \`bg-white\`；卡片 \`bg-white\` \`rounded-none\` 或小圆角，少阴影；主色 \`bg-pink-500\`、\`text-pink-500\` 或 \`bg-teal-400\`；文字 \`text-pink-900\`、\`text-pink-700\`。高饱和、直角或几何、千禧年潮流。
+`;
+
 // ==================== Server Actions（用于 CommandBar）====================
 
 const GenerateUIFromImageInputSchema = z.object({
@@ -799,6 +855,7 @@ Generate production-ready **React + Tailwind CSS** code based on the uploaded im
 - **根布局（必须）**：根节点使用 \`className={cn("flex flex-col h-full min-h-full ...")}\`，主内容区必须含 \`flex-1 min-h-0 overflow-y-auto\`，否则预览中主内容区会被压扁仅显示底部。
 - 代码可直接运行，包含完整交互逻辑。
 ${designSystemEnforcement}
+${UI_UX_PRO_MAX_GUIDANCE}
 
 # Output
 - 只返回完整的 .tsx 代码
@@ -1027,7 +1084,7 @@ const GenerateUIFromTextInputSchema = z.object({
   }).optional().describe('项目画像配置'),
   themeConfig: z.any().optional().describe('UI主题配置'),
   /** 视觉风格预设（与风格选择器一致）：glass 等会注入强约束如渐变底、毛玻璃 */
-  stylePreset: z.enum(['neutral', 'glass', 'flat', 'corporate', 'neo', 'cyberpunk', 'warm', 'brutal', 'custom']).optional().describe('风格预设'),
+  stylePreset: z.enum(STYLE_PRESET_IDS).optional().describe('风格预设'),
   /** 目标视口：与编辑区当前选择一致，生成对应布局 */
   viewportPreset: z.enum(['mobile', 'desktop']).optional().default('mobile').describe('目标视口'),
   /** Stitch 方案：draft=快速模型，quality=重量模型，默认 quality */
@@ -1095,9 +1152,19 @@ export const generateUIFromText = createServerAction()
         if (input.stylePreset === 'flat') systemPrompt += FLAT_STYLE_ENFORCEMENT;
         if (input.stylePreset === 'corporate') systemPrompt += CORPORATE_STYLE_ENFORCEMENT;
         if (input.stylePreset === 'neo') systemPrompt += NEO_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'bento') systemPrompt += BENTO_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'aurora') systemPrompt += AURORA_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'dark') systemPrompt += DARK_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'accessible') systemPrompt += ACCESSIBLE_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'clay') systemPrompt += CLAY_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'liquid') systemPrompt += LIQUID_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'soft') systemPrompt += SOFT_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'retro') systemPrompt += RETRO_STYLE_ENFORCEMENT;
+        if (input.stylePreset === 'y2k') systemPrompt += Y2K_STYLE_ENFORCEMENT;
       }
+      systemPrompt += UI_UX_PRO_MAX_GUIDANCE;
       const useEdit = shouldUseEditMode(input.existingCode, input.prompt ?? '');
-      const userPromptFinal = useEdit && input.existingCode
+      let userPromptFinal = useEdit && input.existingCode
         ? buildUIEditUserPrompt(
             input.nodeLabel || '页面',
             input.prompt ?? '',
@@ -1110,6 +1177,18 @@ export const generateUIFromText = createServerAction()
             viewportPreset,
             input.pageDescription
           );
+      // 在用户提示中显式强调当前选中的 UI 风格，提高模型遵守率
+      if (input.stylePreset || input.themeConfig?.vibe) {
+        const styleLine = [
+          input.stylePreset ? `风格预设：${input.stylePreset}（必须严格采用该预设的视觉与组件风格）` : '',
+          input.themeConfig?.vibe ? `主题氛围：${input.themeConfig.vibe}` : '',
+          input.themeConfig?.colors?.primary ? `主色：${input.themeConfig.colors.primary}` : '',
+        ].filter(Boolean).join('；');
+        if (styleLine) {
+          userPromptFinal += `\n\n【重要】当前选中的 UI 风格必须严格体现：${styleLine}。`;
+          log(`📐 [generateUIFromText] 已向 user 提示注入风格强调: ${styleLine}`);
+        }
+      }
       if (useEdit) {
         log(`📝 [generateUIFromText] 使用「在现有代码基础上修改」模式，existingCode 长度: ${input.existingCode?.length ?? 0}`);
       }

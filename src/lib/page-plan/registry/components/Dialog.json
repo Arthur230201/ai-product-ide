@@ -1,0 +1,6 @@
+{
+  "name": "Dialog",
+  "props": {},
+  "do": ["Trigger with button data-action open-modal data-modal id"],
+  "dont": []
+}

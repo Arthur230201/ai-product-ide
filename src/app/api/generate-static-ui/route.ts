@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { generateStaticUIFromText } from '@/app/actions/ui-pipeline-new';
 
-const STYLE_PRESETS = ['neutral', 'glass', 'flat', 'corporate', 'neo', 'cyberpunk', 'warm', 'brutal', 'custom'] as const;
+import { STYLE_PRESET_IDS } from '@/types/theme';
+const STYLE_PRESETS = STYLE_PRESET_IDS;
 const VIEWPORT_PRESETS = ['mobile', 'desktop'] as const;
 
 /**
