@@ -299,8 +299,8 @@ export function CommandBar(props: {
 
       // 提取 nodes 和 edges
       // 尝试多种可能的路径
-      let nodes: any[] = [];
-      let edges: any[] = [];
+      let nodes: any[] | undefined;
+      let edges: any[] | undefined;
 
       // 优先尝试 resultData.data.nodes 和 resultData.data.edges
       // 同时也尝试直接从 result.data 访问（以防 zsa-react 改变了结构）
