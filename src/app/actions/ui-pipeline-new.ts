@@ -2,7 +2,7 @@
 
 import { createServerAction } from 'zsa';
 import { z } from 'zod';
-import { log, logError } from '@/lib/logger';
+import { log, logError, logWarn } from '@/lib/logger';
 import { getOpenAIKey, getModelForTier, getTextModel } from '@/lib/ai-config';
 import { callText } from '@/lib/ai/llm';
 import type { AIResult } from '@/lib/ai/llm';
@@ -10,6 +10,10 @@ import type { UIPipelineResponse } from './ui-pipeline-response';
 import { cleanHTML, validateHTML, getStageMarker } from '@/lib/ui/html-validator';
 import { mapAIResultToUIPipelineResponse } from './ui-pipeline-response';
 import { STYLE_PRESET_IDS } from '@/types/theme';
+import { DesignSystemSnapshotSchema } from '@/types/design-system-snapshot';
+import { truncateDesignSystemMarkdown } from '@/lib/design-system/truncate-design-system-markdown';
+import { resolveDesignSystemAuto } from '@/lib/design-system/resolve-design-system';
+import { UI_UX_PRO_MAX_GUIDANCE } from '@/lib/prompts/ui-ux-pro-max-guidance';
 
 /**
  * 三段式 UI 生成 Pipeline
@@ -132,8 +136,19 @@ const VIEWPORT_PRESETS = ['mobile', 'desktop'] as const;
 const GenerateStaticUIInputSchema = z.object({
   prompt: z.string().optional().default('').describe('页面描述'),
   nodeLabel: z.string().optional().describe('节点标签'),
-  stylePreset: z.enum(STYLE_PRESETS).optional().default('neutral').describe('视觉风格预设，默认极简中性'),
+  pageDescription: z.string().optional().describe('页面需求摘要'),
+  projectMeta: z
+    .object({
+      projectName: z.string(),
+      industry: z.string(),
+      targetAudience: z.string(),
+      description: z.string(),
+    })
+    .optional(),
+  stylePreset: z.enum(STYLE_PRESETS).optional().default('neutral').describe('视觉风格预设；auto=与主轨一致的设计系统解析'),
   viewportPreset: z.enum(VIEWPORT_PRESETS).optional().default('mobile').describe('目标视口：mobile/tablet/desktop，决定生成布局宽度与结构'),
+  designSystemLocked: z.boolean().optional(),
+  designSystemSnapshot: z.unknown().optional(),
   aiConfig: z.object({
     textModel: z.string().optional(),
   }).optional(),
@@ -215,6 +230,35 @@ QUALITY TARGET:
       if (input.stylePreset === 'soft') systemPrompt += `\n\n${SOFT_STYLE_FRAGMENT}`;
       if (input.stylePreset === 'retro') systemPrompt += `\n\n${RETRO_STYLE_FRAGMENT}`;
       if (input.stylePreset === 'y2k') systemPrompt += `\n\n${Y2K_STYLE_FRAGMENT}`;
+
+      if (input.stylePreset === 'auto') {
+        let injectedFromLock = false;
+        const locked = input.designSystemLocked === true;
+        const snapParsed = DesignSystemSnapshotSchema.safeParse(input.designSystemSnapshot);
+        if (locked && snapParsed.success && snapParsed.data.markdownBlock?.trim()) {
+          systemPrompt += `\n\n${truncateDesignSystemMarkdown(snapParsed.data.markdownBlock)}`;
+          injectedFromLock = true;
+          log('📐 [generateStaticUIFromText] 已注入锁定设计系统快照');
+        } else if (locked && !snapParsed.success) {
+          logWarn('[generateStaticUIFromText] designSystemLocked 但快照无效，将重新推荐');
+        }
+        if (!injectedFromLock) {
+          const { markdown: recMd } = await resolveDesignSystemAuto({
+            projectMeta: input.projectMeta,
+            nodeLabel: input.nodeLabel || '页面',
+            pageDescription: input.pageDescription,
+            prompt: input.prompt,
+            aiConfig: input.aiConfig,
+            tier: 'draft',
+          });
+          if (recMd) {
+            systemPrompt += `\n\n${truncateDesignSystemMarkdown(recMd)}`;
+            log('📐 [generateStaticUIFromText] 已注入智能推荐设计系统（静态轨）');
+          }
+        }
+        systemPrompt += `\n\n【智能推荐模式·静态 HTML】请严格遵循上方设计系统说明，保持单文件静态约束与中文文案。`;
+        systemPrompt += UI_UX_PRO_MAX_GUIDANCE;
+      }
 
       const viewportInstruction =
         input.viewportPreset === 'desktop'

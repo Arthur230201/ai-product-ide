@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build",
+    "build": "node scripts/next-build.cjs",
     "start": "next start",
     "lint": "next lint",
     "selfcheck": "node scripts/self-check.mjs",
@@ -12,11 +12,18 @@
     "viewport:debug": "node scripts/viewport-debug-run.mjs",
     "viewport:read": "node scripts/viewport-debug-read.mjs",
     "build:prd-bundle": "node scripts/build-preview-ui-prd-bundle.mjs",
+    "build:uupm-data": "npx tsx scripts/build-uupm-data.ts",
     "full-flow:verify": "node scripts/run-full-flow-and-verify.mjs",
-    "test": "npx tsx src/lib/page-plan/__tests__/validatePlan.test.ts && npx tsx src/lib/page-plan/__tests__/renderHtml.test.ts && npx tsx src/lib/page-plan/__tests__/buildDataQueryRuntime.test.ts",
+    "test": "npx tsx src/lib/page-plan/__tests__/validatePlan.test.ts && npx tsx src/lib/page-plan/__tests__/renderHtml.test.ts && npx tsx src/lib/page-plan/__tests__/buildDataQueryRuntime.test.ts && npx tsx src/lib/design-system/__tests__/design-system-m1.test.ts && npx tsx src/lib/design-system/__tests__/design-system-m3.test.ts && npx tsx src/lib/design-system/__tests__/design-system-ts-engine.test.ts && npx tsx src/store/__tests__/canvas-project-v3.test.ts && npx tsx src/store/__tests__/design-system-history.test.ts",
     "typecheck": "tsc --noEmit",
     "ci": "npm run typecheck && npm run build && npm test",
-    "cosmos:check": "node scripts/cosmos-demo-check.mjs"
+    "cosmos:check": "node scripts/cosmos-demo-check.mjs",
+    "e2e:stitch": "node scripts/run-e2e-stitch.mjs",
+    "e2e:design-system": "node scripts/run-e2e-design-system.mjs",
+    "verify:uupm": "node scripts/verify-uupm-design-system.mjs",
+    "verify:ts-engine": "node scripts/verify-ts-engine.mjs",
+    "verify:parity": "node scripts/verify-parity.mjs",
+    "full-parity:verify": "npm run typecheck && npm run lint && npm test && npm run build && npm run verify:ts-engine && npm run verify:parity"
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.46",

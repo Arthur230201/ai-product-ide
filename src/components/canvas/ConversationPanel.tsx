@@ -1,53 +1,11 @@
 'use client';
 
 import React, { useRef, useEffect } from 'react';
-import { Send, Bot, User, MessageCircle, MessageSquarePlus, PanelRightClose } from 'lucide-react';
+import { Send, Bot, User, MessageCircle, PanelRightClose } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvas-store';
 import type { ConversationMessage, ClarificationOption } from '@/store/canvas-store';
 import { clsx } from 'clsx';
 import { CommandBar } from './CommandBar';
-
-const MAX_MESSAGES = 100;
-
-/** 模拟 3 轮用户输入 + AI 回复的示例对话（用于演示/联调） */
-export const MOCK_CONVERSATION_3_ROUNDS: ConversationMessage[] = [
-  {
-    id: 'mock-user-1',
-    role: 'user',
-    content: '做一个电商首页，要有轮播图和商品列表',
-    status: 'done',
-  },
-  {
-    id: 'mock-ast-1',
-    role: 'assistant',
-    content: '已根据你的描述生成电商首页结构，包含轮播图与商品列表区域。你可以在画布上查看并继续编辑。',
-    status: 'done',
-  },
-  {
-    id: 'mock-user-2',
-    role: 'user',
-    content: '轮播图改成 3 张，商品列表每行 4 个',
-    status: 'done',
-  },
-  {
-    id: 'mock-ast-2',
-    role: 'assistant',
-    content: '已更新：轮播图为 3 张，商品列表为每行 4 个。若还需要改样式或交互，直接说即可。',
-    status: 'done',
-  },
-  {
-    id: 'mock-user-3',
-    role: 'user',
-    content: '再加一个底部导航，有首页、分类、购物车、我的',
-    status: 'done',
-  },
-  {
-    id: 'mock-ast-3',
-    role: 'assistant',
-    content: '已添加底部导航，包含「首页」「分类」「购物车」「我的」四个入口。当前页面结构已同步到画布。',
-    status: 'done',
-  },
-];
 
 export interface ConversationPanelProps {
   /** 用户回复澄清或输入后续说明时调用（由 CommandBar 传入，内部会带上 context 再调 generateGraph） */
@@ -62,9 +20,10 @@ export function ConversationPanel({ onSubmitReply, isSubmitting, onCollapse }: C
   const {
     conversationMessages,
     pendingClarificationContext,
+    nodeEditSpecClarify,
     appendConversationMessage,
-    setConversationMessages,
     setPendingClarificationReply,
+    setPendingNodeEditSpecFollowUp,
   } = useCanvasStore();
   const [replyDraft, setReplyDraft] = React.useState('');
   const [selectedViewport, setSelectedViewport] = React.useState<'mobile' | 'desktop' | null>(null);
@@ -88,7 +47,22 @@ export function ConversationPanel({ onSubmitReply, isSubmitting, onCollapse }: C
 
   const handleSendReply = () => {
     const text = replyDraft.trim();
-    if (!text || !pendingClarificationContext || isSubmitting) return;
+    if (!text || isSubmitting) return;
+    if (nodeEditSpecClarify) {
+      appendConversationMessage({
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: text,
+        status: 'done',
+      });
+      setPendingNodeEditSpecFollowUp({
+        nodeId: nodeEditSpecClarify.nodeId,
+        rounds: [...nodeEditSpecClarify.rounds, text],
+      });
+      setReplyDraft('');
+      return;
+    }
+    if (!pendingClarificationContext) return;
     const reply = `${viewportPrefix()}；补充：${text}`;
     appendConversationMessage({
       id: `user-${Date.now()}`,
@@ -102,7 +76,21 @@ export function ConversationPanel({ onSubmitReply, isSubmitting, onCollapse }: C
   };
 
   const handleOptionClick = (option: ClarificationOption) => {
-    if (!pendingClarificationContext || isSubmitting) return;
+    if (isSubmitting) return;
+    if (nodeEditSpecClarify) {
+      appendConversationMessage({
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: option.label,
+        status: 'done',
+      });
+      setPendingNodeEditSpecFollowUp({
+        nodeId: nodeEditSpecClarify.nodeId,
+        rounds: [...nodeEditSpecClarify.rounds, option.label],
+      });
+      return;
+    }
+    if (!pendingClarificationContext) return;
     const reply = `${viewportPrefix()}；场景：${option.label}`;
     appendConversationMessage({
       id: `user-${Date.now()}`,
@@ -114,7 +102,7 @@ export function ConversationPanel({ onSubmitReply, isSubmitting, onCollapse }: C
     onSubmitReply?.(reply);
   };
 
-  const hasClarification = pendingClarificationContext !== null;
+  const hasClarification = pendingClarificationContext !== null || nodeEditSpecClarify !== null;
   const showOptions = hasClarification && lastAssistant?.clarification?.options?.length;
 
   return (
@@ -145,15 +133,9 @@ export function ConversationPanel({ onSubmitReply, isSubmitting, onCollapse }: C
           {conversationMessages.length === 0 ? (
             <div className="text-zinc-500 text-sm py-8 space-y-3">
               <p>在这里可以看到你的输入与 AI 的回复；当需求不够明确时，AI 会在这里追问，你只需选择或输入补充说明即可。</p>
-              <p className="text-cyan-400/90 text-xs">在画布底部输入框描述产品想法或上传文件，发送后对话会显示在这里。</p>
-              <button
-                type="button"
-                onClick={() => setConversationMessages(MOCK_CONVERSATION_3_ROUNDS)}
-                className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-600 text-zinc-300 hover:bg-cyan-600/20 hover:border-cyan-500/40 hover:text-cyan-300 transition-colors text-sm"
-              >
-                <MessageSquarePlus className="w-4 h-4" />
-                加载示例对话（3 轮）
-              </button>
+              <p className="text-cyan-400/90 text-xs">
+                在节点编辑页：当前 Tab 为「UI / 需求 / 实现 / 测试」时，输入分别针对界面与交互、PRD、技术实现、测试用例。画布底部输入框发送后对话显示在此。
+              </p>
             </div>
           ) : (
             conversationMessages.map((m) => (
@@ -246,7 +228,11 @@ export function ConversationPanel({ onSubmitReply, isSubmitting, onCollapse }: C
         {/* 底部：澄清时显示输入框 + 发送，或提示 */}
         {hasClarification && (
           <div className="flex-shrink-0 border-t border-zinc-800 p-3 space-y-2">
-            <p className="text-xs text-zinc-500">选择上方选项或输入补充说明后发送，AI 将根据你的回复继续生成。</p>
+            <p className="text-xs text-zinc-500">
+              {nodeEditSpecClarify
+                ? '选择上方选项或输入补充说明后发送，将据此更新本节点需求。'
+                : '选择上方选项或输入补充说明后发送，AI 将根据你的回复继续生成。'}
+            </p>
             <div className="flex gap-2">
               <input
                 type="text"

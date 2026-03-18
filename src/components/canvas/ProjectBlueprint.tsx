@@ -709,11 +709,13 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
             <X className="w-5 h-5 text-zinc-400 hover:text-zinc-200 transition-colors" />
           </button>
         </div>
-        <div className="flex border-b border-zinc-800 bg-zinc-900/95 overflow-x-auto flex-shrink-0">
+        <div className="flex border-b border-zinc-800 bg-zinc-900/95 overflow-x-auto flex-shrink-0" role="tablist">
           {TAB_LIST.map((tab, index) => (
             <button
               key={tab.id}
               type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
               onClick={() => handleTabChange(tab.id)}
               className={clsx(
                 'flex-shrink-0 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 border-b-2 transition-all duration-200 whitespace-nowrap',
@@ -723,7 +725,6 @@ export function ProjectBlueprint({ isOpen, onClose, initialTab, initialData }: P
               )}
               title={`切换到${tab.label} (Ctrl+${index + 1})`}
               aria-label={tab.label}
-              aria-selected={activeTab === tab.id}
             >
               <span>{tab.icon}</span>
               <span>{tab.label}</span>

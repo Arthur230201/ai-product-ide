@@ -1,0 +1,5543 @@
+{
+  "summary": {
+    "engineVersion": "uupm-ts-engine-data@0.0.2",
+    "cases": 120,
+    "styleHitRate": 1,
+    "antiOkRate": 0.9583333333333334,
+    "patternOkRate": 0.9666666666666667,
+    "colorsOkRate": 1,
+    "typographyOkRate": 1,
+    "effectsOkRate": 1,
+    "diversity": {
+      "patternDiversity": 0.4583333333333333,
+      "paletteDiversity": 0.4166666666666667,
+      "typographyDiversity": 0.35,
+      "effectsDiversity": 0.35
+    },
+    "longtail": {
+      "cases": 80,
+      "specialHitRate": 1
+    },
+    "avgTotal": 99.45,
+    "thresholds": {
+      "styleHitRateTarget": 0.9,
+      "antiOkRateTarget": 0.85,
+      "patternOkRateTarget": 0.85,
+      "colorsOkRateTarget": 0.95,
+      "typographyOkRateTarget": 0.95,
+      "effectsOkRateTarget": 0.95,
+      "patternDiversityTarget": 0.35,
+      "paletteDiversityTarget": 0.35,
+      "typographyDiversityTarget": 0.35,
+      "effectsDiversityTarget": 0.35,
+      "longtailSpecialHitRateTarget": 0.7
+    }
+  },
+  "results": [
+    {
+      "name": "fintech trust",
+      "expectStyleId": "gen-fintech-approval",
+      "gotStyleId": "gen-fintech-approval",
+      "patternTop1Id": "pattern-dashboard-timeline",
+      "patternTop1Tags": [
+        "dashboard",
+        "approval",
+        "audit",
+        "审计"
+      ],
+      "paletteTop1Id": "palette-fintech-slate",
+      "paletteTop1Tags": [
+        "fintech",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-fintech-audit",
+      "typographyTop1Tags": [
+        "fintech",
+        "audit",
+        "合规"
+      ],
+      "effectsTop1Id": "fx-approval-data-dense",
+      "effectsTop1Tags": [
+        "approval",
+        "data-dense",
+        "table"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 0.85,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 0,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 92.8,
+      "notes": [
+        "antiPatterns 行业强相关不足（need>=2, got=1）",
+        "a11yRules 条数不足（len=2）"
+      ]
+    },
+    {
+      "name": "saas dashboard",
+      "expectStyleId": "saas-dashboard-neutral",
+      "gotStyleId": "saas-dashboard-neutral",
+      "patternTop1Id": "pattern-零售-admin-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "admin",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-SaaS-violet",
+      "paletteTop1Tags": [
+        "SaaS",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-landing-dense",
+      "typographyTop1Tags": [
+        "landing",
+        "dashboard",
+        "admin",
+        "data-dense"
+      ],
+      "effectsTop1Id": "fx-admin-mobile",
+      "effectsTop1Tags": [
+        "admin",
+        "mobile",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 0,
+      "antiPatternsScore": 0.85,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 97.8,
+      "notes": [
+        "antiPatterns 行业强相关不足（need>=2, got=0）",
+        "antiPatterns 行业关键字命中弱（hits=0）"
+      ]
+    },
+    {
+      "name": "ecommerce mobile",
+      "expectStyleId": "ecommerce-mobile-warm",
+      "gotStyleId": "ecommerce-mobile-warm",
+      "patternTop1Id": "pattern-admin-commerce",
+      "patternTop1Tags": [
+        "admin",
+        "电商",
+        "checkout",
+        "mobile"
+      ],
+      "paletteTop1Id": "palette-电商-rose",
+      "paletteTop1Tags": [
+        "电商",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-mobile-app-mobile",
+      "typographyTop1Tags": [
+        "mobile-app",
+        "mobile",
+        "checkout"
+      ],
+      "effectsTop1Id": "fx-list-detail-micro",
+      "effectsTop1Tags": [
+        "list-detail",
+        "micro",
+        "feedback"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gov form flow",
+      "expectStyleId": "gen-政务-form-flow",
+      "gotStyleId": "gen-政务-form-flow",
+      "patternTop1Id": "pattern-admin-wizard",
+      "patternTop1Tags": [
+        "admin",
+        "form-flow",
+        "政务",
+        "医疗"
+      ],
+      "paletteTop1Id": "palette-政务-teal",
+      "paletteTop1Tags": [
+        "政务",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-form-flow-compact",
+      "typographyTop1Tags": [
+        "form-flow",
+        "list-detail",
+        "table"
+      ],
+      "effectsTop1Id": "fx-form-flow-micro",
+      "effectsTop1Tags": [
+        "form-flow",
+        "micro",
+        "feedback"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "education admin",
+      "expectStyleId": "gen-教育-admin",
+      "gotStyleId": "gen-教育-admin",
+      "patternTop1Id": "pattern-零售-admin-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "admin",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-教育-violet",
+      "paletteTop1Tags": [
+        "教育",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-admin-compact",
+      "typographyTop1Tags": [
+        "admin",
+        "list-detail",
+        "table"
+      ],
+      "effectsTop1Id": "fx-admin-glass",
+      "effectsTop1Tags": [
+        "admin",
+        "glass",
+        "overlay"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "finance reconciliation",
+      "expectStyleId": "fintech-trust",
+      "gotStyleId": "fintech-trust",
+      "patternTop1Id": "pattern-保险-list-detail-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "list-detail",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-fintech-trust",
+      "paletteTop1Tags": [
+        "fintech",
+        "trust",
+        "audit"
+      ],
+      "typographyTop1Id": "typo-dashboard-audit",
+      "typographyTop1Tags": [
+        "dashboard",
+        "fintech",
+        "approval",
+        "audit"
+      ],
+      "effectsTop1Id": "fx-list-detail-soft",
+      "effectsTop1Tags": [
+        "list-detail",
+        "soft-shadow",
+        "hover"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "payment risk review",
+      "expectStyleId": "fintech-trust",
+      "gotStyleId": "fintech-trust",
+      "patternTop1Id": "pattern-保险-checkout-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "checkout",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-fintech-emerald",
+      "paletteTop1Tags": [
+        "fintech",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-dashboard-audit",
+      "typographyTop1Tags": [
+        "dashboard",
+        "fintech",
+        "approval",
+        "audit"
+      ],
+      "effectsTop1Id": "fx-fintech-confirmation",
+      "effectsTop1Tags": [
+        "fintech",
+        "confirm",
+        "danger"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "commerce checkout",
+      "expectStyleId": "ecommerce-mobile-warm",
+      "gotStyleId": "ecommerce-mobile-warm",
+      "patternTop1Id": "pattern-approval-commerce",
+      "patternTop1Tags": [
+        "approval",
+        "电商",
+        "checkout",
+        "mobile"
+      ],
+      "paletteTop1Id": "palette-电商-orange",
+      "paletteTop1Tags": [
+        "电商",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-mobile-commerce",
+      "typographyTop1Tags": [
+        "电商",
+        "mobile"
+      ],
+      "effectsTop1Id": "fx-checkout-glass",
+      "effectsTop1Tags": [
+        "checkout",
+        "glass",
+        "overlay"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 0,
+      "antiPatternsScore": 0.85,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 97.8,
+      "notes": [
+        "antiPatterns 行业强相关不足（need>=2, got=0）",
+        "antiPatterns 行业关键字命中弱（hits=0）"
+      ]
+    },
+    {
+      "name": "commerce cart",
+      "expectStyleId": "ecommerce-mobile-warm",
+      "gotStyleId": "ecommerce-mobile-warm",
+      "patternTop1Id": "pattern-dashboard-commerce",
+      "patternTop1Tags": [
+        "dashboard",
+        "电商",
+        "checkout",
+        "mobile"
+      ],
+      "paletteTop1Id": "palette-电商-slate",
+      "paletteTop1Tags": [
+        "电商",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-admin-compact",
+      "typographyTop1Tags": [
+        "admin",
+        "list-detail",
+        "table"
+      ],
+      "effectsTop1Id": "fx-list-detail-delight",
+      "effectsTop1Tags": [
+        "list-detail",
+        "landing",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "saas users audit",
+      "expectStyleId": "saas-dashboard-neutral",
+      "gotStyleId": "saas-dashboard-neutral",
+      "patternTop1Id": "pattern-制造业-list-detail-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "list-detail",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-SaaS-teal",
+      "paletteTop1Tags": [
+        "SaaS",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-mobile-app-compact",
+      "typographyTop1Tags": [
+        "mobile-app",
+        "list-detail",
+        "table"
+      ],
+      "effectsTop1Id": "fx-admin-glass",
+      "effectsTop1Tags": [
+        "admin",
+        "glass",
+        "overlay"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "logistics dispatch dashboard",
+      "expectStyleId": "gen-物流-dashboard",
+      "gotStyleId": "gen-物流-dashboard",
+      "patternTop1Id": "pattern-零售-checkout-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "checkout",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-物流-orange",
+      "paletteTop1Tags": [
+        "物流",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-landing-dense",
+      "typographyTop1Tags": [
+        "landing",
+        "dashboard",
+        "admin",
+        "data-dense"
+      ],
+      "effectsTop1Id": "fx-list-detail-data-dense",
+      "effectsTop1Tags": [
+        "list-detail",
+        "data-dense",
+        "table"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "logistics order list",
+      "expectStyleId": "gen-物流-list-detail",
+      "gotStyleId": "gen-物流-list-detail",
+      "patternTop1Id": "pattern-制造业-list-detail-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "list-detail",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-物流-indigo",
+      "paletteTop1Tags": [
+        "物流",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-dashboard-compact",
+      "typographyTop1Tags": [
+        "dashboard",
+        "list-detail",
+        "table"
+      ],
+      "effectsTop1Id": "fx-list-detail-soft",
+      "effectsTop1Tags": [
+        "list-detail",
+        "soft-shadow",
+        "hover"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "medical appointment admin",
+      "expectStyleId": "gen-医疗-admin",
+      "gotStyleId": "gen-医疗-admin",
+      "patternTop1Id": "pattern-零售-admin-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "admin",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-医疗-cyan",
+      "paletteTop1Tags": [
+        "医疗",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-list-detail-mobile",
+      "typographyTop1Tags": [
+        "list-detail",
+        "mobile",
+        "checkout",
+        "mobile-app"
+      ],
+      "effectsTop1Id": "fx-admin-glass",
+      "effectsTop1Tags": [
+        "admin",
+        "glass",
+        "overlay"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "medical patient form flow",
+      "expectStyleId": "gen-医疗-form-flow",
+      "gotStyleId": "gen-医疗-form-flow",
+      "patternTop1Id": "pattern-form-flow-wizard",
+      "patternTop1Tags": [
+        "form-flow",
+        "政务",
+        "医疗"
+      ],
+      "paletteTop1Id": "palette-医疗-indigo",
+      "paletteTop1Tags": [
+        "医疗",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-form-flow-compact",
+      "typographyTop1Tags": [
+        "form-flow",
+        "list-detail",
+        "table"
+      ],
+      "effectsTop1Id": "fx-form-flow-focus",
+      "effectsTop1Tags": [
+        "form-flow",
+        "focus",
+        "keyboard"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 0,
+      "antiPatternsScore": 0.85,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 97.8,
+      "notes": [
+        "antiPatterns 行业强相关不足（need>=2, got=0）",
+        "antiPatterns 行业关键字命中弱（hits=0）"
+      ]
+    },
+    {
+      "name": "content newsroom dashboard",
+      "expectStyleId": "gen-内容资讯-dashboard",
+      "gotStyleId": "gen-内容资讯-dashboard",
+      "patternTop1Id": "pattern-零售-landing-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "landing",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-内容资讯-emerald",
+      "paletteTop1Tags": [
+        "内容资讯",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-dashboard-readable",
+      "typographyTop1Tags": [
+        "dashboard",
+        "landing",
+        "content"
+      ],
+      "effectsTop1Id": "fx-list-detail-data-dense",
+      "effectsTop1Tags": [
+        "list-detail",
+        "data-dense",
+        "table"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "content article list-detail",
+      "expectStyleId": "gen-内容资讯-list-detail",
+      "gotStyleId": "gen-内容资讯-list-detail",
+      "patternTop1Id": "pattern-list-detail-filters",
+      "patternTop1Tags": [
+        "list-detail",
+        "dashboard",
+        "admin",
+        "筛选"
+      ],
+      "paletteTop1Id": "palette-内容资讯-blue",
+      "paletteTop1Tags": [
+        "内容资讯",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-landing-dense",
+      "typographyTop1Tags": [
+        "landing",
+        "dashboard",
+        "admin",
+        "data-dense"
+      ],
+      "effectsTop1Id": "fx-admin-delight",
+      "effectsTop1Tags": [
+        "admin",
+        "landing",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gov approval flow",
+      "expectStyleId": "gen-政务-approval",
+      "gotStyleId": "gen-政务-approval",
+      "patternTop1Id": "pattern-list-detail-timeline",
+      "patternTop1Tags": [
+        "list-detail",
+        "approval",
+        "audit",
+        "审计"
+      ],
+      "paletteTop1Id": "palette-政务-blue",
+      "paletteTop1Tags": [
+        "政务",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-能源-handover",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "timeline",
+        "audit"
+      ],
+      "effectsTop1Id": "fx-list-detail-strict",
+      "effectsTop1Tags": [
+        "list-detail",
+        "audit",
+        "confirm"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "education mobile app",
+      "expectStyleId": "gen-教育-mobile-app",
+      "gotStyleId": "gen-教育-mobile-app",
+      "patternTop1Id": "pattern-零售-list-detail-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "list-detail",
+        "industry-special",
+        "dashboard",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-教育-orange",
+      "paletteTop1Tags": [
+        "教育",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-checkout-mobile",
+      "typographyTop1Tags": [
+        "checkout",
+        "mobile",
+        "mobile-app"
+      ],
+      "effectsTop1Id": "fx-list-detail-mobile",
+      "effectsTop1Tags": [
+        "list-detail",
+        "mobile",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "saas landing page",
+      "expectStyleId": "gen-SaaS-landing",
+      "gotStyleId": "gen-SaaS-landing",
+      "patternTop1Id": "pattern-文旅-form-flow-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "form-flow",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-SaaS-slate",
+      "paletteTop1Tags": [
+        "SaaS",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-approval-editorial",
+      "typographyTop1Tags": [
+        "approval",
+        "landing",
+        "media",
+        "story"
+      ],
+      "effectsTop1Id": "fx-list-detail-delight",
+      "effectsTop1Tags": [
+        "list-detail",
+        "landing",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "fintech approval flow",
+      "expectStyleId": "gen-fintech-approval",
+      "gotStyleId": "gen-fintech-approval",
+      "patternTop1Id": "pattern-admin-timeline",
+      "patternTop1Tags": [
+        "admin",
+        "approval",
+        "audit",
+        "审计"
+      ],
+      "paletteTop1Id": "palette-fintech-teal",
+      "paletteTop1Tags": [
+        "fintech",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-admin-audit",
+      "typographyTop1Tags": [
+        "admin",
+        "fintech",
+        "approval",
+        "audit"
+      ],
+      "effectsTop1Id": "fx-list-detail-strict",
+      "effectsTop1Tags": [
+        "list-detail",
+        "audit",
+        "confirm"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 0.85,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 0,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 92.8,
+      "notes": [
+        "antiPatterns 行业强相关不足（need>=2, got=1）",
+        "a11yRules 条数不足（len=2）"
+      ]
+    },
+    {
+      "name": "ecommerce product detail",
+      "expectStyleId": "ecommerce-mobile-warm",
+      "gotStyleId": "ecommerce-mobile-warm",
+      "patternTop1Id": "pattern-list-detail-split",
+      "patternTop1Tags": [
+        "list-detail",
+        "master-detail",
+        "分栏",
+        "详情",
+        "审计"
+      ],
+      "paletteTop1Id": "palette-电商-rose",
+      "paletteTop1Tags": [
+        "电商",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-approval-mobile",
+      "typographyTop1Tags": [
+        "approval",
+        "mobile",
+        "checkout",
+        "mobile-app"
+      ],
+      "effectsTop1Id": "fx-list-detail-data-dense",
+      "effectsTop1Tags": [
+        "list-detail",
+        "data-dense",
+        "table"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gov dashboard",
+      "expectStyleId": "gen-政务-dashboard",
+      "gotStyleId": "gen-政务-dashboard",
+      "patternTop1Id": "pattern-零售-admin-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "admin",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-政务-cyan",
+      "paletteTop1Tags": [
+        "政务",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-approval-dense",
+      "typographyTop1Tags": [
+        "approval",
+        "dashboard",
+        "admin",
+        "data-dense"
+      ],
+      "effectsTop1Id": "fx-dashboard-soft",
+      "effectsTop1Tags": [
+        "dashboard",
+        "soft-shadow",
+        "hover"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "medical landing",
+      "expectStyleId": "gen-医疗-landing",
+      "gotStyleId": "gen-医疗-landing",
+      "patternTop1Id": "pattern-零售-approval-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "approval",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-医疗-blue",
+      "paletteTop1Tags": [
+        "医疗",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-approval-editorial",
+      "typographyTop1Tags": [
+        "approval",
+        "landing",
+        "media",
+        "story"
+      ],
+      "effectsTop1Id": "fx-admin-delight",
+      "effectsTop1Tags": [
+        "admin",
+        "landing",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "logistics mobile app",
+      "expectStyleId": "gen-物流-mobile-app",
+      "gotStyleId": "gen-物流-mobile-app",
+      "patternTop1Id": "pattern-零售-mobile-app-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "mobile-app",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-物流-cyan",
+      "paletteTop1Tags": [
+        "物流",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-form-flow-mobile",
+      "typographyTop1Tags": [
+        "form-flow",
+        "mobile",
+        "checkout",
+        "mobile-app"
+      ],
+      "effectsTop1Id": "fx-mobile-app-strict",
+      "effectsTop1Tags": [
+        "mobile-app",
+        "audit",
+        "confirm"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "content landing",
+      "expectStyleId": "gen-内容资讯-landing",
+      "gotStyleId": "gen-内容资讯-landing",
+      "patternTop1Id": "pattern-零售-approval-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "approval",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-内容资讯-teal",
+      "paletteTop1Tags": [
+        "内容资讯",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-list-detail-readable",
+      "typographyTop1Tags": [
+        "list-detail",
+        "landing",
+        "content"
+      ],
+      "effectsTop1Id": "fx-dashboard-delight",
+      "effectsTop1Tags": [
+        "dashboard",
+        "landing",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "fintech dashboard",
+      "expectStyleId": "gen-fintech-approval",
+      "gotStyleId": "gen-fintech-approval",
+      "patternTop1Id": "pattern-零售-form-flow-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "form-flow",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-fintech-teal",
+      "paletteTop1Tags": [
+        "fintech",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-list-detail-audit",
+      "typographyTop1Tags": [
+        "list-detail",
+        "fintech",
+        "approval",
+        "audit"
+      ],
+      "effectsTop1Id": "fx-dashboard-mobile",
+      "effectsTop1Tags": [
+        "dashboard",
+        "mobile",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 0,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 95,
+      "notes": [
+        "a11yRules 条数不足（len=2）"
+      ]
+    },
+    {
+      "name": "saas admin settings",
+      "expectStyleId": "gen-SaaS-form-flow",
+      "gotStyleId": "gen-SaaS-form-flow",
+      "patternTop1Id": "pattern-能源-admin-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "admin",
+        "industry-special",
+        "dashboard",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-SaaS-cyan",
+      "paletteTop1Tags": [
+        "SaaS",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-form-flow-dense",
+      "typographyTop1Tags": [
+        "form-flow",
+        "dashboard",
+        "admin",
+        "data-dense"
+      ],
+      "effectsTop1Id": "fx-admin-micro",
+      "effectsTop1Tags": [
+        "admin",
+        "micro",
+        "feedback"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "ecommerce landing",
+      "expectStyleId": "ecommerce-mobile-warm",
+      "gotStyleId": "ecommerce-mobile-warm",
+      "patternTop1Id": "pattern-文旅-list-detail-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "list-detail",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-电商-orange",
+      "paletteTop1Tags": [
+        "电商",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-零售-pricing",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "price",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-checkout-delight",
+      "effectsTop1Tags": [
+        "checkout",
+        "landing",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gov list detail",
+      "expectStyleId": "gen-政务-form-flow",
+      "gotStyleId": "gen-政务-form-flow",
+      "patternTop1Id": "pattern-form-flow-wizard",
+      "patternTop1Tags": [
+        "form-flow",
+        "政务",
+        "医疗"
+      ],
+      "paletteTop1Id": "palette-政务-blue",
+      "paletteTop1Tags": [
+        "政务",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-form-flow-compact",
+      "typographyTop1Tags": [
+        "form-flow",
+        "list-detail",
+        "table"
+      ],
+      "effectsTop1Id": "fx-mobile-press",
+      "effectsTop1Tags": [
+        "mobile",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "content mobile app",
+      "expectStyleId": "gen-内容资讯-mobile-app",
+      "gotStyleId": "gen-内容资讯-mobile-app",
+      "patternTop1Id": "pattern-零售-dashboard-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "dashboard",
+        "industry-special",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-内容资讯-indigo",
+      "paletteTop1Tags": [
+        "内容资讯",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-mobile-app-compact",
+      "typographyTop1Tags": [
+        "mobile-app",
+        "list-detail",
+        "table"
+      ],
+      "effectsTop1Id": "fx-list-detail-soft",
+      "effectsTop1Tags": [
+        "list-detail",
+        "soft-shadow",
+        "hover"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:landing:v1",
+      "expectStyleId": "gen-制造业-landing",
+      "gotStyleId": "gen-制造业-landing",
+      "patternTop1Id": "pattern-制造业-landing-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "landing",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-amber-sop",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-kpi",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "metrics",
+        "table"
+      ],
+      "effectsTop1Id": "fx-制造业-dispatch",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "workflow",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:landing:v2",
+      "expectStyleId": "gen-制造业-landing",
+      "gotStyleId": "gen-制造业-landing",
+      "patternTop1Id": "pattern-制造业-landing-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "landing",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-steel",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-ops",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "data-dense",
+        "status"
+      ],
+      "effectsTop1Id": "fx-制造业-ops",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "alarm",
+        "confirm"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:mobile-app:v1",
+      "expectStyleId": "gen-制造业-mobile-app",
+      "gotStyleId": "gen-制造业-mobile-app",
+      "patternTop1Id": "pattern-制造业-list-detail-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "list-detail",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-graphite",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-sop",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "wizard",
+        "instructions"
+      ],
+      "effectsTop1Id": "fx-制造业-dispatch",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "workflow",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:mobile-app:v2",
+      "expectStyleId": "gen-制造业-mobile-app",
+      "gotStyleId": "gen-制造业-mobile-app",
+      "patternTop1Id": "pattern-制造业-mobile-app-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "mobile-app",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-hazard",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-ops",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "data-dense",
+        "status"
+      ],
+      "effectsTop1Id": "fx-制造业-dispatch",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "workflow",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:form-flow:v1",
+      "expectStyleId": "gen-制造业-form-flow",
+      "gotStyleId": "gen-制造业-form-flow",
+      "patternTop1Id": "pattern-制造业-form-flow-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "form-flow",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-amber-sop",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-kpi",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "metrics",
+        "table"
+      ],
+      "effectsTop1Id": "fx-制造业-dispatch",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "workflow",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:form-flow:v2",
+      "expectStyleId": "gen-制造业-form-flow",
+      "gotStyleId": "gen-制造业-form-flow",
+      "patternTop1Id": "pattern-制造业-form-flow-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "form-flow",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-graphite",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-sop",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "wizard",
+        "instructions"
+      ],
+      "effectsTop1Id": "fx-制造业-ops",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "alarm",
+        "confirm"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:checkout:v1",
+      "expectStyleId": "gen-制造业-checkout",
+      "gotStyleId": "gen-制造业-checkout",
+      "patternTop1Id": "pattern-制造业-checkout-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "checkout",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-steel",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-sop",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "wizard",
+        "instructions"
+      ],
+      "effectsTop1Id": "fx-制造业-dispatch",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "workflow",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:checkout:v2",
+      "expectStyleId": "gen-制造业-checkout",
+      "gotStyleId": "gen-制造业-checkout",
+      "patternTop1Id": "pattern-制造业-checkout-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "checkout",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-hazard",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-ops",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "data-dense",
+        "status"
+      ],
+      "effectsTop1Id": "fx-制造业-dispatch",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "workflow",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:approval:v1",
+      "expectStyleId": "gen-制造业-approval",
+      "gotStyleId": "gen-制造业-approval",
+      "patternTop1Id": "pattern-制造业-approval-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "approval",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-hazard",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-sop",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "wizard",
+        "instructions"
+      ],
+      "effectsTop1Id": "fx-制造业-shift",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "timeline",
+        "handover"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:approval:v2",
+      "expectStyleId": "gen-制造业-approval",
+      "gotStyleId": "gen-制造业-approval",
+      "patternTop1Id": "pattern-制造业-approval-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "approval",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-graphite",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-ops",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "data-dense",
+        "status"
+      ],
+      "effectsTop1Id": "fx-制造业-shift",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "timeline",
+        "handover"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:dashboard:v1",
+      "expectStyleId": "gen-制造业-dashboard",
+      "gotStyleId": "gen-制造业-dashboard",
+      "patternTop1Id": "pattern-制造业-dashboard-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "dashboard",
+        "industry-special",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-hazard",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-ops",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "data-dense",
+        "status"
+      ],
+      "effectsTop1Id": "fx-制造业-ops",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "alarm",
+        "confirm"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:dashboard:v2",
+      "expectStyleId": "gen-制造业-dashboard",
+      "gotStyleId": "gen-制造业-dashboard",
+      "patternTop1Id": "pattern-制造业-admin-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "admin",
+        "industry-special",
+        "dashboard",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-graphite",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-kpi",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "metrics",
+        "table"
+      ],
+      "effectsTop1Id": "fx-制造业-shift",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "timeline",
+        "handover"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:admin:v1",
+      "expectStyleId": "gen-制造业-admin",
+      "gotStyleId": "gen-制造业-admin",
+      "patternTop1Id": "pattern-制造业-landing-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "landing",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-hazard",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-ops",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "data-dense",
+        "status"
+      ],
+      "effectsTop1Id": "fx-制造业-dispatch",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "workflow",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:admin:v2",
+      "expectStyleId": "gen-制造业-admin",
+      "gotStyleId": "gen-制造业-admin",
+      "patternTop1Id": "pattern-制造业-approval-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "approval",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-steel",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-sop",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "wizard",
+        "instructions"
+      ],
+      "effectsTop1Id": "fx-制造业-ops",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "alarm",
+        "confirm"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:list-detail:v1",
+      "expectStyleId": "gen-制造业-list-detail",
+      "gotStyleId": "gen-制造业-list-detail",
+      "patternTop1Id": "pattern-制造业-list-detail-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "list-detail",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-graphite",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-ops",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "data-dense",
+        "status"
+      ],
+      "effectsTop1Id": "fx-制造业-ops",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "alarm",
+        "confirm"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:制造业:list-detail:v2",
+      "expectStyleId": "gen-制造业-list-detail",
+      "gotStyleId": "gen-制造业-list-detail",
+      "patternTop1Id": "pattern-制造业-list-detail-shopfloor-ops",
+      "patternTop1Tags": [
+        "制造业",
+        "list-detail",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "alarm",
+        "status",
+        "shift"
+      ],
+      "paletteTop1Id": "palette-制造业-amber-sop",
+      "paletteTop1Tags": [
+        "制造业",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-制造业-sop",
+      "typographyTop1Tags": [
+        "制造业",
+        "industry-special",
+        "wizard",
+        "instructions"
+      ],
+      "effectsTop1Id": "fx-制造业-ops",
+      "effectsTop1Tags": [
+        "制造业",
+        "industry-special",
+        "alarm",
+        "confirm"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:landing:v1",
+      "expectStyleId": "gen-能源-landing",
+      "gotStyleId": "gen-能源-landing",
+      "patternTop1Id": "pattern-能源-landing-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "landing",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-night-ops",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-grid",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "metrics",
+        "charts"
+      ],
+      "effectsTop1Id": "fx-能源-handover",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "timeline",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:landing:v2",
+      "expectStyleId": "gen-能源-landing",
+      "gotStyleId": "gen-能源-landing",
+      "patternTop1Id": "pattern-能源-landing-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "landing",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-safety",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-safety",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "safety",
+        "alarm"
+      ],
+      "effectsTop1Id": "fx-能源-map",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "map",
+        "hover"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:mobile-app:v1",
+      "expectStyleId": "gen-能源-mobile-app",
+      "gotStyleId": "gen-能源-mobile-app",
+      "patternTop1Id": "pattern-能源-list-detail-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "list-detail",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-amber-alert",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-handover",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "timeline",
+        "audit"
+      ],
+      "effectsTop1Id": "fx-能源-safety",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "safety",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:mobile-app:v2",
+      "expectStyleId": "gen-能源-mobile-app",
+      "gotStyleId": "gen-能源-mobile-app",
+      "patternTop1Id": "pattern-能源-mobile-app-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "mobile-app",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-grid-blue",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-grid",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "metrics",
+        "charts"
+      ],
+      "effectsTop1Id": "fx-能源-handover",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "timeline",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:form-flow:v1",
+      "expectStyleId": "gen-能源-form-flow",
+      "gotStyleId": "gen-能源-form-flow",
+      "patternTop1Id": "pattern-能源-form-flow-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "form-flow",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-safety",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-handover",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "timeline",
+        "audit"
+      ],
+      "effectsTop1Id": "fx-能源-safety",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "safety",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:form-flow:v2",
+      "expectStyleId": "gen-能源-form-flow",
+      "gotStyleId": "gen-能源-form-flow",
+      "patternTop1Id": "pattern-能源-form-flow-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "form-flow",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-night-ops",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-grid",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "metrics",
+        "charts"
+      ],
+      "effectsTop1Id": "fx-能源-handover",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "timeline",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:checkout:v1",
+      "expectStyleId": "gen-能源-checkout",
+      "gotStyleId": "gen-能源-checkout",
+      "patternTop1Id": "pattern-能源-checkout-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "checkout",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-night-ops",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-handover",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "timeline",
+        "audit"
+      ],
+      "effectsTop1Id": "fx-能源-safety",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "safety",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:checkout:v2",
+      "expectStyleId": "gen-能源-checkout",
+      "gotStyleId": "gen-能源-checkout",
+      "patternTop1Id": "pattern-能源-checkout-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "checkout",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-grid-blue",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-grid",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "metrics",
+        "charts"
+      ],
+      "effectsTop1Id": "fx-能源-safety",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "safety",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:approval:v1",
+      "expectStyleId": "gen-能源-approval",
+      "gotStyleId": "gen-能源-approval",
+      "patternTop1Id": "pattern-能源-approval-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "approval",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-grid-blue",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-grid",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "metrics",
+        "charts"
+      ],
+      "effectsTop1Id": "fx-能源-handover",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "timeline",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:approval:v2",
+      "expectStyleId": "gen-能源-approval",
+      "gotStyleId": "gen-能源-approval",
+      "patternTop1Id": "pattern-能源-approval-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "approval",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-safety",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-grid",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "metrics",
+        "charts"
+      ],
+      "effectsTop1Id": "fx-能源-safety",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "safety",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:dashboard:v1",
+      "expectStyleId": "gen-能源-dashboard",
+      "gotStyleId": "gen-能源-dashboard",
+      "patternTop1Id": "pattern-能源-dashboard-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "dashboard",
+        "industry-special",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-amber-alert",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-grid",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "metrics",
+        "charts"
+      ],
+      "effectsTop1Id": "fx-能源-map",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "map",
+        "hover"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:dashboard:v2",
+      "expectStyleId": "gen-能源-dashboard",
+      "gotStyleId": "gen-能源-dashboard",
+      "patternTop1Id": "pattern-能源-admin-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "admin",
+        "industry-special",
+        "dashboard",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-safety",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-handover",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "timeline",
+        "audit"
+      ],
+      "effectsTop1Id": "fx-能源-map",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "map",
+        "hover"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:admin:v1",
+      "expectStyleId": "gen-能源-admin",
+      "gotStyleId": "gen-能源-admin",
+      "patternTop1Id": "pattern-能源-checkout-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "checkout",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-grid-blue",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-safety",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "safety",
+        "alarm"
+      ],
+      "effectsTop1Id": "fx-能源-map",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "map",
+        "hover"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:admin:v2",
+      "expectStyleId": "gen-能源-admin",
+      "gotStyleId": "gen-能源-admin",
+      "patternTop1Id": "pattern-能源-approval-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "approval",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-amber-alert",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-grid",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "metrics",
+        "charts"
+      ],
+      "effectsTop1Id": "fx-能源-safety",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "safety",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:list-detail:v1",
+      "expectStyleId": "gen-能源-list-detail",
+      "gotStyleId": "gen-能源-list-detail",
+      "patternTop1Id": "pattern-能源-list-detail-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "list-detail",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-night-ops",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-grid",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "metrics",
+        "charts"
+      ],
+      "effectsTop1Id": "fx-能源-handover",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "timeline",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:能源:list-detail:v2",
+      "expectStyleId": "gen-能源-list-detail",
+      "gotStyleId": "gen-能源-list-detail",
+      "patternTop1Id": "pattern-能源-list-detail-safety-ops",
+      "patternTop1Tags": [
+        "能源",
+        "list-detail",
+        "industry-special",
+        "dashboard",
+        "admin",
+        "map",
+        "alarm",
+        "safety"
+      ],
+      "paletteTop1Id": "palette-能源-safety",
+      "paletteTop1Tags": [
+        "能源",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-能源-handover",
+      "typographyTop1Tags": [
+        "能源",
+        "industry-special",
+        "timeline",
+        "audit"
+      ],
+      "effectsTop1Id": "fx-能源-handover",
+      "effectsTop1Tags": [
+        "能源",
+        "industry-special",
+        "timeline",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:零售:landing:v1",
+      "expectStyleId": "gen-零售-landing",
+      "gotStyleId": "gen-零售-landing",
+      "patternTop1Id": "pattern-零售-landing-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "landing",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-member-blue",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-pricing",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "price",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-零售-fast",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "pos",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:零售:landing:v2",
+      "expectStyleId": "gen-零售-landing",
+      "gotStyleId": "gen-零售-landing",
+      "patternTop1Id": "pattern-零售-landing-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "landing",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-mint",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-pos",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "pos",
+        "touch"
+      ],
+      "effectsTop1Id": "fx-零售-promo",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "promo",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:零售:mobile-app:v1",
+      "expectStyleId": "gen-零售-mobile-app",
+      "gotStyleId": "gen-零售-mobile-app",
+      "patternTop1Id": "pattern-零售-list-detail-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "list-detail",
+        "industry-special",
+        "dashboard",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-mint",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-pricing",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "price",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-零售-promo",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "promo",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:零售:mobile-app:v2",
+      "expectStyleId": "gen-零售-mobile-app",
+      "gotStyleId": "gen-零售-mobile-app",
+      "patternTop1Id": "pattern-零售-approval-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "approval",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-member-blue",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-store",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "inventory",
+        "promo"
+      ],
+      "effectsTop1Id": "fx-零售-fast",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "pos",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:零售:form-flow:v1",
+      "expectStyleId": "gen-零售-form-flow",
+      "gotStyleId": "gen-零售-form-flow",
+      "patternTop1Id": "pattern-零售-form-flow-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "form-flow",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-fresh",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-store",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "inventory",
+        "promo"
+      ],
+      "effectsTop1Id": "fx-零售-fast",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "pos",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:零售:form-flow:v2",
+      "expectStyleId": "gen-零售-form-flow",
+      "gotStyleId": "gen-零售-form-flow",
+      "patternTop1Id": "pattern-零售-form-flow-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "form-flow",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-night-pos",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-pricing",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "price",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-零售-fast",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "pos",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:零售:checkout:v1",
+      "expectStyleId": "gen-零售-checkout",
+      "gotStyleId": "gen-零售-checkout",
+      "patternTop1Id": "pattern-零售-checkout-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "checkout",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-member-blue",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-store",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "inventory",
+        "promo"
+      ],
+      "effectsTop1Id": "fx-零售-fast",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "pos",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:零售:checkout:v2",
+      "expectStyleId": "gen-零售-checkout",
+      "gotStyleId": "gen-零售-checkout",
+      "patternTop1Id": "pattern-零售-checkout-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "checkout",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-mint",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-pricing",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "price",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-零售-promo",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "promo",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:零售:approval:v1",
+      "expectStyleId": "gen-零售-approval",
+      "gotStyleId": "gen-零售-approval",
+      "patternTop1Id": "pattern-零售-approval-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "approval",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-mint",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-store",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "inventory",
+        "promo"
+      ],
+      "effectsTop1Id": "fx-零售-promo",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "promo",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:零售:approval:v2",
+      "expectStyleId": "gen-零售-approval",
+      "gotStyleId": "gen-零售-approval",
+      "patternTop1Id": "pattern-零售-approval-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "approval",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-night-pos",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-pricing",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "price",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-零售-fast",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "pos",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:零售:dashboard:v1",
+      "expectStyleId": "gen-零售-dashboard",
+      "gotStyleId": "gen-零售-dashboard",
+      "patternTop1Id": "pattern-零售-mobile-app-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "mobile-app",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-mint",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-pricing",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "price",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-零售-promo",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "promo",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:零售:dashboard:v2",
+      "expectStyleId": "gen-零售-dashboard",
+      "gotStyleId": "gen-零售-dashboard",
+      "patternTop1Id": "pattern-零售-form-flow-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "form-flow",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-member-blue",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-pricing",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "price",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-零售-fast",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "pos",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:零售:admin:v1",
+      "expectStyleId": "gen-零售-admin",
+      "gotStyleId": "gen-零售-admin",
+      "patternTop1Id": "pattern-零售-landing-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "landing",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-mint",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-pos",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "pos",
+        "touch"
+      ],
+      "effectsTop1Id": "fx-零售-scan",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "search",
+        "barcode"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 0,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 90,
+      "notes": [
+        "pattern 未命中推断形态（trace）"
+      ]
+    },
+    {
+      "name": "gen:零售:admin:v2",
+      "expectStyleId": "gen-零售-admin",
+      "gotStyleId": "gen-零售-admin",
+      "patternTop1Id": "pattern-零售-approval-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "approval",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-member-blue",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-store",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "inventory",
+        "promo"
+      ],
+      "effectsTop1Id": "fx-零售-promo",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "promo",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 0,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 90,
+      "notes": [
+        "pattern 未命中推断形态（trace）"
+      ]
+    },
+    {
+      "name": "gen:零售:list-detail:v1",
+      "expectStyleId": "gen-零售-list-detail",
+      "gotStyleId": "gen-零售-list-detail",
+      "patternTop1Id": "pattern-零售-form-flow-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "form-flow",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-night-pos",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-pos",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "pos",
+        "touch"
+      ],
+      "effectsTop1Id": "fx-零售-scan",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "search",
+        "barcode"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:零售:list-detail:v2",
+      "expectStyleId": "gen-零售-list-detail",
+      "gotStyleId": "gen-零售-list-detail",
+      "patternTop1Id": "pattern-零售-mobile-app-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "mobile-app",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-零售-fresh",
+      "paletteTop1Tags": [
+        "零售",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-零售-pricing",
+      "typographyTop1Tags": [
+        "零售",
+        "industry-special",
+        "price",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-零售-promo",
+      "effectsTop1Tags": [
+        "零售",
+        "industry-special",
+        "promo",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:landing:v1",
+      "expectStyleId": "gen-保险-landing",
+      "gotStyleId": "gen-保险-landing",
+      "patternTop1Id": "pattern-保险-landing-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "landing",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-trust",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-claims",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "audit",
+        "explain"
+      ],
+      "effectsTop1Id": "fx-保险-compare",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "diff",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:landing:v2",
+      "expectStyleId": "gen-保险-landing",
+      "gotStyleId": "gen-保险-landing",
+      "patternTop1Id": "pattern-保险-landing-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "landing",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-paper",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-risk",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "risk",
+        "explain"
+      ],
+      "effectsTop1Id": "fx-保险-docs",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "documents",
+        "copy"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:mobile-app:v1",
+      "expectStyleId": "gen-保险-mobile-app",
+      "gotStyleId": "gen-保险-mobile-app",
+      "patternTop1Id": "pattern-保险-list-detail-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "list-detail",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-trust",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-risk",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "risk",
+        "explain"
+      ],
+      "effectsTop1Id": "fx-保险-trust",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "audit",
+        "timeline"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:mobile-app:v2",
+      "expectStyleId": "gen-保险-mobile-app",
+      "gotStyleId": "gen-保险-mobile-app",
+      "patternTop1Id": "pattern-保险-mobile-app-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "mobile-app",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-slate-audit",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-policy",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "documents",
+        "readable"
+      ],
+      "effectsTop1Id": "fx-保险-compare",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "diff",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:form-flow:v1",
+      "expectStyleId": "gen-保险-form-flow",
+      "gotStyleId": "gen-保险-form-flow",
+      "patternTop1Id": "pattern-保险-form-flow-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "form-flow",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-paper",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-claims",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "audit",
+        "explain"
+      ],
+      "effectsTop1Id": "fx-保险-compare",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "diff",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:form-flow:v2",
+      "expectStyleId": "gen-保险-form-flow",
+      "gotStyleId": "gen-保险-form-flow",
+      "patternTop1Id": "pattern-保险-form-flow-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "form-flow",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-slate-audit",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-policy",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "documents",
+        "readable"
+      ],
+      "effectsTop1Id": "fx-保险-compare",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "diff",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:checkout:v1",
+      "expectStyleId": "gen-保险-checkout",
+      "gotStyleId": "gen-保险-checkout",
+      "patternTop1Id": "pattern-保险-checkout-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "checkout",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-risk-amber",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-risk",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "risk",
+        "explain"
+      ],
+      "effectsTop1Id": "fx-保险-compare",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "diff",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:checkout:v2",
+      "expectStyleId": "gen-保险-checkout",
+      "gotStyleId": "gen-保险-checkout",
+      "patternTop1Id": "pattern-保险-checkout-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "checkout",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-slate-audit",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-policy",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "documents",
+        "readable"
+      ],
+      "effectsTop1Id": "fx-保险-compare",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "diff",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:approval:v1",
+      "expectStyleId": "gen-保险-approval",
+      "gotStyleId": "gen-保险-approval",
+      "patternTop1Id": "pattern-保险-dashboard-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "dashboard",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-paper",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-risk",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "risk",
+        "explain"
+      ],
+      "effectsTop1Id": "fx-保险-trust",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "audit",
+        "timeline"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:approval:v2",
+      "expectStyleId": "gen-保险-approval",
+      "gotStyleId": "gen-保险-approval",
+      "patternTop1Id": "pattern-保险-approval-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "approval",
+        "industry-special",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-risk-amber",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-claims",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "audit",
+        "explain"
+      ],
+      "effectsTop1Id": "fx-保险-trust",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "audit",
+        "timeline"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:dashboard:v1",
+      "expectStyleId": "gen-保险-dashboard",
+      "gotStyleId": "gen-保险-dashboard",
+      "patternTop1Id": "pattern-保险-list-detail-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "list-detail",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-slate-audit",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-policy",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "documents",
+        "readable"
+      ],
+      "effectsTop1Id": "fx-保险-compare",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "diff",
+        "audit"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:dashboard:v2",
+      "expectStyleId": "gen-保险-dashboard",
+      "gotStyleId": "gen-保险-dashboard",
+      "patternTop1Id": "pattern-保险-dashboard-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "dashboard",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-risk-amber",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-risk",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "risk",
+        "explain"
+      ],
+      "effectsTop1Id": "fx-保险-trust",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "audit",
+        "timeline"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:admin:v1",
+      "expectStyleId": "gen-保险-admin",
+      "gotStyleId": "gen-保险-admin",
+      "patternTop1Id": "pattern-保险-list-detail-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "list-detail",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-slate-audit",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-policy",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "documents",
+        "readable"
+      ],
+      "effectsTop1Id": "fx-保险-trust",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "audit",
+        "timeline"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 0,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 90,
+      "notes": [
+        "pattern 未命中推断形态（trace）"
+      ]
+    },
+    {
+      "name": "gen:保险:admin:v2",
+      "expectStyleId": "gen-保险-admin",
+      "gotStyleId": "gen-保险-admin",
+      "patternTop1Id": "pattern-保险-admin-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "admin",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-risk-amber",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-risk",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "risk",
+        "explain"
+      ],
+      "effectsTop1Id": "fx-保险-docs",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "documents",
+        "copy"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:list-detail:v1",
+      "expectStyleId": "gen-保险-list-detail",
+      "gotStyleId": "gen-保险-list-detail",
+      "patternTop1Id": "pattern-保险-list-detail-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "list-detail",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-paper",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-claims",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "audit",
+        "explain"
+      ],
+      "effectsTop1Id": "fx-保险-docs",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "documents",
+        "copy"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:保险:list-detail:v2",
+      "expectStyleId": "gen-保险-list-detail",
+      "gotStyleId": "gen-保险-list-detail",
+      "patternTop1Id": "pattern-保险-list-detail-claims-audit",
+      "patternTop1Tags": [
+        "保险",
+        "list-detail",
+        "industry-special",
+        "approval",
+        "audit",
+        "timeline",
+        "risk"
+      ],
+      "paletteTop1Id": "palette-保险-trust",
+      "paletteTop1Tags": [
+        "保险",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-保险-risk",
+      "typographyTop1Tags": [
+        "保险",
+        "industry-special",
+        "risk",
+        "explain"
+      ],
+      "effectsTop1Id": "fx-保险-docs",
+      "effectsTop1Tags": [
+        "保险",
+        "industry-special",
+        "documents",
+        "copy"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:landing:v1",
+      "expectStyleId": "gen-文旅-landing",
+      "gotStyleId": "gen-文旅-landing",
+      "patternTop1Id": "pattern-文旅-landing-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "landing",
+        "industry-special",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-ocean",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-booking",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "checkout",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-文旅-experience",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:landing:v2",
+      "expectStyleId": "gen-文旅-landing",
+      "gotStyleId": "gen-文旅-landing",
+      "patternTop1Id": "pattern-文旅-mobile-app-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "mobile-app",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-experience",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-booking",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "checkout",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-文旅-experience",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:mobile-app:v1",
+      "expectStyleId": "gen-文旅-mobile-app",
+      "gotStyleId": "gen-文旅-mobile-app",
+      "patternTop1Id": "pattern-文旅-list-detail-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "list-detail",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-sunset",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-story",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "readable",
+        "media"
+      ],
+      "effectsTop1Id": "fx-文旅-gallery",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "scroll"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:mobile-app:v2",
+      "expectStyleId": "gen-文旅-mobile-app",
+      "gotStyleId": "gen-文旅-mobile-app",
+      "patternTop1Id": "pattern-文旅-mobile-app-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "mobile-app",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-experience",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-itinerary",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "timeline",
+        "cards"
+      ],
+      "effectsTop1Id": "fx-文旅-experience",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:form-flow:v1",
+      "expectStyleId": "gen-文旅-form-flow",
+      "gotStyleId": "gen-文旅-form-flow",
+      "patternTop1Id": "pattern-文旅-form-flow-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "form-flow",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-experience",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-itinerary",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "timeline",
+        "cards"
+      ],
+      "effectsTop1Id": "fx-文旅-gallery",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "scroll"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:form-flow:v2",
+      "expectStyleId": "gen-文旅-form-flow",
+      "gotStyleId": "gen-文旅-form-flow",
+      "patternTop1Id": "pattern-文旅-form-flow-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "form-flow",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-sunset",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-booking",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "checkout",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-文旅-experience",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:checkout:v1",
+      "expectStyleId": "gen-文旅-checkout",
+      "gotStyleId": "gen-文旅-checkout",
+      "patternTop1Id": "pattern-文旅-checkout-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "checkout",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-sunset",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-itinerary",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "timeline",
+        "cards"
+      ],
+      "effectsTop1Id": "fx-文旅-gallery",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "scroll"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:checkout:v2",
+      "expectStyleId": "gen-文旅-checkout",
+      "gotStyleId": "gen-文旅-checkout",
+      "patternTop1Id": "pattern-文旅-checkout-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "checkout",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-forest",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-itinerary",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "timeline",
+        "cards"
+      ],
+      "effectsTop1Id": "fx-文旅-gallery",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "scroll"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:approval:v1",
+      "expectStyleId": "gen-文旅-approval",
+      "gotStyleId": "gen-文旅-approval",
+      "patternTop1Id": "pattern-文旅-approval-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "approval",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-forest",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-itinerary",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "timeline",
+        "cards"
+      ],
+      "effectsTop1Id": "fx-文旅-gallery",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "scroll"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:approval:v2",
+      "expectStyleId": "gen-文旅-approval",
+      "gotStyleId": "gen-文旅-approval",
+      "patternTop1Id": "pattern-文旅-approval-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "approval",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-ocean",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-booking",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "checkout",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-文旅-experience",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:dashboard:v1",
+      "expectStyleId": "gen-文旅-dashboard",
+      "gotStyleId": "gen-文旅-dashboard",
+      "patternTop1Id": "pattern-文旅-list-detail-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "list-detail",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-forest",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-booking",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "checkout",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-文旅-experience",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:dashboard:v2",
+      "expectStyleId": "gen-文旅-dashboard",
+      "gotStyleId": "gen-文旅-dashboard",
+      "patternTop1Id": "pattern-文旅-dashboard-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "dashboard",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-ocean",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-booking",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "checkout",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-文旅-experience",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:admin:v1",
+      "expectStyleId": "gen-文旅-admin",
+      "gotStyleId": "gen-文旅-admin",
+      "patternTop1Id": "pattern-文旅-list-detail-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "list-detail",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-forest",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-booking",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "checkout",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-文旅-gallery",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "scroll"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 0,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 90,
+      "notes": [
+        "pattern 未命中推断形态（trace）"
+      ]
+    },
+    {
+      "name": "gen:文旅:admin:v2",
+      "expectStyleId": "gen-文旅-admin",
+      "gotStyleId": "gen-文旅-admin",
+      "patternTop1Id": "pattern-文旅-admin-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "admin",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-sunset",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-itinerary",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "timeline",
+        "cards"
+      ],
+      "effectsTop1Id": "fx-文旅-gallery",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "scroll"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:list-detail:v1",
+      "expectStyleId": "gen-文旅-list-detail",
+      "gotStyleId": "gen-文旅-list-detail",
+      "patternTop1Id": "pattern-文旅-list-detail-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "list-detail",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-ocean",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-booking",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "checkout",
+        "cta"
+      ],
+      "effectsTop1Id": "fx-文旅-experience",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:文旅:list-detail:v2",
+      "expectStyleId": "gen-文旅-list-detail",
+      "gotStyleId": "gen-文旅-list-detail",
+      "patternTop1Id": "pattern-文旅-list-detail-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "list-detail",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-文旅-experience",
+      "paletteTop1Tags": [
+        "文旅",
+        "dark",
+        "accessible",
+        "industry-special"
+      ],
+      "typographyTop1Id": "typo-文旅-story",
+      "typographyTop1Tags": [
+        "文旅",
+        "industry-special",
+        "readable",
+        "media"
+      ],
+      "effectsTop1Id": "fx-文旅-experience",
+      "effectsTop1Tags": [
+        "文旅",
+        "industry-special",
+        "media",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 2,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:SaaS:landing:v1",
+      "expectStyleId": "gen-SaaS-landing",
+      "gotStyleId": "gen-SaaS-landing",
+      "patternTop1Id": "pattern-文旅-admin-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "admin",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-SaaS-teal",
+      "paletteTop1Tags": [
+        "SaaS",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-mobile-app-editorial",
+      "typographyTop1Tags": [
+        "mobile-app",
+        "landing",
+        "media",
+        "story"
+      ],
+      "effectsTop1Id": "fx-approval-delight",
+      "effectsTop1Tags": [
+        "approval",
+        "landing",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:SaaS:landing:v2",
+      "expectStyleId": "gen-SaaS-landing",
+      "gotStyleId": "gen-SaaS-landing",
+      "patternTop1Id": "pattern-文旅-mobile-app-itinerary-experience",
+      "patternTop1Tags": [
+        "文旅",
+        "mobile-app",
+        "industry-special",
+        "landing",
+        "mobile",
+        "cards",
+        "media",
+        "cta"
+      ],
+      "paletteTop1Id": "palette-SaaS-orange",
+      "paletteTop1Tags": [
+        "SaaS",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-checkout-editorial",
+      "typographyTop1Tags": [
+        "checkout",
+        "landing",
+        "media",
+        "story"
+      ],
+      "effectsTop1Id": "fx-checkout-delight",
+      "effectsTop1Tags": [
+        "checkout",
+        "landing",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:SaaS:mobile-app:v1",
+      "expectStyleId": "gen-SaaS-mobile-app",
+      "gotStyleId": "gen-SaaS-mobile-app",
+      "patternTop1Id": "pattern-list-detail-split",
+      "patternTop1Tags": [
+        "list-detail",
+        "master-detail",
+        "分栏",
+        "详情",
+        "审计"
+      ],
+      "paletteTop1Id": "palette-SaaS-teal",
+      "paletteTop1Tags": [
+        "SaaS",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-admin-mobile",
+      "typographyTop1Tags": [
+        "admin",
+        "mobile",
+        "checkout",
+        "mobile-app"
+      ],
+      "effectsTop1Id": "fx-mobile-app-mobile",
+      "effectsTop1Tags": [
+        "mobile-app",
+        "mobile",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:SaaS:mobile-app:v2",
+      "expectStyleId": "gen-SaaS-mobile-app",
+      "gotStyleId": "gen-SaaS-mobile-app",
+      "patternTop1Id": "pattern-零售-mobile-app-store-pos",
+      "patternTop1Tags": [
+        "零售",
+        "mobile-app",
+        "industry-special",
+        "dashboard",
+        "list-detail",
+        "pos",
+        "inventory",
+        "promo"
+      ],
+      "paletteTop1Id": "palette-SaaS-blue",
+      "paletteTop1Tags": [
+        "SaaS",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-landing-mobile",
+      "typographyTop1Tags": [
+        "landing",
+        "mobile",
+        "checkout",
+        "mobile-app"
+      ],
+      "effectsTop1Id": "fx-list-detail-calm",
+      "effectsTop1Tags": [
+        "list-detail",
+        "calm",
+        "no-bounce"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:SaaS:form-flow:v1",
+      "expectStyleId": "gen-SaaS-form-flow",
+      "gotStyleId": "gen-SaaS-form-flow",
+      "patternTop1Id": "pattern-form-flow-filters",
+      "patternTop1Tags": [
+        "form-flow",
+        "dashboard",
+        "admin",
+        "筛选"
+      ],
+      "paletteTop1Id": "palette-SaaS-violet",
+      "paletteTop1Tags": [
+        "SaaS",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-saas-dense",
+      "typographyTop1Tags": [
+        "saas",
+        "dashboard",
+        "data-dense"
+      ],
+      "effectsTop1Id": "fx-form-flow-focus",
+      "effectsTop1Tags": [
+        "form-flow",
+        "focus",
+        "keyboard"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:SaaS:form-flow:v2",
+      "expectStyleId": "gen-SaaS-form-flow",
+      "gotStyleId": "gen-SaaS-form-flow",
+      "patternTop1Id": "pattern-form-flow-timeline",
+      "patternTop1Tags": [
+        "form-flow",
+        "approval",
+        "audit",
+        "审计"
+      ],
+      "paletteTop1Id": "palette-SaaS-amber",
+      "paletteTop1Tags": [
+        "SaaS",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-form-flow-dense",
+      "typographyTop1Tags": [
+        "form-flow",
+        "dashboard",
+        "admin",
+        "data-dense"
+      ],
+      "effectsTop1Id": "fx-soft-lift",
+      "effectsTop1Tags": [
+        "saas",
+        "dashboard",
+        "soft-shadow"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:SaaS:checkout:v1",
+      "expectStyleId": "gen-SaaS-checkout",
+      "gotStyleId": "gen-SaaS-checkout",
+      "patternTop1Id": "pattern-checkout-timeline",
+      "patternTop1Tags": [
+        "checkout",
+        "approval",
+        "audit",
+        "审计"
+      ],
+      "paletteTop1Id": "palette-SaaS-indigo",
+      "paletteTop1Tags": [
+        "SaaS",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-checkout-dense",
+      "typographyTop1Tags": [
+        "checkout",
+        "dashboard",
+        "admin",
+        "data-dense"
+      ],
+      "effectsTop1Id": "fx-checkout-strict",
+      "effectsTop1Tags": [
+        "checkout",
+        "audit",
+        "confirm"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:SaaS:checkout:v2",
+      "expectStyleId": "gen-SaaS-checkout",
+      "gotStyleId": "gen-SaaS-checkout",
+      "patternTop1Id": "pattern-checkout-filters",
+      "patternTop1Tags": [
+        "checkout",
+        "dashboard",
+        "admin",
+        "筛选"
+      ],
+      "paletteTop1Id": "palette-SaaS-blue",
+      "paletteTop1Tags": [
+        "SaaS",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-saas-dense",
+      "typographyTop1Tags": [
+        "saas",
+        "dashboard",
+        "data-dense"
+      ],
+      "effectsTop1Id": "fx-checkout-mobile",
+      "effectsTop1Tags": [
+        "checkout",
+        "mobile",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:SaaS:approval:v1",
+      "expectStyleId": "gen-SaaS-approval",
+      "gotStyleId": "gen-SaaS-approval",
+      "patternTop1Id": "pattern-mobile-app-timeline",
+      "patternTop1Tags": [
+        "mobile-app",
+        "approval",
+        "audit",
+        "审计"
+      ],
+      "paletteTop1Id": "palette-SaaS-orange",
+      "paletteTop1Tags": [
+        "SaaS",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-approval-compact",
+      "typographyTop1Tags": [
+        "approval",
+        "list-detail",
+        "table"
+      ],
+      "effectsTop1Id": "fx-approval-delight",
+      "effectsTop1Tags": [
+        "approval",
+        "landing",
+        "cta"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    },
+    {
+      "name": "gen:SaaS:approval:v2",
+      "expectStyleId": "gen-SaaS-approval",
+      "gotStyleId": "gen-SaaS-approval",
+      "patternTop1Id": "pattern-form-flow-timeline",
+      "patternTop1Tags": [
+        "form-flow",
+        "approval",
+        "audit",
+        "审计"
+      ],
+      "paletteTop1Id": "palette-SaaS-slate",
+      "paletteTop1Tags": [
+        "SaaS",
+        "dark",
+        "accessible",
+        "industry-tuned"
+      ],
+      "typographyTop1Id": "typo-approval-mobile",
+      "typographyTop1Tags": [
+        "approval",
+        "mobile",
+        "checkout",
+        "mobile-app"
+      ],
+      "effectsTop1Id": "fx-approval-mobile",
+      "effectsTop1Tags": [
+        "approval",
+        "mobile",
+        "press"
+      ],
+      "styleHit": 1,
+      "antiPatternsIndustryHits": 1,
+      "antiPatternsScore": 1,
+      "patternScore": 1,
+      "colorsScore": 1,
+      "a11yScore": 1,
+      "typographyScore": 1,
+      "effectsScore": 1,
+      "total": 100,
+      "notes": []
+    }
+  ]
+}

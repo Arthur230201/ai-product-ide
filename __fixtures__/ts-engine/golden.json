@@ -1,0 +1,370 @@
+{
+  "engineVersion": "uupm-ts-engine-data@0.0.2",
+  "generated": {
+    "targetCount": 120,
+    "variantPerPair": 2
+  },
+  "cases": [
+    {
+      "name": "fintech trust",
+      "input": {
+        "projectName": "FinOps",
+        "industry": "fintech",
+        "description": "风控审批、对账、交易审计",
+        "nodeLabel": "交易审批列表",
+        "pageDescription": "表格、筛选、状态标签、审计记录",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-fintech-approval"
+    },
+    {
+      "name": "saas dashboard",
+      "input": {
+        "projectName": "Admin",
+        "industry": "SaaS",
+        "description": "企业数据看板",
+        "nodeLabel": "数据看板",
+        "pageDescription": "数据卡片、表格、筛选、分页",
+        "prompt": ""
+      },
+      "expectStyleId": "saas-dashboard-neutral"
+    },
+    {
+      "name": "ecommerce mobile",
+      "input": {
+        "projectName": "Shop",
+        "industry": "电商",
+        "description": "移动端商品列表与结算",
+        "nodeLabel": "商品列表页",
+        "pageDescription": "双列卡片、价格、加购、优惠券",
+        "prompt": ""
+      },
+      "expectStyleId": "ecommerce-mobile-warm"
+    },
+    {
+      "name": "gov form flow",
+      "input": {
+        "projectName": "Gov",
+        "industry": "政务",
+        "description": "在线办事大厅，表单流与进度跟踪",
+        "nodeLabel": "事项申报表单",
+        "pageDescription": "多步骤表单、材料清单、进度条",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-政务-form-flow"
+    },
+    {
+      "name": "education admin",
+      "input": {
+        "projectName": "EduOps",
+        "industry": "教育",
+        "description": "课程管理与学员列表后台",
+        "nodeLabel": "课程管理",
+        "pageDescription": "表格、筛选、批量操作",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-教育-admin"
+    },
+    {
+      "name": "finance reconciliation",
+      "input": {
+        "projectName": "Recon",
+        "industry": "金融",
+        "description": "对账与异常处理",
+        "nodeLabel": "对账列表",
+        "pageDescription": "审计字段、异常状态、操作记录",
+        "prompt": ""
+      },
+      "expectStyleId": "fintech-trust"
+    },
+    {
+      "name": "payment risk review",
+      "input": {
+        "projectName": "Risk",
+        "industry": "支付",
+        "description": "风险审核与合规审计",
+        "nodeLabel": "风险审核",
+        "pageDescription": "审批、时间线、操作日志",
+        "prompt": ""
+      },
+      "expectStyleId": "fintech-trust"
+    },
+    {
+      "name": "commerce checkout",
+      "input": {
+        "projectName": "Shop",
+        "industry": "电商",
+        "description": "移动端下单与结算",
+        "nodeLabel": "结算页",
+        "pageDescription": "地址、支付方式、优惠券、提交订单",
+        "prompt": ""
+      },
+      "expectStyleId": "ecommerce-mobile-warm"
+    },
+    {
+      "name": "commerce cart",
+      "input": {
+        "projectName": "Shop",
+        "industry": "电商",
+        "description": "购物车与凑单",
+        "nodeLabel": "购物车",
+        "pageDescription": "商品列表、数量步进、优惠提示、结算条",
+        "prompt": ""
+      },
+      "expectStyleId": "ecommerce-mobile-warm"
+    },
+    {
+      "name": "saas users audit",
+      "input": {
+        "projectName": "Admin",
+        "industry": "SaaS",
+        "description": "企业账号与权限审计",
+        "nodeLabel": "权限审计",
+        "pageDescription": "列表、筛选、详情、操作记录",
+        "prompt": ""
+      },
+      "expectStyleId": "saas-dashboard-neutral"
+    },
+    {
+      "name": "logistics dispatch dashboard",
+      "input": {
+        "projectName": "LogiOps",
+        "industry": "物流",
+        "description": "调度与运力看板",
+        "nodeLabel": "调度看板",
+        "pageDescription": "指标卡片、地图占位、列表、筛选",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-物流-dashboard"
+    },
+    {
+      "name": "logistics order list",
+      "input": {
+        "projectName": "LogiOps",
+        "industry": "物流",
+        "description": "运单列表与异常处理",
+        "nodeLabel": "运单列表",
+        "pageDescription": "表格、筛选、异常状态、批量操作",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-物流-list-detail"
+    },
+    {
+      "name": "medical appointment admin",
+      "input": {
+        "projectName": "MedOps",
+        "industry": "医疗",
+        "description": "预约与医生排班后台",
+        "nodeLabel": "预约管理",
+        "pageDescription": "表格、筛选、详情、状态标签",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-医疗-admin"
+    },
+    {
+      "name": "medical patient form flow",
+      "input": {
+        "projectName": "MedOps",
+        "industry": "医疗",
+        "description": "病历采集与就诊登记",
+        "nodeLabel": "就诊登记",
+        "pageDescription": "多步骤表单、校验、保存草稿",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-医疗-form-flow"
+    },
+    {
+      "name": "content newsroom dashboard",
+      "input": {
+        "projectName": "News",
+        "industry": "内容资讯",
+        "description": "编辑部选题与稿件看板",
+        "nodeLabel": "内容看板",
+        "pageDescription": "指标、列表、筛选、状态标签",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-内容资讯-dashboard"
+    },
+    {
+      "name": "content article list-detail",
+      "input": {
+        "projectName": "News",
+        "industry": "内容资讯",
+        "description": "文章列表与详情编辑",
+        "nodeLabel": "文章管理",
+        "pageDescription": "列表、搜索、详情、富文本占位",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-内容资讯-list-detail"
+    },
+    {
+      "name": "gov approval flow",
+      "input": {
+        "projectName": "Gov",
+        "industry": "政务",
+        "description": "事项审批流与进度追踪",
+        "nodeLabel": "审批中心",
+        "pageDescription": "列表、筛选、审批、时间线、操作记录",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-政务-approval"
+    },
+    {
+      "name": "education mobile app",
+      "input": {
+        "projectName": "Edu",
+        "industry": "教育",
+        "description": "移动端学习任务与课程列表",
+        "nodeLabel": "学习任务",
+        "pageDescription": "卡片列表、进度、CTA",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-教育-mobile-app"
+    },
+    {
+      "name": "saas landing page",
+      "input": {
+        "projectName": "SaaS",
+        "industry": "SaaS",
+        "description": "官网落地页与定价",
+        "nodeLabel": "官网首页",
+        "pageDescription": "hero、功能区块、价格表、FAQ、CTA",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-SaaS-landing"
+    },
+    {
+      "name": "fintech approval flow",
+      "input": {
+        "projectName": "FinOps",
+        "industry": "fintech",
+        "description": "风控审批流程与审计",
+        "nodeLabel": "审批流",
+        "pageDescription": "列表、详情、时间线、审计日志",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-fintech-approval"
+    },
+    {
+      "name": "ecommerce product detail",
+      "input": {
+        "projectName": "Shop",
+        "industry": "电商",
+        "description": "移动端商品详情与加购",
+        "nodeLabel": "商品详情",
+        "pageDescription": "图片轮播、规格选择、加购、评价",
+        "prompt": ""
+      },
+      "expectStyleId": "ecommerce-mobile-warm"
+    },
+    {
+      "name": "gov dashboard",
+      "input": {
+        "projectName": "Gov",
+        "industry": "政务",
+        "description": "政务大厅数据看板",
+        "nodeLabel": "政务看板",
+        "pageDescription": "指标卡片、列表、筛选、公告",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-政务-dashboard"
+    },
+    {
+      "name": "medical landing",
+      "input": {
+        "projectName": "Med",
+        "industry": "医疗",
+        "description": "医院服务介绍与挂号入口",
+        "nodeLabel": "医院首页",
+        "pageDescription": "hero、科室入口、医生列表、CTA",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-医疗-landing"
+    },
+    {
+      "name": "logistics mobile app",
+      "input": {
+        "projectName": "Logi",
+        "industry": "物流",
+        "description": "司机移动端接单与路线",
+        "nodeLabel": "司机接单",
+        "pageDescription": "卡片、状态、地图占位、CTA",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-物流-mobile-app"
+    },
+    {
+      "name": "content landing",
+      "input": {
+        "projectName": "News",
+        "industry": "内容资讯",
+        "description": "新闻频道落地页",
+        "nodeLabel": "频道页",
+        "pageDescription": "栏目导航、推荐、列表、订阅 CTA",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-内容资讯-landing"
+    },
+    {
+      "name": "fintech dashboard",
+      "input": {
+        "projectName": "FinOps",
+        "industry": "fintech",
+        "description": "风控与交易概览看板",
+        "nodeLabel": "风控看板",
+        "pageDescription": "指标卡片、趋势占位、列表、筛选",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-fintech-approval"
+    },
+    {
+      "name": "saas admin settings",
+      "input": {
+        "projectName": "Admin",
+        "industry": "SaaS",
+        "description": "企业后台配置与权限",
+        "nodeLabel": "系统设置",
+        "pageDescription": "侧栏、表单、保存、二次确认",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-SaaS-form-flow"
+    },
+    {
+      "name": "ecommerce landing",
+      "input": {
+        "projectName": "Shop",
+        "industry": "电商",
+        "description": "大促活动落地页",
+        "nodeLabel": "活动页",
+        "pageDescription": "hero、优惠信息、商品推荐、CTA",
+        "prompt": ""
+      },
+      "expectStyleId": "ecommerce-mobile-warm"
+    },
+    {
+      "name": "gov list detail",
+      "input": {
+        "projectName": "Gov",
+        "industry": "政务",
+        "description": "事项列表与详情查询",
+        "nodeLabel": "事项列表",
+        "pageDescription": "列表、筛选、详情、材料清单占位",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-政务-form-flow"
+    },
+    {
+      "name": "content mobile app",
+      "input": {
+        "projectName": "News",
+        "industry": "内容资讯",
+        "description": "移动端资讯流与频道订阅",
+        "nodeLabel": "资讯流",
+        "pageDescription": "卡片列表、频道 tab、订阅 CTA",
+        "prompt": ""
+      },
+      "expectStyleId": "gen-内容资讯-mobile-app"
+    }
+  ]
+}
+

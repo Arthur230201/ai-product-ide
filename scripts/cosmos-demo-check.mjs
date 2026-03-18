@@ -68,7 +68,9 @@ async function main() {
     await page.screenshot({ path: screenshotPath, fullPage: false });
 
     const knownHeadless = (t) =>
-      /WebGL context|Error creating WebGL|BindToCurrentSequence|SwiftShader|ANGLE/i.test(t || '');
+      /WebGL context|Error creating WebGL|BindToCurrentSequence|SwiftShader|ANGLE|net::ERR_CONNECTION_CLOSED/i.test(
+        t || ''
+      );
     const consoleErrors = errors.filter((e) => !knownHeadless(e.text));
     const report = {
       url: baseUrl + '/index.html',

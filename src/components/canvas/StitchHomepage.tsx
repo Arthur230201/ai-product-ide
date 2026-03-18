@@ -9,19 +9,32 @@ import { toast } from 'sonner';
 
 const SIDEBAR_WIDTH_PX = 220;
 
+/** 首页「开始设计」通过自定义事件触发建图，避免 store 被 rehydrate 覆盖导致不触发 */
+export const STITCH_START_DESIGN_EVENT = 'stitch-start-design';
+export type StitchStartDesignDetail = {
+  prompt: string;
+  media: { mediaBase64: string; mediaType: 'image' | 'video' } | null;
+  /** 首页选择的「应用」= mobile、「Web」= desktop，用于锁定节点详情中的 UI 预览视口 */
+  viewport?: 'mobile' | 'desktop';
+};
+
 /** 试试这些描述：点击即触发生成 */
 const EXAMPLE_PROMPTS = [
   {
-    label: '健身 App',
-    prompt: '做一个健身 App，包含训练计划、打卡、数据统计与个人中心',
+    label: '打车 App',
+    prompt: '我要做一个打车 app，包含乘客端下单、行程、订单与支付',
   },
   {
-    label: '商品列表页',
-    prompt: '做一个商品列表页，支持按分类筛选、搜索、卡片网格展示',
+    label: '听歌 App',
+    prompt: '我需要一个听歌app',
   },
   {
-    label: '报销审批流程',
-    prompt: '做一个报销审批流程：提交申请、审批列表、通过/驳回与状态流转',
+    label: '进销存系统',
+    prompt: '我需要一个进销存系统',
+  },
+  {
+    label: '购物软件',
+    prompt: '我需要一个购物软件',
   },
 ];
 
@@ -46,7 +59,7 @@ function fileToBase64(file: File): Promise<{ mediaBase64: string; mediaType: 'im
 }
 
 export function StitchHomepage() {
-  const { setPendingCreatePrompt, setPendingCreateMedia, setConversationPanelOpen, clearCanvas, loadProject, isAiCreatePending } = useCanvasStore();
+  const { setConversationPanelOpen, clearCanvas, loadProject, isAiCreatePending } = useCanvasStore();
   const [prompt, setPrompt] = useState('');
   const [startType, setStartType] = useState<(typeof START_TYPES)[number]['id']>('app');
   const [projectList, setProjectList] = useState<ProjectListItem[]>([]);
@@ -62,11 +75,18 @@ export function StitchHomepage() {
     const hasContent = text || homeAttachment;
     if (!hasContent) return;
     setConversationPanelOpen(true);
-    setPendingCreatePrompt(text || '根据上传的文件生成产品图');
-    if (homeAttachment) setPendingCreateMedia(homeAttachment);
+    const promptToSend = text || '根据上传的文件生成产品图';
+    const viewport = startType === 'web' ? 'desktop' : 'mobile';
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent(STITCH_START_DESIGN_EVENT, {
+          detail: { prompt: promptToSend, media: homeAttachment, viewport } as StitchStartDesignDetail,
+        })
+      );
+    }
     setPrompt('');
     setHomeAttachment(null);
-  }, [prompt, homeAttachment, setPendingCreatePrompt, setPendingCreateMedia, setConversationPanelOpen]);
+  }, [prompt, homeAttachment, startType, setConversationPanelOpen]);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -84,9 +104,16 @@ export function StitchHomepage() {
   const handleExampleClick = useCallback(
     (examplePrompt: string) => {
       setConversationPanelOpen(true);
-      setPendingCreatePrompt(examplePrompt);
+      const viewport = startType === 'web' ? 'desktop' : 'mobile';
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(
+          new CustomEvent(STITCH_START_DESIGN_EVENT, {
+            detail: { prompt: examplePrompt, media: null, viewport } as StitchStartDesignDetail,
+          })
+        );
+      }
     },
-    [setPendingCreatePrompt, setConversationPanelOpen]
+    [startType, setConversationPanelOpen]
   );
 
   const handleNewProject = useCallback(() => {
@@ -192,9 +219,9 @@ export function StitchHomepage() {
                   handleStartDesign();
                 }
               }}
-              placeholder="描述设计内容"
+              placeholder="例如：我要做一个打车 app，包含乘客端下单、行程、订单与支付"
               rows={4}
-              className="w-full resize-none bg-transparent pl-12 pr-4 py-4 pt-4 pb-12 text-zinc-100 placeholder-zinc-500 focus:outline-none text-sm leading-relaxed"
+              className="w-full resize-none bg-transparent pl-12 pr-4 py-4 pt-4 pb-12 text-zinc-100 placeholder-zinc-400 focus:outline-none text-sm leading-relaxed"
               aria-label="描述设计内容"
             />
             <div className="absolute left-3 top-4 flex items-center gap-2">

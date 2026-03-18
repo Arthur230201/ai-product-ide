@@ -1,5 +1,20 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "overrides": [
+    {
+      "files": ["src/**/*.ts", "src/**/*.tsx"],
+      "excludedFiles": ["src/store/canvas-store.ts", "src/store/__tests__/**"],
+      "rules": {
+        "no-restricted-syntax": [
+          "error",
+          {
+            "selector": "MemberExpression[property.name=\"__unsafeSetDesignSystemSnapshot\"]",
+            "message": "禁止在业务代码中调用 __unsafeSetDesignSystemSnapshot；请使用 commitDesignSystemSnapshot/resetDesignSystem/rollbackDesignSystemSnapshot 作为单一写入点。"
+          }
+        ]
+      }
+    }
+  ]
 }
 
 

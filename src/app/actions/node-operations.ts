@@ -14,7 +14,12 @@ import {
   buildUIEditUserPrompt,
 } from '@/lib/prompts/ui-generation-prompt';
 import { UI_UX_PRO_MAX_GUIDANCE } from '@/lib/prompts/ui-ux-pro-max-guidance';
-import { recommendDesignSystemMarkdown } from '@/lib/design-system/recommend-design-system';
+import { resolveDesignSystemAuto } from '@/lib/design-system/resolve-design-system';
+import { truncateDesignSystemMarkdown } from '@/lib/design-system/truncate-design-system-markdown';
+import {
+  DesignSystemSnapshotSchema,
+  type DesignSystemSnapshot,
+} from '@/types/design-system-snapshot';
 import { STYLE_PRESET_IDS } from '@/types/theme';
 import { callText, callObject } from '@/lib/ai/llm';
 import type { AIResult } from '@/lib/ai/llm';
@@ -24,7 +29,15 @@ const DEFAULT_REFINE_PROMPT = '仅做视觉优化：改善层次、间距与圆�
 
 /** UI 生成接口返回类型（generateUIFromText / generateUIFromImage） */
 export type UIGenerationResponse =
-  | { type: 'success'; code: string; requestId?: string; stages?: unknown; viewportUsed?: 'mobile' | 'desktop' }
+  | {
+      type: 'success';
+      code: string;
+      requestId?: string;
+      stages?: unknown;
+      viewportUsed?: 'mobile' | 'desktop';
+      /** 智能推荐成功时返回，供客户端持久化后锁定复用 */
+      designSystemSnapshot?: DesignSystemSnapshot;
+    }
   | { type: 'skeleton'; code: string; requestId?: string; stages?: unknown }
   | { type: 'rate_limit'; cooldownSeconds: number; requestId?: string; message?: string }
   | { type: 'network_error'; requestId?: string; message?: string; retryable?: boolean }
@@ -1251,6 +1264,9 @@ const GenerateUIFromTextInputSchema = z.object({
   systemPromptSuffix: z.string().optional().describe('领域系统提示词片段'),
   /** 当前节点已有 UI 代码；若提供且有效，则按「在现有基础上修改」生成，避免整页重写 */
   existingCode: z.string().optional().describe('当前页面的 view.code，用于增量编辑'),
+  /** M1：锁定后注入快照 markdown，跳过推荐 LLM */
+  designSystemLocked: z.boolean().optional(),
+  designSystemSnapshot: z.unknown().optional(),
 });
 
 export const generateUIFromText = createServerAction()
@@ -1321,8 +1337,29 @@ export const generateUIFromText = createServerAction()
           log('📐 [generateUIFromText] 智能推荐模式：不注入固定风格 enforcement');
         }
       }
-      if (input.stylePreset === 'auto') {
-        const recommendMd = await recommendDesignSystemMarkdown({
+      let designSystemSnapshotForClient: DesignSystemSnapshot | undefined;
+      let injectedDesignSystemFromLock = false;
+      const locked = input.designSystemLocked === true;
+      const snapParsed = DesignSystemSnapshotSchema.safeParse(input.designSystemSnapshot);
+      if (
+        input.stylePreset === 'auto' &&
+        locked &&
+        snapParsed.success &&
+        snapParsed.data.markdownBlock?.trim()
+      ) {
+        const injected = truncateDesignSystemMarkdown(snapParsed.data.markdownBlock);
+        systemPrompt += `\n\n${injected}`;
+        injectedDesignSystemFromLock = true;
+        log('📐 [generateUIFromText] 已注入锁定设计系统快照', {
+          bytesAfter: Buffer.byteLength(injected, 'utf8'),
+        });
+      } else if (input.stylePreset === 'auto' && locked && !snapParsed.success) {
+        logWarn('[generateUIFromText] designSystemLocked 但快照无效，将重新推荐', {
+          issues: snapParsed.success ? [] : snapParsed.error.issues.slice(0, 3),
+        });
+      }
+      if (!injectedDesignSystemFromLock && input.stylePreset === 'auto') {
+        const { markdown: recommendMd, snapshot } = await resolveDesignSystemAuto({
           projectMeta: input.projectMeta,
           nodeLabel: input.nodeLabel,
           pageDescription: input.pageDescription,
@@ -1330,9 +1367,14 @@ export const generateUIFromText = createServerAction()
           aiConfig: input.aiConfig,
           tier: 'draft',
         });
-        if (recommendMd) {
-          systemPrompt += `\n\n${recommendMd}`;
-          log('📐 [generateUIFromText] 已注入「本次推荐设计系统」Markdown');
+        if (recommendMd && snapshot) {
+          const injected = truncateDesignSystemMarkdown(recommendMd);
+          systemPrompt += `\n\n${injected}`;
+          designSystemSnapshotForClient = snapshot;
+          log('📐 [generateUIFromText] 已注入「本次推荐设计系统」Markdown', {
+            bytesBefore: Buffer.byteLength(recommendMd, 'utf8'),
+            bytesAfter: Buffer.byteLength(injected, 'utf8'),
+          });
         }
       }
       systemPrompt += UI_UX_PRO_MAX_GUIDANCE;
@@ -1614,6 +1656,9 @@ export const generateUIFromText = createServerAction()
         code: generatedCode,
         requestId,
         viewportUsed: viewportPreset,
+        ...(designSystemSnapshotForClient
+          ? { designSystemSnapshot: designSystemSnapshotForClient }
+          : {}),
       };
     } catch (error) {
       const errorDuration = Date.now() - startTime;

@@ -13,6 +13,28 @@ import { PC_VIEWPORT_WIDTH, PC_VIEWPORT_HEIGHT, MOBILE_VIEWPORT_WIDTH, MOBILE_VI
 
 export type ViewportPreset = 'mobile' | 'desktop';
 
+/**
+ * lucide 的 Icon 依赖 iconNode 数组；误写 <Icon /> 会在 iconNode.map 处崩溃。
+ * 预览沙箱注入安全包装：无有效 iconNode 时用 Circle 占位。
+ */
+const LIVE_PREVIEW_SAFE_LUCIDE_ICON_INIT = `
+var Icon = (function() {
+  var _Raw = LucideIcons.Icon;
+  return function SafeLucideIconPreview(props) {
+    var p = props == null ? {} : props;
+    if (!Array.isArray(p.iconNode)) {
+      return React.createElement(LucideIcons.Circle, {
+        size: p.size != null ? p.size : 24,
+        className: p.className || '',
+        color: p.color != null ? p.color : 'currentColor',
+        strokeWidth: p.strokeWidth != null ? p.strokeWidth : 2,
+        absoluteStrokeWidth: p.absoluteStrokeWidth
+      });
+    }
+    return React.createElement(_Raw, p);
+  };
+})();`.trim();
+
 /** 捕获生成组件在渲染阶段的错误（如 cn/Stars 未定义），避免白屏 */
 class PreviewErrorBoundary extends React.Component<
   { children: React.ReactNode; onError: (err: Error) => void },
@@ -259,9 +281,10 @@ export const LivePreview = ({
       const iconReplacements: Array<{ from: string; to: string }> = [];
       
       usedIconNames.forEach(iconName => {
-        const isReserved = iconName === 'Icon';
-        const iconExists = !isReserved && iconName in LucideIcons &&
-          (typeof (LucideIcons as any)[iconName] === 'function' || typeof (LucideIcons as any)[iconName] === 'object');
+        const iconExists =
+          iconName in LucideIcons &&
+          (typeof (LucideIcons as any)[iconName] === 'function' ||
+            typeof (LucideIcons as any)[iconName] === 'object');
         
         if (!iconExists) {
           const similarIcon = Object.keys(LucideIcons).find(key =>
@@ -355,6 +378,14 @@ export const LivePreview = ({
             isUndefined: LucideIcons === undefined
           });
         }
+      }
+      if (
+        /<Icon(?=[\s/>])/.test(cleaned) &&
+        !previewUIKeys.has('Icon') &&
+        'Icon' in LucideIcons &&
+        'Circle' in LucideIcons
+      ) {
+        declarations.unshift(LIVE_PREVIEW_SAFE_LUCIDE_ICON_INIT);
       }
 
       // 包装代码，确保可以返回组件

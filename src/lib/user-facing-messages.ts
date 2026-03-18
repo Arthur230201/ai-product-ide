@@ -48,7 +48,7 @@ export const EMPTY_CANVAS_SECONDARY = '打开右侧 AI 对话开始';
 
 /** 四维 Tab tooltip 中文短说明 */
 export const TAB_TOOLTIPS: Record<string, string> = {
-  View: '界面',
+  View: 'UI',
   Spec: '需求',
   Impl: '实现',
   Test: '测试',

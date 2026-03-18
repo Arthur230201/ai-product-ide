@@ -1,6 +1,8 @@
 # 设计系统「智能推荐」— 方案与路线图
 
-分支：`feature/design-system-auto`
+> **长期完整总方案**见 [DESIGN_SYSTEM_MASTER_PLAN.md](./DESIGN_SYSTEM_MASTER_PLAN.md)（Phase 1～5、数据模型、全链路）。
+
+分支：`feature/design-system-auto`（Phase 1 实现可在此分支或已合并主线）
 
 ## 本分支已交付（Phase 1）
 

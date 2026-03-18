@@ -30,12 +30,59 @@ export interface FallbackGraphResult {
 }
 
 /**
- * Build fallback graph when AI fails or returns invalid schema.
- * 不按关键词匹配领域，统一使用通用降级图；领域与页面由大模型生成时通过提示词约束。
+ * Build fallback graph when LLM call fails (timeout / 429 / network).
+ * 单一通用图，不做按关键词选择模板的补丁；正常路径由 callObject 结构化输出保证可解析。
  */
 export function buildFallbackGraph(_prompt: string): FallbackGraphResult {
   const warnings: string[] = [];
   return buildGenericFallback(warnings);
+}
+
+/**
+ * 打车/出行场景降级图：6 页（首页、下单、行程、支付、订单列表、订单详情）
+ */
+function buildRideHailingFallback(warnings: string[]): FallbackGraphResult {
+  warnings.push('使用打车场景模板生成降级图结构（大模型未返回或超时）');
+
+  const nodes: FractalNode[] = [
+    createNode('home', '首页', 'View', 100, 200),
+    createNode('ride_request', '下单', 'Action', 450, 200),
+    createNode('trip', '行程', 'View', 800, 200),
+    createNode('payment', '支付', 'Action', 450, 400),
+    createNode('order_list', '订单', 'View', 100, 400),
+    createNode('order_detail', '订单详情', 'View', 800, 400),
+  ];
+
+  const edges: Edge[] = [
+    createEdge('home', 'ride_request', '叫车'),
+    createEdge('ride_request', 'trip', '进入行程'),
+    createEdge('trip', 'payment', '去支付'),
+    createEdge('payment', 'order_list', '查看订单'),
+    createEdge('order_list', 'order_detail', '查看详情'),
+    createEdge('order_detail', 'order_list', '返回列表'),
+    createEdge('order_list', 'home', '返回首页'),
+  ];
+
+  return {
+    global: {
+      userJourneys: [
+        {
+          id: 'JOURNEY_01',
+          name: '乘客完成一次打车',
+          actor: '乘客',
+          narrative: '从首页叫车到行程结束、支付并查看订单',
+          steps: ['首页叫车', '下单', '行程中', '支付', '查看订单'],
+        },
+      ],
+      businessEvents: [
+        { id: 'EVENT_01', name: '用车请求已提交', trigger: '乘客提交下单', outcome: '生成订单并进入行程' },
+        { id: 'EVENT_02', name: '支付已完成', trigger: '乘客确认付款', outcome: '订单状态更新为已支付' },
+      ],
+    },
+    nodes,
+    edges,
+    warnings,
+  };
 }
 
 /**

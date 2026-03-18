@@ -28,7 +28,7 @@ export const FractalNode = memo(
 
     // 四维轻量标识：View / Spec / Impl / Test 是否有内容
     const dims = [
-      { key: 'view', label: '界面', has: !!(data.artifacts?.view?.code?.trim()) },
+      { key: 'view', label: 'UI', has: !!(data.artifacts?.view?.code?.trim()) },
       { key: 'spec', label: '需求', has: !!(data.artifacts?.spec?.title || (Array.isArray(data.artifacts?.spec?.requirements) && data.artifacts.spec.requirements.length > 0)) },
       { key: 'impl', label: '实现', has: !!((data.artifacts?.impl?.apiEndpoints?.length ?? 0) > 0 || data.artifacts?.impl?.dbSchema?.trim()) },
       { key: 'test', label: '测试', has: !!(Array.isArray(data.artifacts?.test?.cases) && data.artifacts.test.cases.length > 0) },

@@ -63,6 +63,64 @@
   }
 }
 
+/* ========== 全局 Toast（AppToaster / Sonner）========== */
+.app-toaster [data-sonner-toast].app-toast {
+  background: linear-gradient(
+    165deg,
+    rgba(39, 39, 42, 0.94) 0%,
+    rgba(24, 24, 27, 0.97) 48%,
+    rgba(9, 9, 11, 0.99) 100%
+  );
+  border-color: rgba(82, 82, 91, 0.55) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.045) inset,
+    0 28px 56px -16px rgba(0, 0, 0, 0.72);
+  animation: toastEnter 0.38s var(--motion-ease-out) both;
+}
+
+@keyframes toastEnter {
+  from {
+    opacity: 0;
+    transform: translateX(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.app-toaster [data-sonner-toast].app-toast::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 4px 4px 0;
+  background: var(--app-toast-bar, #71717a);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--app-toast-bar) 35%, transparent);
+}
+
+.app-toast--success {
+  --app-toast-bar: #34d399;
+}
+.app-toast--error {
+  --app-toast-bar: #fb7185;
+}
+.app-toast--warning {
+  --app-toast-bar: #fbbf24;
+}
+.app-toast--info,
+.app-toast--loading {
+  --app-toast-bar: #22d3ee;
+}
+
+.app-toaster [data-sonner-toast][data-swiping='true'] {
+  transition: transform 0.2s var(--motion-ease-out), opacity 0.2s ease;
+}
+
 @import 'reactflow/dist/style.css';
 
 @layer base {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react';
 import { useCanvasStore } from '@/store/canvas-store';
-import { CONVERSATION_PANEL_WIDTH_PX } from '@/lib/layout-constants';
-import { X, ArrowLeft, Download, Wand2, RefreshCw, FileText, Database, Bug, Play, Edit, Eye, FileCheck, Smartphone, Monitor, Check } from 'lucide-react';
+import { NODE_DETAIL_LEFT_RATIO } from '@/lib/layout-constants';
+import { X, ArrowLeft, Download, Wand2, RefreshCw, FileText, Database, Bug, Play, Edit, Eye, FileCheck, Check, ZoomIn, ZoomOut } from 'lucide-react';
 import { LivePreview } from './LivePreview'; 
 import { SpecViewer } from './SpecViewer';
 import { NodeTree } from './NodeTree';
@@ -13,7 +13,7 @@ import { generatePageLevelPrd, inferPrdOptions, PrdOptions, extractFunctionTable
 import { getViewportSize } from '@/lib/viewport-constants';
 import { toast } from 'sonner';
 import { clsx } from 'clsx';
-import { isPlaceholderUiCode } from '@/utils/prdGenerator';
+import { isPlaceholderUiCode } from '@/utils/html-body-extractor';
 
 // 简单的编辑器组件
 const EditorSection = ({ value, onChange, onBlur, placeholder }: { value: string, onChange: (v: string) => void, onBlur?: () => void, placeholder: string }) => {
@@ -29,7 +29,7 @@ const EditorSection = ({ value, onChange, onBlur, placeholder }: { value: string
 };
 
 export function NodeDetailPanel() {
-  const { selectedNodeId, nodes, isDetailPanelOpen, closeNodeDetail, updateNodeData, projectMeta, aiConfig, viewportPreset, viewportLocked, lockViewport } = useCanvasStore();
+  const { selectedNodeId, nodes, isDetailPanelOpen, closeNodeDetail, updateNodeData, projectMeta, aiConfig, viewportPreset, viewportLocked, conversationPanelOpen, setNodeEditActiveTab } = useCanvasStore();
   const { execute: executeAnalysis, isPending: isGeneratingPrd } = useServerAction(generateAnalysisFromCode);
   const [activeTab, setActiveTab] = useState<'view' | 'spec' | 'impl' | 'test'>('view');
   const [isLoading, setIsLoading] = useState(false);
@@ -49,8 +49,13 @@ export function NodeDetailPanel() {
     viewportSubmitRef.current = effectiveViewport;
   }, [effectiveViewport]);
   const [previewContainerSize, setPreviewContainerSize] = useState({ w: 0, h: 0 });
+  /** UI 预览区缩放，1 = 100%，范围 0.5～2，步进 0.25 */
+  const [previewZoom, setPreviewZoom] = useState(1);
+  const PREVIEW_ZOOM_MIN = 0.5;
+  const PREVIEW_ZOOM_MAX = 2;
+  const PREVIEW_ZOOM_STEP = 0.25;
 
-  // 测量预览容器尺寸；切回「界面」Tab 时需重新测量，否则容器被卸载后尺寸会失效导致预览超出范围
+  // 测量预览容器尺寸；切回「UI」Tab 或 AI 面板开关时重新测量，避免预览区被右侧面板遮挡时仍用旧尺寸导致裁切
   useLayoutEffect(() => {
     if (activeTab !== 'view') return;
     const el = previewContainerRef.current;
@@ -63,7 +68,7 @@ export function NodeDetailPanel() {
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [effectiveViewport, activeTab]);
+  }, [effectiveViewport, activeTab, conversationPanelOpen]);
 
   // 获取选中的节点（使用 useMemo 稳定引用，避免无限循环）
   const selectedNode = useMemo(() => {
@@ -108,6 +113,12 @@ export function NodeDetailPanel() {
       setTitle('');
     }
   }, [selectedNodeId, selectedNode, nodeTitleValue]);
+
+  // 供 AI 对话框识别当前是「UI/需求/实现/测试」哪一 Tab
+  useEffect(() => {
+    if (!isDetailPanelOpen || !selectedNodeId) setNodeEditActiveTab(null);
+    else setNodeEditActiveTab(activeTab);
+  }, [isDetailPanelOpen, selectedNodeId, activeTab, setNodeEditActiveTab]);
 
   // 处理全局ESC键关闭面板（必须在条件返回之前）
   useEffect(() => {
@@ -367,7 +378,7 @@ export function NodeDetailPanel() {
   const isTestEmpty = !artifacts.test || 
     (!artifacts.test.cases || artifacts.test.cases.length === 0);
 
-  // 进度步骤：仅前一步有内容才可进入下一步（界面 → 需求 → 实现 → 测试用例）
+  // 进度步骤：仅前一步有内容才可进入下一步（UI → 需求 → 实现 → 测试用例）
   const viewCode = data.artifacts?.view?.code;
   const hasViewContent = !!viewCode?.trim() && !isPlaceholderUiCode(viewCode);
   const specRequirementsList = Array.isArray(artifacts.spec?.requirements) ? artifacts.spec.requirements : [];
@@ -527,16 +538,11 @@ export function NodeDetailPanel() {
     }
   };
 
-  // 右侧对话区固定宽度，不收进
-  const conversationWidthPx = CONVERSATION_PANEL_WIDTH_PX;
-
+  // 节点列表占左 1/5，UI 预览区占中间剩余宽度（与 AI 面板无关，主内容区已由上层保证）
+  const gridCols = `${NODE_DETAIL_LEFT_RATIO * 100}% minmax(0, 1fr)`;
   return (
-    <div
-      className="fixed left-0 top-0 bottom-0 h-screen bg-zinc-950 z-40 flex flex-col animate-in fade-in duration-200"
-      style={{ width: `calc(100vw - ${conversationWidthPx}px)` }}
-    >
-      
-      {/* 1. Header（P3 编辑模式：返回画布 + 节点标题 + 关闭） */}
+    <div className="absolute inset-0 bg-zinc-950 z-40 flex flex-col animate-in fade-in duration-200">
+      {/* 1. Header（返回画布 + 节点标题 + 关闭） */}
       <div className="h-14 border-b border-zinc-800 flex items-center gap-3 px-4 bg-zinc-900/50 shrink-0">
         <button
           type="button"
@@ -582,26 +588,29 @@ export function NodeDetailPanel() {
         </button>
       </div>
 
-      {/* 2. Main Body（P3：左侧四维 Tab + 节点树 + 入口，右侧预览） */}
-      <div className="flex-1 min-h-0 grid grid-cols-[minmax(96px,10%)_1fr] overflow-hidden">
-        {/* LEFT COLUMN: 仅节点列表 */}
-        <div className="flex flex-col min-h-0 overflow-hidden border-r border-zinc-800">
+      {/* 2. Main Body：左 1/5 节点列表 | 中间 UI 预览区占剩余宽度 */}
+      <div
+        className="flex-1 min-h-0 grid overflow-hidden"
+        style={{ gridTemplateColumns: gridCols }}
+      >
+        {/* 左列：节点列表（约 1/5） */}
+        <div className="flex flex-col min-h-0 overflow-hidden border-r border-zinc-800 min-w-0">
           <NodeTree />
         </div>
 
-        {/* 中间主内容区：单行（进度步骤 + 当前 Tab 操作）+ 下方全为关键内容区；pr-4 与右侧 AI 对话留出外边距 */}
-        <div className="flex flex-col flex-1 min-h-0 bg-zinc-950 relative overflow-hidden min-w-0 pr-4">
-          {/* 单行：左侧进度步骤（界面→需求→实现→测试用例）+ 右侧当前步骤操作，尽量压缩高度 */}
+        {/* 中列：进度步骤 + UI 预览区（占除节点列表外的全部中间宽度） */}
+        <div className="flex flex-col flex-1 min-h-0 bg-zinc-950 relative overflow-x-auto overflow-y-hidden min-w-0">
+          {/* 单行：左侧进度步骤（UI→需求→实现→测试）+ 右侧当前步骤操作，尽量压缩高度 */}
           <div className="shrink-0 h-10 border-b border-zinc-800 flex items-center justify-between gap-3 px-3 bg-zinc-900/40">
             <nav className="flex items-center gap-0 min-w-0" aria-label="节点进度">
               {(() => {
                 const steps = [
-                  { id: 'view' as const, label: '界面', icon: Eye },
+                  { id: 'view' as const, label: 'UI', icon: Eye },
                   { id: 'spec' as const, label: '需求', icon: FileText },
                   { id: 'impl' as const, label: '实现', icon: Database },
                   { id: 'test' as const, label: '测试', icon: Bug },
                 ];
-                const lockTips = ['', '请先完成界面', '请先完成需求', '请先完成实现'];
+                const lockTips = ['', '请先完成 UI', '请先完成需求', '请先完成实现'];
                 return steps.map((step, index) => {
                   const unlocked = stepUnlock[step.id];
                   const done = stepDone[step.id];
@@ -639,41 +648,36 @@ export function NodeDetailPanel() {
                 });
               })()}
             </nav>
-            {/* 右侧：当前 Tab 操作（界面=视口+增加交互；需求/实现/测试=对应生成按钮） */}
+            {/* 右侧：当前 Tab 操作（UI=视口+增加交互；需求/实现/测试=对应生成按钮） */}
             <div className="flex items-center gap-2 shrink-0">
               {activeTab === 'view' && (
                 <>
-                  {viewportLocked !== null ? (
-                    <div className="inline-flex items-center gap-1.5 px-2 py-1 text-xs text-zinc-400 border border-zinc-700 rounded" role="status" aria-label="平台已锁定">
-                      {viewportLocked === 'mobile' ? <Smartphone size={12} className="shrink-0" /> : <Monitor size={12} className="shrink-0" />}
-                      <span>已锁定：{viewportLocked === 'mobile' ? '移动端' : '桌面端'}</span>
-                    </div>
-                  ) : (
-                    <div className="flex rounded border border-zinc-700 overflow-hidden" role="group" aria-label="视口预设">
-                      {[
-                        { id: 'mobile', label: '移动', icon: Smartphone, title: '移动端 375px' },
-                        { id: 'desktop', label: '桌面', icon: Monitor, title: '桌面 1280px' },
-                      ].map(({ id, label, icon: Icon, title }) => (
-                        <button
-                          key={id}
-                          type="button"
-                          data-testid={id === 'desktop' ? 'viewport-desktop' : 'viewport-mobile'}
-                          onClick={() => {
-                            lockViewport(id as 'mobile' | 'desktop');
-                            viewportSubmitRef.current = id as 'mobile' | 'desktop';
-                          }}
-                          title={title}
-                          className={clsx(
-                            'inline-flex items-center gap-1.5 px-2 py-1 text-xs font-medium transition-colors whitespace-nowrap shrink-0',
-                            effectiveViewport === id ? 'bg-cyan-600 text-white' : 'text-zinc-400 hover:bg-zinc-800'
-                          )}
-                        >
-                          <Icon size={12} className="shrink-0" />
-                          <span>{label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  {/* 预览区放大/缩小 */}
+                  <div className="inline-flex items-center gap-0.5 border border-zinc-700 rounded overflow-hidden" role="group" aria-label="预览缩放">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewZoom((z) => Math.max(PREVIEW_ZOOM_MIN, z - PREVIEW_ZOOM_STEP))}
+                      disabled={previewZoom <= PREVIEW_ZOOM_MIN}
+                      title="缩小"
+                      className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                      aria-label="缩小"
+                    >
+                      <ZoomOut size={14} className="shrink-0" />
+                    </button>
+                    <span className="px-2 py-1 text-xs text-zinc-400 tabular-nums min-w-[3rem] text-center" title={`当前 ${Math.round(previewZoom * 100)}%`}>
+                      {Math.round(previewZoom * 100)}%
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewZoom((z) => Math.min(PREVIEW_ZOOM_MAX, z + PREVIEW_ZOOM_STEP))}
+                      disabled={previewZoom >= PREVIEW_ZOOM_MAX}
+                      title="放大"
+                      className="p-1.5 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-700 disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                      aria-label="放大"
+                    >
+                      <ZoomIn size={14} className="shrink-0" />
+                    </button>
+                  </div>
                   <button
                     onClick={handleAddInteractions}
                     disabled={isLoading}
@@ -738,39 +742,49 @@ export function NodeDetailPanel() {
             </div>
           </div>
 
-          {/* 界面：UI 预览；与左侧节点列表、上方进度栏、右侧 AI 对话保持外边距，避免被遮挡 */}
+          {/* UI：预览；以「除节点列表与 AI 外的中间区域」中线为基准定位与缩放，避免左右被裁切 */}
           {activeTab === 'view' && (
             <div
               ref={previewContainerRef}
-              className="flex-1 min-h-0 min-w-0 w-full overflow-hidden flex justify-center items-start pt-5 pb-5 pl-5 pr-5 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] relative"
+              className={clsx(
+                'flex-1 min-h-[320px] min-w-0 w-full p-8 relative bg-zinc-900/80',
+                previewZoom > 1 ? 'overflow-auto' : 'overflow-hidden'
+              )}
             >
                 {(() => {
                   const presetSize = getViewportSize(effectiveViewport);
                   const { w: cw, h: ch } = previewContainerSize;
-                  const fitScale = cw > 0 && ch > 0 ? Math.min(1, cw / presetSize.w, ch / presetSize.h) : 1;
-                  // 包装器仅占缩放后的尺寸，避免 1280px 布局宽度溢出导致预览右侧被裁切或压到 AI 对话下
-                  const wrapperW = presetSize.w * fitScale;
-                  const wrapperH = presetSize.h * fitScale;
+                  const measured = cw > 0 && ch > 0;
+                  const fitScale = measured ? Math.min(1, cw / presetSize.w, ch / presetSize.h) : 1;
+                  const effectiveScale = fitScale * previewZoom;
+                  const wrapperW = presetSize.w * effectiveScale;
+                  const wrapperH = presetSize.h * effectiveScale;
                   return (
                     <div
                       style={{
+                        position: 'absolute',
+                        left: '50%',
+                        top: 32,
                         width: wrapperW,
                         height: wrapperH,
-                        flexShrink: 0,
-                        position: 'relative',
-                        overflow: 'hidden',
+                        maxWidth: '100%',
+                        minHeight: measured ? undefined : Math.min(400, presetSize.h),
+                        transform: 'translateX(-50%)',
+                        boxSizing: 'border-box',
                         transition: 'width 0.2s ease, height 0.2s ease',
                       }}
                     >
                       <div
                         style={{
                           position: 'absolute',
-                          left: 0,
-                          top: 0,
+                          left: '50%',
+                          top: '50%',
                           width: presetSize.w,
                           height: presetSize.h,
-                          transform: `scale(${fitScale})`,
-                          transformOrigin: 'top center',
+                          marginLeft: -presetSize.w / 2,
+                          marginTop: -presetSize.h / 2,
+                          transform: `scale(${effectiveScale})`,
+                          transformOrigin: 'center center',
                           transition: 'transform 0.2s ease',
                         }}
                       >

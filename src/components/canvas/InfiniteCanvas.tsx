@@ -21,11 +21,12 @@ import { ProjectToolbar } from './ProjectToolbar';
 import { RefreshCw } from 'lucide-react';
 import { AutoLayoutButton } from './AutoLayoutButton';
 import { StyleExtractor } from './StyleExtractor';
+import { OPEN_STYLE_EXTRACTOR_EVENT } from '@/lib/canvas-ui-events';
 import { AIConfigButton } from './AIConfigButton';
 import { NodeDetailPanel } from './NodeDetailPanel';
 import { PresentationMode } from './PresentationMode';
 import { ConversationPanel } from './ConversationPanel';
-import { CONVERSATION_PANEL_WIDTH_PX } from '@/lib/layout-constants';
+import { CONVERSATION_PANEL_WIDTH_PX, AI_PANEL_WIDTH_RATIO } from '@/lib/layout-constants';
 import { clsx } from 'clsx';
 import { MessageCircle } from 'lucide-react';
 import { StitchHomepage } from './StitchHomepage';
@@ -253,8 +254,9 @@ function CanvasContent() {
         e.preventDefault();
         e.stopPropagation(); // 防止事件冒泡，避免重复触发
         
-        // 使用最新的状态，避免状态更新延迟问题
-        const currentState = useCanvasStore.getState();
+        // 使用最新的状态，避免状态更新延迟问题（getState 在 store 未就绪时可能不可用）
+        const currentState = typeof useCanvasStore?.getState === 'function' ? useCanvasStore.getState() : null;
+        if (!currentState) return;
         const currentSelectedNodeId = currentState.selectedNodeId;
         const currentNodes = currentState.nodes;
         
@@ -480,6 +482,12 @@ function TopButtons({
     setIsStyleExtractorOpen(true);
   }, []);
 
+  useEffect(() => {
+    const onOpen = () => setIsStyleExtractorOpen(true);
+    window.addEventListener(OPEN_STYLE_EXTRACTOR_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_STYLE_EXTRACTOR_EVENT, onOpen);
+  }, []);
+
   // 点击外部关闭菜单
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -570,6 +578,7 @@ export function InfiniteCanvas() {
     selectedNodeId,
     isDetailPanelOpen,
     isAiCreatePending,
+    conversationPanelOpen,
     setConversationPanelOpen,
     pendingClarificationContext,
   } = useCanvasStore();
@@ -584,46 +593,55 @@ export function InfiniteCanvas() {
     nodes.length === 0 ||
     (nodes.length === 1 && nodes[0].data?.label === '首页' && nodes[0].id === 'page-1');
 
+  // 只有在进入创建模式的画布后（非首页）才显示右侧 AI 对话框；首页不显示
+  const showConversationPanel = !isPresentationMode && !showStitchHome && conversationPanelOpen;
+
+  // 文档流分栏：主内容区 flex:1 + AI 面板固定宽，从根上杜绝预览区被遮盖（见 docs/NODE_EDIT_LAYOUT_EXPERT_DISCUSSION.md）
   return (
     <div className="fixed inset-0 w-full h-full bg-zinc-950 overflow-hidden flex flex-col">
-      {/* 画布区域：空态为 Stitch 首页，否则为 ReactFlow */}
-      <div className="flex-1 min-h-0 relative">
-        {showStitchHome ? (
-          <StitchHomepage />
-        ) : (
-          <ReactFlowProvider>
-            <CanvasContent />
-            {!isPresentationMode && (
-              <TopButtons
-                isDetailPanelOpen={isDetailPanelOpen}
-                onPresentationModeChange={handlePresentationModeChange}
-              />
+      <div className="flex-1 min-h-0 flex flex-row min-w-0">
+        {/* 主内容区：占满剩余宽度，节点详情在此区内绝对定位；overflow-hidden 保证不溢出到右侧 AI 区 */}
+        <div className="flex-1 min-w-0 min-h-0 relative flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 relative">
+            {showStitchHome ? (
+              <StitchHomepage />
+            ) : (
+              <ReactFlowProvider>
+                <CanvasContent />
+                {!isPresentationMode && (
+                  <TopButtons
+                    isDetailPanelOpen={isDetailPanelOpen}
+                    onPresentationModeChange={handlePresentationModeChange}
+                  />
+                )}
+                {!isPresentationMode && <RefreshButton isDetailPanelOpen={isDetailPanelOpen} />}
+              </ReactFlowProvider>
             )}
-            {!isPresentationMode && <RefreshButton isDetailPanelOpen={isDetailPanelOpen} />}
-          </ReactFlowProvider>
-        )}
-      </div>
-      {isPresentationMode && (
-        <PresentationMode
-          initialNodeId={selectedNodeId || (nodes.length > 0 ? nodes[0].id : null)}
-          onClose={() => setIsPresentationMode(false)}
-        />
-      )}
-      <NodeDetailPanel />
-      {/* 右侧 AI 对话区：始终挂载以便首页「开始设计」触发的 effect 能运行；首页时隐藏，进入项目后展示 */}
-      {!isPresentationMode && (
+          </div>
+          {isPresentationMode && (
+            <PresentationMode
+              initialNodeId={selectedNodeId || (nodes.length > 0 ? nodes[0].id : null)}
+              onClose={() => setIsPresentationMode(false)}
+            />
+          )}
+          <NodeDetailPanel />
+        </div>
+        {/* 右侧 AI 对话：占右侧约 1/5，最小 280px，主内容区占剩余宽度 */}
         <aside
           className={clsx(
-            'fixed top-0 bottom-0 right-0 flex flex-col bg-zinc-900 border-l border-zinc-800 z-30 transition-[width] duration-200 overflow-hidden',
-            showStitchHome && 'w-0 border-0 opacity-0 pointer-events-none'
+            'flex flex-col bg-zinc-900 border-l border-zinc-800 transition-[width] duration-200 overflow-hidden shrink-0',
+            !showConversationPanel && 'border-0 overflow-hidden'
           )}
-          style={{ width: showStitchHome ? 0 : CONVERSATION_PANEL_WIDTH_PX }}
+          style={{
+            width: showConversationPanel ? `${AI_PANEL_WIDTH_RATIO * 100}%` : 0,
+            minWidth: showConversationPanel ? CONVERSATION_PANEL_WIDTH_PX : 0,
+          }}
           aria-label="AI 对话"
-          aria-hidden={showStitchHome}
+          aria-hidden={!showConversationPanel}
         >
           <ConversationPanel isSubmitting={isAiCreatePending} />
         </aside>
-      )}
+      </div>
     </div>
   );
 }

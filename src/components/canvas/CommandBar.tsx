@@ -4,10 +4,22 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Paperclip, X, Send, Loader2, FileText, Image as ImageIcon, Video, Bot, User, MessageCircle } from 'lucide-react';
 import { useServerAction } from 'zsa-react';
 import { generateGraph } from '@/app/actions/generate-graph';
-import { updateNodeArtifacts, generateUIFromImage, generateUIFromText, generateAnalysisFromCode, type UIGenerationResponse } from '@/app/actions/node-operations';
+import {
+  updateNodeArtifacts,
+  generateUIFromImage,
+  generateUIFromText,
+  generateAnalysisFromCode,
+  nodeEditSpecUserChat,
+  nodeEditImplChat,
+  generateTestCases,
+  type NodeEditPanelMedia,
+  type UIGenerationResponse,
+} from '@/app/actions/node-operations';
 import { useCanvasStore, type ConversationMessage } from '@/store/canvas-store';
+import { safeParseDesignSystemSnapshot } from '@/types/design-system-snapshot';
 import { toast } from 'sonner';
 import { log, logError, logWarn } from '@/lib/logger';
+import { STITCH_START_DESIGN_EVENT, type StitchStartDesignDetail } from '@/components/canvas/StitchHomepage';
 import { classifyHTMLFile, getClassificationDescription, type HTMLFileClassificationContext } from '@/utils/html-file-classifier';
 import { parseHTML, generateStructuredInfoText, generateIconMappingInstructions } from '@/utils/html-parser';
 
@@ -20,6 +32,41 @@ interface FileAttachment {
   preview?: string;
   mimeType?: string; // For PDF and other binary files
   rawTextContent?: string; // 原始文本内容（用于HTML文件分类分析）
+}
+
+/** 需求/实现/测试 Tab：从附件收集图片与 HTML，供服务端多模态调用 */
+function gatherNodeEditPanelMedia(
+  primary: FileAttachment | null,
+  list: FileAttachment[]
+): NodeEditPanelMedia[] {
+  const out: NodeEditPanelMedia[] = [];
+  const seen = new Set<string>();
+  const push = (a: FileAttachment) => {
+    if (a.type === 'media' && a.mimeType?.startsWith('image/') && a.content) {
+      const k = `img:${a.content.length}`;
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push({ kind: 'image', base64: a.content, mimeType: a.mimeType });
+      return;
+    }
+    if (a.type === 'text') {
+      const raw = (a.rawTextContent || a.content || '').trim();
+      if (!raw) return;
+      const isHtml =
+        /<\s*html[\s>]/i.test(raw) ||
+        /^\s*<!DOCTYPE\s+html/i.test(raw) ||
+        Boolean(a.mimeType?.includes('html')) ||
+        /\.html?$/i.test(a.name);
+      if (!isHtml) return;
+      const k = `html:${raw.slice(0, 300)}`;
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push({ kind: 'html', snippet: raw.slice(0, 120000) });
+    }
+  };
+  if (primary) push(primary);
+  list.forEach(push);
+  return out;
 }
 
 /**
@@ -143,7 +190,10 @@ export function CommandBar(props: {
     setPendingCreatePrompt,
     pendingCreateMedia,
     setPendingCreateMedia,
+    setNodeEditSpecClarify,
+    setPendingNodeEditSpecFollowUp,
   } = useCanvasStore();
+  const pendingNodeEditSpecFollowUp = useCanvasStore((s) => s.pendingNodeEditSpecFollowUp);
   /** 最近一次建图请求的入参，用于澄清时再次调用 */
   const lastCreateInputRef = useRef<{
     prompt: string;
@@ -234,6 +284,25 @@ export function CommandBar(props: {
         return;
       }
 
+      // 若服务端返回错误（如 OPENAI_API_KEY 未配置、LLM 无法调用）：直接提示并结束
+      const raw = resultData as { ok?: boolean; type?: string; message?: string };
+      if (raw?.ok === false && raw?.message) {
+        logError('❌ [CommandBar] 建图失败（服务端返回）', { type: raw.type, message: raw.message });
+        updateLastAssistantMessage(raw.message, 'error');
+        toast.error('无法生成画布', {
+          description: raw.type === 'validation_error' && raw.message.includes('OPENAI_API_KEY')
+            ? 'LLM 未配置：请在项目根目录 .env.local 中设置 OPENAI_API_KEY'
+            : raw.message,
+          duration: 6000,
+        });
+        setIsProcessingVideo(false);
+        setIsTimeoutOverride(false);
+        clearLoadingTimers();
+        setProgress(0);
+        setLoadingStep('');
+        return;
+      }
+
       // 若服务端返回澄清请求：展示在对话窗口，等待用户选择/输入后再次请求
       const responseData = resultData?.data ?? resultData;
       const isClarification = (resultData as any)?.type === 'clarification_needed' || responseData?.type === 'clarification_needed';
@@ -297,22 +366,17 @@ export function CommandBar(props: {
         fullStructure: JSON.stringify(resultData).substring(0, 1000),
       });
 
-      // 提取 nodes 和 edges
-      // 尝试多种可能的路径
+      // 提取 nodes 和 edges（zsa-react onSuccess 传 result = { data: serverReturn }，serverReturn 即 { type, nodes, edges, global }）
       let nodes: any[] = [];
       let edges: any[] = [];
-
-      // 优先尝试 resultData.data.nodes 和 resultData.data.edges
-      // 同时也尝试直接从 result.data 访问（以防 zsa-react 改变了结构）
-      let data: any = null;
-      if ((resultData as any)?.data) {
-        data = (resultData as any).data;
-      } else if ((result as any)?.data) {
-        // 如果 resultData.data 不存在，直接使用 result.data
-        data = (result as any).data;
-        log('⚠️ [CommandBar] resultData.data 不存在，使用 result.data');
+      const payload = (resultData as any)?.data ?? resultData;
+      if (Array.isArray(payload?.nodes)) nodes = payload.nodes;
+      if (Array.isArray(payload?.edges)) edges = payload.edges;
+      if (nodes.length > 0 && edges.length >= 0) {
+        log('✅ [CommandBar] 从 payload 提取到 nodes/edges', { nodesCount: nodes.length, edgesCount: edges.length });
       }
-      
+
+      let data: any = payload;
       if (data) {
         const dataKeys = Object.keys(data);
         log('🔍 [CommandBar] 检查 data 对象:', {
@@ -478,21 +542,27 @@ export function CommandBar(props: {
       }
       
       // 如果 nodes 和 edges 都无效，或返回结果无图
-      // 或者输入确实不够明确，打开项目画像页面让用户补充信息
+      // 统一视为「系统未能生成有效结果」，而不是简单归因于用户输入不明确
       if ((!nodes || !Array.isArray(nodes) || nodes.length === 0) && 
           (!edges || !Array.isArray(edges) || edges.length === 0)) {
-        log('⚠️ [CommandBar] 无法生成有效的图结构，可能是输入不够明确，打开项目画像页面');
-        updateLastAssistantMessage('输入信息不够明确，请在项目画像页面补充详细信息。', 'done');
+        log('⚠️ [CommandBar] 无法生成有效的图结构，将引导用户前往项目画像页面补充/确认信息');
+        const trimmedPrompt = prompt.trim();
+        const inferredMeta = inferProjectMetaFromPrompt(trimmedPrompt);
+        const projectNameFromPrompt =
+          trimmedPrompt.length > 40 ? `${trimmedPrompt.slice(0, 40)}…` : trimmedPrompt || '未命名项目';
+        updateLastAssistantMessage('暂时无法根据当前内容生成画布，请在项目画像页面补充或确认项目信息后再试一次。', 'done');
         openBlueprint('profile', {
-          description: prompt.trim(),
+          description: trimmedPrompt,
+          projectName: projectNameFromPrompt,
+          ...inferredMeta,
         });
         setIsProcessingVideo(false);
         setIsTimeoutOverride(false);
         clearLoadingTimers();
         setProgress(0);
         setLoadingStep('');
-        toast.info('输入信息不够明确', {
-          description: '请在项目画像页面补充详细信息',
+        toast.info('暂时无法生成画布', {
+          description: '请在项目画像页面补充或确认项目信息后再试一次',
           duration: 4000,
         });
         return;
@@ -643,6 +713,116 @@ export function CommandBar(props: {
       });
   }, [pendingClarificationReply, pendingClarificationContext, aiConfig, executeCreate, setPendingClarificationReply, setPendingClarificationContext, updateLastAssistantMessage, setAiCreatePending, lockViewport]);
 
+  /** 需求澄清多轮：首轮若带图/HTML，后续追问需重复带上附件上下文 */
+  const nodeEditSpecStickyMediaRef = useRef<NodeEditPanelMedia[]>([]);
+  const isDetailPanelOpenStore = useCanvasStore((s) => s.isDetailPanelOpen);
+  useEffect(() => {
+    if (!isDetailPanelOpenStore) nodeEditSpecStickyMediaRef.current = [];
+  }, [isDetailPanelOpenStore]);
+
+  /** 需求 Tab：用户在对话窗选择/输入澄清后的跟进 */
+  const nodeEditSpecFollowInFlight = useRef(false);
+  useEffect(() => {
+    const fu = pendingNodeEditSpecFollowUp;
+    if (!fu || nodeEditSpecFollowInFlight.current) return;
+    nodeEditSpecFollowInFlight.current = true;
+    setPendingNodeEditSpecFollowUp(null);
+    setAiCreatePending(true);
+    (async () => {
+      try {
+        const st = useCanvasStore.getState();
+        const node = st.nodes.find((n) => n.id === fu.nodeId);
+        if (!node) {
+          appendConversationMessage({
+            id: `a-${Date.now()}`,
+            role: 'assistant',
+            content: '节点已不存在，无法更新需求。',
+            status: 'error',
+          });
+          setNodeEditSpecClarify(null);
+          return;
+        }
+        const reqs = Array.isArray(node.data?.artifacts?.spec?.requirements)
+          ? (node.data!.artifacts!.spec!.requirements as string[]).filter((x) => String(x).trim())
+          : [];
+        const sticky = nodeEditSpecStickyMediaRef.current;
+        const res = await nodeEditSpecUserChat({
+          nodeLabel: String(node.data?.label ?? node.id),
+          currentRequirements: reqs,
+          userRounds: fu.rounds,
+          media: sticky.length > 0 ? sticky : undefined,
+          aiConfig,
+        });
+        if (!res.ok) {
+          appendConversationMessage({
+            id: `a-${Date.now()}`,
+            role: 'assistant',
+            content: res.message,
+            status: 'error',
+          });
+          return;
+        }
+        if (res.data.kind === 'clarify') {
+          setNodeEditSpecClarify({ nodeId: fu.nodeId, rounds: fu.rounds });
+          appendConversationMessage({
+            id: `a-${Date.now()}`,
+            role: 'assistant',
+            content: res.data.question,
+            status: 'done',
+            clarification: {
+              message: res.data.question,
+              question: res.data.question,
+              options: res.data.options.map((o) => ({
+                id: o.id,
+                label: o.label,
+                desc: o.desc ?? '',
+                example: '',
+              })),
+            },
+          });
+        } else {
+          nodeEditSpecStickyMediaRef.current = [];
+          setNodeEditSpecClarify(null);
+          const spec = node.data.artifacts?.spec;
+          updateNodeData(fu.nodeId, {
+            artifacts: {
+              ...node.data.artifacts,
+              spec: {
+                ...spec,
+                title: res.data.title ?? spec?.title ?? String(node.data?.label ?? ''),
+                requirements: res.data.requirements,
+              },
+            },
+          });
+          appendConversationMessage({
+            id: `a-${Date.now()}`,
+            role: 'assistant',
+            content: `已更新「${node.data?.label ?? ''}」的需求（${res.data.requirements.length} 条）。`,
+            status: 'done',
+          });
+        }
+      } catch (e) {
+        appendConversationMessage({
+          id: `a-${Date.now()}`,
+          role: 'assistant',
+          content: e instanceof Error ? e.message : '处理失败',
+          status: 'error',
+        });
+      } finally {
+        nodeEditSpecFollowInFlight.current = false;
+        setAiCreatePending(false);
+      }
+    })();
+  }, [
+    pendingNodeEditSpecFollowUp,
+    setPendingNodeEditSpecFollowUp,
+    setAiCreatePending,
+    aiConfig,
+    appendConversationMessage,
+    setNodeEditSpecClarify,
+    updateNodeData,
+  ]);
+
   // 首页触发生成时用于在 onSuccess 里自动设置项目名称
   const lastPendingCreatePromptRef = useRef<string | null>(null);
 
@@ -689,6 +869,55 @@ export function CommandBar(props: {
         setAiCreatePending(false);
       });
   }, [pendingCreatePrompt, setPendingCreatePrompt, pendingCreateMedia, setPendingCreateMedia, aiConfig, appendConversationMessage, setAiCreatePending, setConversationPanelOpen, updateLastAssistantMessage, executeCreate]);
+
+  // 首页「开始设计」/「试试这些描述」：通过自定义事件触发，避免 store rehydrate 覆盖导致不触发
+  const stitchStartInFlightRef = useRef(false);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<StitchStartDesignDetail>).detail;
+      if (!detail?.prompt || stitchStartInFlightRef.current) return;
+      stitchStartInFlightRef.current = true;
+      const promptText = String(detail.prompt).trim();
+      const media = detail.media ?? null;
+      const viewport = detail.viewport === 'desktop' || detail.viewport === 'mobile' ? detail.viewport : undefined;
+      if (viewport) lockViewport(viewport);
+      log('[CommandBar] stitch-start-design 收到，开始建图', { promptLength: promptText.length, hasMedia: !!media, viewport });
+      lastPendingCreatePromptRef.current = promptText || null;
+      const userMsg: ConversationMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: promptText || (media ? '（上传的文件）' : ''),
+        status: 'done',
+      };
+      const astMsg: ConversationMessage = {
+        id: `ast-${Date.now()}`,
+        role: 'assistant',
+        content: '正在生成画布…',
+        status: 'sending',
+      };
+      appendConversationMessage(userMsg);
+      appendConversationMessage(astMsg);
+      setAiCreatePending(true);
+      setConversationPanelOpen(true);
+      executeCreate({
+        prompt: promptText || '根据上传的文件生成产品图',
+        mediaBase64: media?.mediaBase64,
+        mediaType: media?.mediaType,
+        aiConfig,
+      })
+        .catch((err) => {
+          logError('[CommandBar] 首页触发生成失败', err);
+          lastPendingCreatePromptRef.current = null;
+          updateLastAssistantMessage(err instanceof Error ? err.message : '请求失败，请重试。', 'error');
+        })
+        .finally(() => {
+          stitchStartInFlightRef.current = false;
+          setAiCreatePending(false);
+        });
+    };
+    window.addEventListener(STITCH_START_DESIGN_EVENT, handler);
+    return () => window.removeEventListener(STITCH_START_DESIGN_EVENT, handler);
+  }, [aiConfig, appendConversationMessage, setAiCreatePending, setConversationPanelOpen, updateLastAssistantMessage, executeCreate, lockViewport]);
 
   // Model Relay actions（必须在所有使用它的函数之前定义）
   const { execute: executeUI, isPending: isGeneratingUI } = useServerAction(generateUIFromImage, {
@@ -1532,6 +1761,232 @@ export function CommandBar(props: {
     }
 
     if ((isEditMode || embedInPanel) && selectedNode) {
+      const stNode = useCanvasStore.getState();
+      const panelMedia = gatherNodeEditPanelMedia(attachment, attachments);
+      const nodeEditBranch =
+        embedInPanel &&
+        stNode.isDetailPanelOpen &&
+        (Boolean(prompt.trim()) || panelMedia.length > 0);
+      const tab = stNode.nodeEditActiveTab;
+
+      if (nodeEditBranch && tab === 'spec') {
+        const node = selectedNode;
+        const reqs = Array.isArray(node.data?.artifacts?.spec?.requirements)
+          ? (node.data!.artifacts!.spec!.requirements as string[]).filter((x) => String(x).trim())
+          : [];
+        const userLine =
+          prompt.trim() ||
+          (panelMedia.length > 0 ? '请结合附件更新或澄清本页需求。' : '');
+        const userDisplay =
+          userLine +
+          (panelMedia.length > 0
+            ? ` （附件：${panelMedia.map((m) => (m.kind === 'image' ? '图片' : 'HTML')).join('、')}）`
+            : '');
+        setAiCreatePending(true);
+        appendConversationMessage({
+          id: `u-${Date.now()}`,
+          role: 'user',
+          content: userDisplay,
+          status: 'done',
+        });
+        try {
+          const res = await nodeEditSpecUserChat({
+            nodeLabel: String(node.data?.label ?? node.id),
+            currentRequirements: reqs,
+            userRounds: [userLine],
+            media: panelMedia.length > 0 ? panelMedia : undefined,
+            aiConfig,
+          });
+          if (!res.ok) {
+            appendConversationMessage({
+              id: `a-${Date.now()}`,
+              role: 'assistant',
+              content: res.message,
+              status: 'error',
+            });
+          } else if (res.data.kind === 'clarify') {
+            nodeEditSpecStickyMediaRef.current =
+              panelMedia.length > 0 ? [...panelMedia] : [];
+            setNodeEditSpecClarify({ nodeId: node.id, rounds: [userLine] });
+            appendConversationMessage({
+              id: `a-${Date.now()}`,
+              role: 'assistant',
+              content: res.data.question,
+              status: 'done',
+              clarification: {
+                message: res.data.question,
+                question: res.data.question,
+                options: res.data.options.map((o) => ({
+                  id: o.id,
+                  label: o.label,
+                  desc: o.desc ?? '',
+                  example: '',
+                })),
+              },
+            });
+          } else {
+            nodeEditSpecStickyMediaRef.current = [];
+            setNodeEditSpecClarify(null);
+            const spec = node.data.artifacts?.spec;
+            updateNodeData(node.id, {
+              artifacts: {
+                ...node.data.artifacts,
+                spec: {
+                  ...spec,
+                  title: res.data.title ?? spec?.title ?? String(node.data?.label ?? ''),
+                  requirements: res.data.requirements,
+                },
+              },
+            });
+            appendConversationMessage({
+              id: `a-${Date.now()}`,
+              role: 'assistant',
+              content: `已按你的说明更新「${node.data?.label ?? ''}」的需求（${res.data.requirements.length} 条）。`,
+              status: 'done',
+            });
+          }
+        } catch (e) {
+          appendConversationMessage({
+            id: `a-${Date.now()}`,
+            role: 'assistant',
+            content: e instanceof Error ? e.message : '需求处理失败',
+            status: 'error',
+          });
+        } finally {
+          setAiCreatePending(false);
+          setPrompt('');
+          setAttachment(null);
+          setAttachments([]);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          if (textareaRef.current) textareaRef.current.style.height = 'auto';
+        }
+        return;
+      }
+
+      if (nodeEditBranch && tab === 'impl') {
+        const node = selectedNode;
+        const reqs = Array.isArray(node.data?.artifacts?.spec?.requirements)
+          ? (node.data!.artifacts!.spec!.requirements as string[]).filter((x) => String(x).trim())
+          : [];
+        const userMsg =
+          prompt.trim() ||
+          (panelMedia.length > 0 ? '请结合附件从实现角度分析与建议。' : '');
+        const userDisplay =
+          userMsg +
+          (panelMedia.length > 0
+            ? ` （附件：${panelMedia.map((m) => (m.kind === 'image' ? '图片' : 'HTML')).join('、')}）`
+            : '');
+        setAiCreatePending(true);
+        appendConversationMessage({
+          id: `u-${Date.now()}`,
+          role: 'user',
+          content: userDisplay,
+          status: 'done',
+        });
+        try {
+          const res = await nodeEditImplChat({
+            nodeLabel: String(node.data?.label ?? node.id),
+            userMessage: userMsg,
+            requirements: reqs,
+            media: panelMedia.length > 0 ? panelMedia : undefined,
+            aiConfig,
+          });
+          appendConversationMessage({
+            id: `a-${Date.now()}`,
+            role: 'assistant',
+            content: res.ok ? res.reply : res.message,
+            status: res.ok ? 'done' : 'error',
+          });
+        } catch (e) {
+          appendConversationMessage({
+            id: `a-${Date.now()}`,
+            role: 'assistant',
+            content: e instanceof Error ? e.message : '请求失败',
+            status: 'error',
+          });
+        } finally {
+          setAiCreatePending(false);
+          setPrompt('');
+          setAttachment(null);
+          setAttachments([]);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          if (textareaRef.current) textareaRef.current.style.height = 'auto';
+        }
+        return;
+      }
+
+      if (nodeEditBranch && tab === 'test') {
+        const node = selectedNode;
+        const reqs = Array.isArray(node.data?.artifacts?.spec?.requirements)
+          ? (node.data!.artifacts!.spec!.requirements as string[]).filter((x) => String(x).trim())
+          : [];
+        const title = String(node.data?.artifacts?.spec?.title ?? node.data?.label ?? node.id);
+        const userNote =
+          prompt.trim() ||
+          (panelMedia.length > 0 ? '请结合附件生成测试用例。' : '');
+        const withUser =
+          reqs.length > 0
+            ? [...reqs, `【测试 Tab 用户说明】${userNote}`]
+            : [userNote || '【测试】请根据附件与说明生成测试要点'];
+        const userDisplay =
+          userNote +
+          (panelMedia.length > 0
+            ? ` （附件：${panelMedia.map((m) => (m.kind === 'image' ? '图片' : 'HTML')).join('、')}）`
+            : '');
+        setAiCreatePending(true);
+        appendConversationMessage({
+          id: `u-${Date.now()}`,
+          role: 'user',
+          content: userDisplay,
+          status: 'done',
+        });
+        try {
+          const tc = await generateTestCases({
+            title,
+            requirements: withUser,
+            media: panelMedia.length > 0 ? panelMedia : undefined,
+            aiConfig,
+          });
+          if (!tc.ok) {
+            appendConversationMessage({
+              id: `a-${Date.now()}`,
+              role: 'assistant',
+              content: tc.message || '生成测试用例失败',
+              status: 'error',
+            });
+          } else {
+            const cases = tc.data?.cases ?? [];
+            updateNodeData(node.id, {
+              artifacts: {
+                ...node.data.artifacts,
+                test: { cases },
+              },
+            });
+            appendConversationMessage({
+              id: `a-${Date.now()}`,
+              role: 'assistant',
+              content: `已根据当前需求与你的说明生成 ${cases.length} 条测试要点，可在节点「测试」Tab 查看。`,
+              status: 'done',
+            });
+          }
+        } catch (e) {
+          appendConversationMessage({
+            id: `a-${Date.now()}`,
+            role: 'assistant',
+            content: e instanceof Error ? e.message : '生成失败',
+            status: 'error',
+          });
+        } finally {
+          setAiCreatePending(false);
+          setPrompt('');
+          setAttachment(null);
+          setAttachments([]);
+          if (fileInputRef.current) fileInputRef.current.value = '';
+          if (textareaRef.current) textareaRef.current.style.height = 'auto';
+        }
+        return;
+      }
+
       // 检查是否有图片附件，如果有则使用 Model Relay 流程（generateUIFromImage）
       // 优先用 attachment，若无图片则从 attachments 中取第一个图片，确保「上传图片生成UI」一定走通
       const isPdf = (a: FileAttachment | null) => a?.mimeType === 'application/pdf';
@@ -2326,6 +2781,17 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                 selectedNode.data.artifacts.view.code.trim() !== '// PLACEHOLDER'
                   ? selectedNode.data.artifacts.view.code
                   : undefined;
+              const dsForUi = useCanvasStore.getState();
+              const designSystemUiPayload =
+                stylePreset === 'auto'
+                  ? {
+                      designSystemLocked: dsForUi.designSystemLocked,
+                      designSystemSnapshot:
+                        dsForUi.designSystemLocked && dsForUi.designSystemSnapshot
+                          ? dsForUi.designSystemSnapshot
+                          : undefined,
+                    }
+                  : {};
               uiResult = await executeUIText({
                 prompt: htmlReferencePrompt,
                 nodeLabel: targetNodeLabel,
@@ -2336,6 +2802,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                 tier: uiGenerationTier,
                 aiConfig: aiConfig,
                 existingCode: existingCodeForHtml,
+                ...designSystemUiPayload,
               });
               
               const callDuration = Date.now() - callStartTime;
@@ -2415,6 +2882,19 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                   },
                 },
               });
+
+              const htmlSnap = (htmlData as { designSystemSnapshot?: unknown }).designSystemSnapshot;
+              if (htmlSnap != null) {
+                const parsed = safeParseDesignSystemSnapshot(htmlSnap);
+                if (parsed.ok) {
+                  useCanvasStore.getState().commitDesignSystemSnapshot({
+                    snapshot: parsed.data,
+                    reason: 'ui_generate',
+                    engine: 'auto',
+                    lockAfter: false,
+                  });
+                }
+              }
               
               setLoadingStep('✅ UI代码生成完成');
               setProgress(100);
@@ -2576,7 +3056,13 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
           // 🚨 保存目标节点ID和标签（防止用户在生成过程中切换节点）
           const targetNodeId = selectedNode.id;
           const targetNodeLabel = selectedNode.data.label || selectedNode.id;
-          const rawUserPrompt = prompt.trim();
+          const stUi = useCanvasStore.getState();
+          const rawUserPrompt =
+            embedInPanel &&
+            stUi.isDetailPanelOpen &&
+            (stUi.nodeEditActiveTab === 'view' || stUi.nodeEditActiveTab === null)
+              ? `【节点编辑·UI｜「${targetNodeLabel}」】以下输入仅针对本页 UI/交互与视觉，请按 UI 修改理解（勿当作整图建图或改写需求文档）。\n\n${prompt.trim()}`
+              : prompt.trim();
           const pageDescription = getNodePageDescription(selectedNode);
           log('🚀 [CommandBar] 准备调用 executeUIText (文本模式)...');
           log('📋 [CommandBar] executeUIText 调用参数 (文本模式):', {
@@ -2616,6 +3102,18 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
           const viewportLabel = viewportPresetForCall === 'desktop' ? '桌面' : '移动';
           toast.info(`正在按【${viewportLabel}】视口生成…`, { duration: 3000, id: 'viewport-send' });
 
+          const dsText = useCanvasStore.getState();
+          const designSystemTextPayload =
+            stylePreset === 'auto'
+              ? {
+                  designSystemLocked: dsText.designSystemLocked,
+                  designSystemSnapshot:
+                    dsText.designSystemLocked && dsText.designSystemSnapshot
+                      ? dsText.designSystemSnapshot
+                      : undefined,
+                }
+              : {};
+
           const uiResultRaw = await executeUIText({
             prompt: rawUserPrompt,
             nodeLabel: targetNodeLabel,
@@ -2627,6 +3125,7 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
             tier: uiGenerationTier,
             aiConfig: aiConfig,
             existingCode: existingCodeForText,
+            ...designSystemTextPayload,
           });
           
           const callDuration = Date.now() - callStartTime;
@@ -2732,6 +3231,18 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
                 },
               },
             });
+
+            if (response.type === 'success' && response.designSystemSnapshot != null) {
+              const parsedDs = safeParseDesignSystemSnapshot(response.designSystemSnapshot);
+              if (parsedDs.ok) {
+                useCanvasStore.getState().commitDesignSystemSnapshot({
+                  snapshot: parsedDs.data,
+                  reason: 'ui_generate',
+                  engine: 'auto',
+                  lockAfter: false,
+                });
+              }
+            }
             
             // 验证更新是否成功
             setTimeout(() => {
@@ -3148,7 +3659,13 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
       ? '👀 扫描构建'
       : '生成');
 
-  const waitingClarification = Boolean(pendingClarificationContext && !isEditMode);
+  const nodeEditSpecClarify = useCanvasStore((s) => s.nodeEditSpecClarify);
+  const nodeEditTabForPlaceholder = useCanvasStore((s) =>
+    s.isDetailPanelOpen && s.selectedNodeId ? s.nodeEditActiveTab : null
+  );
+  const waitingClarification = Boolean(
+    (pendingClarificationContext && !isEditMode) || nodeEditSpecClarify !== null
+  );
 
   return (
     <div
@@ -3460,13 +3977,19 @@ ${prompt.trim() ? `用户要求：${prompt.trim()}` : '请基于这个HTML文件
               placeholder={
                 waitingClarification
                   ? (embedInPanel ? '请在上方选择或输入后发送' : '请在右侧对话窗口选择或输入后发送')
+                  : embedInPanel && nodeEditTabForPlaceholder === 'spec'
+                  ? `需求：补充或修改「${selectedNode?.data?.label ?? '本页'}」的 PRD…`
+                  : embedInPanel && nodeEditTabForPlaceholder === 'impl'
+                  ? '实现：询问 API、数据表、模块划分…'
+                  : embedInPanel && nodeEditTabForPlaceholder === 'test'
+                  ? '测试：说明关注点或生成/更新用例…'
                   : isUIGenerationContext && selectedNode
-                  ? `编辑 ${selectedNode.data.label}...`
+                  ? `UI：编辑 ${selectedNode.data.label} 的界面与交互…`
                   : embedInPanel
-                  ? '描述产品想法，或拖拽文件到这里'
-                  : '描述你的想法，或拖拽文件到这里'
+                  ? '例如：我要做一个打车 app，包含乘客端下单、行程、订单与支付'
+                  : '例如：我要做一个打车 app，包含乘客端下单、行程、订单与支付'
               }
-              className={`flex-1 bg-transparent text-zinc-100 placeholder-zinc-500 outline-none resize-none overflow-y-auto leading-relaxed ${
+              className={`flex-1 bg-transparent text-zinc-100 placeholder-zinc-400 outline-none resize-none overflow-y-auto leading-relaxed ${
                 embedInPanel ? 'text-sm py-2 min-h-[44px] max-h-[120px]' : 'text-base py-2.5 min-h-[60px] max-h-[200px]'
               }`}
               style={{ pointerEvents: 'auto' }}

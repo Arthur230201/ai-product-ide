@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -21,11 +25,57 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Full parity verify (gates)
+        run: npm run full-parity:verify
 
-      - name: Build
-        run: npm run build
+      - name: Upload parity reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-reports
+          path: |
+            reports/parity-report.json
+            reports/parity-report.md
+          if-no-files-found: warn
 
-      - name: Test
-        run: npm test
+      - name: Comment parity summary on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const p = path.join(process.cwd(), 'reports', 'parity-report.json');
+            if (!fs.existsSync(p)) {
+              core.warning('parity-report.json not found, skip commenting');
+              return;
+            }
+            const r = JSON.parse(fs.readFileSync(p, 'utf8'));
+            const s = r.summary;
+            const pct = (x) => `${(x * 100).toFixed(1)}%`;
+            const ok =
+              s.styleHitRate >= s.thresholds.styleHitRateTarget &&
+              s.antiOkRate >= s.thresholds.antiOkRateTarget &&
+              s.patternOkRate >= s.thresholds.patternOkRateTarget &&
+              s.colorsOkRate >= s.thresholds.colorsOkRateTarget;
+            const body = [
+              '## UIUXProMax parity gate',
+              '',
+              `- engineVersion: **${s.engineVersion}**`,
+              `- cases: **${s.cases}**`,
+              `- styleHitRate: **${pct(s.styleHitRate)}** (target ${pct(s.thresholds.styleHitRateTarget)})`,
+              `- antiOkRate: **${pct(s.antiOkRate)}** (target ${pct(s.thresholds.antiOkRateTarget)})`,
+              `- patternOkRate: **${pct(s.patternOkRate)}** (target ${pct(s.thresholds.patternOkRateTarget)})`,
+              `- colorsOkRate: **${pct(s.colorsOkRate)}** (target ${pct(s.thresholds.colorsOkRateTarget)})`,
+              `- avgTotal: **${s.avgTotal.toFixed(1)} / 100**`,
+              '',
+              ok ? '✅ **PASS** thresholds met' : '❌ **FAIL** thresholds not met',
+              '',
+              'Artifacts: `parity-reports` (includes `parity-report.json` and `parity-report.md`).',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });

@@ -22,7 +22,9 @@ export default function Error({
           <h2 className="text-xl font-semibold">出现错误</h2>
         </div>
         <p className="text-zinc-300 mb-4">
-          {error.message || '应用程序遇到了意外错误'}
+          {error.message?.includes('Failed to fetch') || error.message?.includes('fetch')
+            ? '无法连接服务器。请确保开发服务已启动（如 npm run dev），并检查网络与防火墙。'
+            : (error.message || '应用程序遇到了意外错误')}
         </p>
         {error.digest && (
           <p className="text-xs text-zinc-500 mb-4">错误 ID: {error.digest}</p>

@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PRD导出验证 - PRD</title>
+    <title>我需要一个企业资产管理系统 - PRD</title>
     <!-- PRD export mount: v2 = 仅替换顶层组件 + nodeId 带索引，避免重复声明 -->
     <!-- React Runtime -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -54,7 +54,8 @@
         }
         .main-content { margin-left: 280px; min-height: 100vh; background: #fff; }
         [id].prd-scroll-target { scroll-margin-top: 1.5rem; }
-        .device-sandbox { position: relative; width: 100%; min-height: 400px; height: 100%; overflow: hidden; border-radius: 1rem; border: 2px solid #e2e8f0; background: #fff; }
+        /* 与预览模式一致：固定视口宽度，避免导出后因容器宽度不同导致样式差异 */
+        .device-sandbox { position: relative; width: 100%; min-height: 400px; height: 100%; overflow: hidden; border-radius: 1rem; border: 2px solid #e2e8f0; background: #fff; box-sizing: border-box; }
         .device-sandbox > div { width: 100%; height: 100%; min-height: 100%; box-sizing: border-box; }
         .prd-ui-viewport { min-height: 100%; box-sizing: border-box; }
         
@@ -235,46 +236,50 @@
         .phone-mockup img:hover {
             transform: scale(1.02);
         }
-        /* 移动端界面示意：保持现有视口框样式 */
+        /* 移动端界面示意：与编辑/演示预览一致，固定宽度/高度（viewport-constants） */
         .mobile-ui-viewport {
-            width: 100%;
-            max-width: 400px;
-            min-height: 480px;
+            width: 375px;
+            max-width: 100%;
+            min-height: 812px;
             border-radius: 0.75rem;
             border: 2px solid #e2e8f0;
             overflow: hidden;
             background: #fff;
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08);
             margin: 0 auto;
+            box-sizing: border-box;
         }
-        .mobile-ui-viewport .device-sandbox { min-height: 480px; }
-        /* PC 端界面示意：Word 式排版，正常文档流比例 */
+        .mobile-ui-viewport .device-sandbox { min-height: 812px; width: 375px; }
+        /* PC 端界面示意：与编辑/演示预览一致，固定宽度/高度，窄屏可横向滚动 */
         .pc-ui-doc-flow {
-            width: 100%;
+            width: 1280px;
             max-width: 100%;
             border: 1px solid #e2e8f0;
             border-radius: 0.5rem;
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: hidden;
             background: #fff;
             box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            box-sizing: border-box;
         }
         .pc-ui-doc-flow .device-sandbox {
-            min-height: 320px;
-            width: 100%;
+            min-height: 800px;
+            width: 1280px;
+            flex-shrink: 0;
         }
         /* 兼容旧类名 */
         .desktop-viewport {
-            width: 100%;
-            min-width: 320px;
+            width: 1280px;
             max-width: 100%;
             min-height: 480px;
             border-radius: 0.75rem;
             border: 2px solid #e2e8f0;
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: hidden;
             background: #fff;
             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.08);
         }
-        .desktop-viewport .device-sandbox { min-height: 480px; }
+        .desktop-viewport .device-sandbox { min-height: 480px; width: 1280px; }
         
         /* PRD Table Styling */
         .markdown-body table {
@@ -345,23 +350,64 @@
 
     <aside class="sidebar">
         <div class="p-6 border-b border-slate-800">
-            <h1 class="text-white text-lg font-bold leading-tight">PRD导出验证</h1>
+            <h1 class="text-white text-lg font-bold leading-tight">我需要一个企业资产管理系统</h1>
             <div class="text-xs mt-2 text-slate-500">版本: 1.0.0</div>
         </div>
         <nav class="p-4 space-y-1 text-sm">
             <a href="#version-control" class="block px-4 py-2 hover:bg-slate-800 rounded text-white font-medium">0. 版本记录</a>
             <a href="#ch1" class="block px-4 py-2 hover:bg-slate-800 rounded">1. 项目综述</a>
             <a href="#ch2" class="block px-4 py-2 hover:bg-slate-800 rounded">2. 全局规范</a>
+            
             <a href="#ch3" class="block px-4 py-2 hover:bg-slate-800 rounded">3. 系统架构</a>
             <a href="#ch4" class="block px-4 py-2 hover:bg-slate-800 rounded">4. 业务流程</a>
             <a href="#ch5" class="block px-4 py-2 hover:bg-slate-800 rounded">5. 功能详述</a>
             
                     <div class="space-y-0.5">
-                        <a href="#node-0" class="block px-4 py-1.5 hover:bg-slate-800 rounded truncate pl-6 text-xs font-medium text-slate-300 transition-colors">5.1 商品列表</a>
+                        <a href="#node-0" class="block px-4 py-1.5 hover:bg-slate-800 rounded truncate pl-6 text-xs font-medium text-slate-300 transition-colors">5.1 资产总览</a>
                         <a href="#node-0-stories" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.1.1 用户故事</a>
-                        
+                        <a href="#node-0-story-0" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.1.1.1 US-001</a>
                         <a href="#node-0-ui" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.1.2 界面示意</a>
                         <a href="#node-0-section-0" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.1.3 功能需求说明</a>
+                    </div>
+                
+                    <div class="space-y-0.5">
+                        <a href="#node-1" class="block px-4 py-1.5 hover:bg-slate-800 rounded truncate pl-6 text-xs font-medium text-slate-300 transition-colors">5.2 资产列表</a>
+                        <a href="#node-1-stories" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.2.1 用户故事</a>
+                        <a href="#node-1-story-0" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.2.1.1 US-002</a>
+                        <a href="#node-1-ui" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.2.2 界面示意</a>
+                        <a href="#node-1-section-0" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.2.3 功能需求说明</a>
+                    </div>
+                
+                    <div class="space-y-0.5">
+                        <a href="#node-2" class="block px-4 py-1.5 hover:bg-slate-800 rounded truncate pl-6 text-xs font-medium text-slate-300 transition-colors">5.3 资产详情</a>
+                        <a href="#node-2-stories" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.3.1 用户故事</a>
+                        <a href="#node-2-story-0" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.3.1.1 US-003</a>
+                        <a href="#node-2-ui" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.3.2 界面示意</a>
+                        <a href="#node-2-section-0" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.3.3 功能需求说明</a>
+                    </div>
+                
+                    <div class="space-y-0.5">
+                        <a href="#node-3" class="block px-4 py-1.5 hover:bg-slate-800 rounded truncate pl-6 text-xs font-medium text-slate-300 transition-colors">5.4 申领资产</a>
+                        <a href="#node-3-stories" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.4.1 用户故事</a>
+                        <a href="#node-3-story-0" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.4.1.1 US-004</a>
+                        <a href="#node-3-ui" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.4.2 界面示意</a>
+                        <a href="#node-3-section-0" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.4.3 功能需求说明</a>
+                    </div>
+                
+                    <div class="space-y-0.5">
+                        <a href="#node-4" class="block px-4 py-1.5 hover:bg-slate-800 rounded truncate pl-6 text-xs font-medium text-slate-300 transition-colors">5.5 申领记录</a>
+                        <a href="#node-4-stories" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.5.1 用户故事</a>
+                        <a href="#node-4-story-0" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.5.1.1 US-005</a>
+                        <a href="#node-4-ui" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.5.2 界面示意</a>
+                        <a href="#node-4-section-0" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.5.3 功能需求说明</a>
+                    </div>
+                
+                    <div class="space-y-0.5">
+                        <a href="#node-5" class="block px-4 py-1.5 hover:bg-slate-800 rounded truncate pl-6 text-xs font-medium text-slate-300 transition-colors">5.6 资产管理</a>
+                        <a href="#node-5-stories" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.6.1 用户故事</a>
+                        <a href="#node-5-story-0" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.6.1.1 US-006</a>
+                        <a href="#node-5-ui" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.6.2 界面示意</a>
+                        <a href="#node-5-section-0" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-10 text-xs text-slate-400 transition-colors">5.6.3 功能需求说明</a>
                     </div>
                 
         </nav>
@@ -385,7 +431,7 @@
                         <tbody>
                             <tr>
                                 <td class="p-3 border font-mono text-blue-600">1.0.0</td>
-                                <td class="p-3 border">2026年3月5日</td>
+                                <td class="p-3 border">2026年3月18日</td>
                                 <td class="p-3 border font-medium">Project Owner</td>
                                 <td class="p-3 border text-gray-600">初始版本生成 (Auto-generated)</td>
                             </tr>
@@ -406,7 +452,7 @@
 
                 <h3>1.2 目标用户</h3>
                 <div class="bg-blue-50 text-blue-800 p-4 rounded-lg border border-blue-100">
-                    <strong>👥 核心用户群体：</strong> 普通用户
+                    <strong>👥 核心用户群体：</strong> 企业用户
                 </div>
             </section>
 
@@ -416,15 +462,15 @@
                 <h3>2.1 全局交互/数据规则</h3>
                 <div class="markdown-body text-sm">
                     <h3>性能要求</h3>
-<p>首屏 3 秒内可交互</p>
+<p>首屏加载 &lt; 1.5s，支持 5000 并发</p>
 <h3>安全要求</h3>
-<p>登录态加密</p>
+<p>所有敏感数据需要加密存储，API 需要身份验证</p>
 <h3>兼容性要求</h3>
-<p>Chrome/Safari 最新版</p>
+<p>支持 Chrome 90+、Safari 14+、移动端 iOS 14+、Android 10+</p>
 <h3>错误处理</h3>
-<p>明确提示与重试</p>
+<p>使用全局 Toast 提示，错误信息需要用户友好</p>
 <h3>数据追踪</h3>
-<p>关键操作可追溯</p>
+<p>集成 Google Analytics，追踪用户行为数据</p>
 
                 </div>
 
@@ -447,6 +493,7 @@
 </tbody></table>
 
                 </div>
+                
             </section>
 
             <section id="ch3" class="mb-20 scroll-mt-10 prd-scroll-target">
@@ -476,25 +523,453 @@
 
                 
                 <div id="node-0" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20 prd-scroll-target">
-                    <h2>5.1 商品列表</h2>
+                    <h2>5.1 资产总览</h2>
                     <div class="markdown-body text-sm bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
                         <div class="p-6">
-                            <div id="node-0-stories" class="mb-6 scroll-mt-20 prd-scroll-target"><h3>5.1.1 用户故事</h3><div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg"><p class="text-slate-500 italic">（暂无用户故事）</p></div></div>
+                            <div id="node-0-stories" class="mb-6 scroll-mt-20 prd-scroll-target"><h3>5.1.1 用户故事</h3></div>
+                          <div id="node-0-story-0" class="mb-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-500 shadow-sm scroll-mt-20">
+                              <div class="flex items-start justify-between mb-4">
+                                  <h3>【用户故事卡片 US-001】</h3>
+                                  <span class="text-xs text-slate-500 font-mono">5.1.1.1</span>
+                              </div>
+                              
+                              <div class="space-y-3">
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">🧑‍💻</span>
+                                          <span>角色</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">员工</p>
+                                  </div>
+                                  
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">🚩</span>
+                                          <span>目标</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">查看资产总体情况</p>
+                                  </div>
+                                  
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">💎</span>
+                                          <span>价值</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">了解当前资产状况</p>
+                                  </div>
+                                  
+                                  <div class="mt-4 pt-4 border-t border-blue-200">
+                                      <h4 class="text-base font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                          <span class="text-xl">✅</span>
+                                          <span>验收标准 (逻辑细节)</span>
+                                      </h4>
+                                      <ul class="ml-6 space-y-2">
+                                          
+                                                  <li class="text-sm text-slate-700 ">
+                                                      成功加载资产统计数据
+                                                  </li>
+                                                
+                                      </ul>
+                                  </div>
+                              </div>
+                          </div>
+                        
                             <div id="node-0-ui" class="mb-8 scroll-mt-20 prd-scroll-target">
                                 <h3>5.1.2 界面示意</h3>
                                 
-                                <div class="pc-ui-doc-flow bg-white">
-                                    <div id="root-product_list_1_0" class="device-sandbox bg-white" style="min-height: 320px; width: 100%;">
+                                <div class="mobile-ui-viewport bg-white">
+                                    <div id="root-dashboard_0" class="device-sandbox bg-white" style="min-height: 812px; width: 375px;">
                                         <div class="flex items-center justify-center h-full text-slate-400 text-sm">UI 加载中…</div>
                                     </div>
                                 </div>
-                                <p class="text-center text-xs text-slate-500 mt-3 font-mono">图 5.1.2 界面示意（PC 端，文档流）</p>
+                                <p class="text-center text-xs text-slate-500 mt-3 font-mono">图 5.1.2 界面示意（移动端）</p>
                                 
                             </div>
                             
                             <div id="node-0-section-0" class="mb-6 scroll-mt-20 prd-scroll-target">
                               <h3>5.1.3 功能需求说明</h3>
-                              <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg"><p>发现/列表页，包含搜索框、筛选、排序、分页；点击进入详情。</p>
+                              <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg"><p>页面描述：展示资产整体分布与关键统计。
+作为员工，查看资产总体情况，以便了解当前资产状况</p>
+</div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="node-separator my-8 border-slate-300" />
+                </div>
+                
+                <div id="node-1" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20 prd-scroll-target">
+                    <h2>5.2 资产列表</h2>
+                    <div class="markdown-body text-sm bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-6">
+                            <div id="node-1-stories" class="mb-6 scroll-mt-20 prd-scroll-target"><h3>5.2.1 用户故事</h3></div>
+                          <div id="node-1-story-0" class="mb-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-500 shadow-sm scroll-mt-20">
+                              <div class="flex items-start justify-between mb-4">
+                                  <h3>【用户故事卡片 US-002】</h3>
+                                  <span class="text-xs text-slate-500 font-mono">5.2.1.1</span>
+                              </div>
+                              
+                              <div class="space-y-3">
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">🧑‍💻</span>
+                                          <span>角色</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">员工</p>
+                                  </div>
+                                  
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">🚩</span>
+                                          <span>目标</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">浏览资产列表</p>
+                                  </div>
+                                  
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">💎</span>
+                                          <span>价值</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">找到需要的资产</p>
+                                  </div>
+                                  
+                                  <div class="mt-4 pt-4 border-t border-blue-200">
+                                      <h4 class="text-base font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                          <span class="text-xl">✅</span>
+                                          <span>验收标准 (逻辑细节)</span>
+                                      </h4>
+                                      <ul class="ml-6 space-y-2">
+                                          
+                                                  <li class="text-sm text-slate-700 ">
+                                                      列表可按类型筛选
+                                                  </li>
+                                                
+                                      </ul>
+                                  </div>
+                              </div>
+                          </div>
+                        
+                            <div id="node-1-ui" class="mb-8 scroll-mt-20 prd-scroll-target">
+                                <h3>5.2.2 界面示意</h3>
+                                
+                                <div class="pc-ui-doc-flow bg-slate-50 flex items-center justify-center" style="min-height: 800px;">
+                                    <div class="text-center text-slate-400">
+                                        <div class="text-4xl mb-2">📱</div>
+                                        <p class="text-sm">暂无 UI 预览</p>
+                                    </div>
+                                </div>
+                                <p class="text-center text-xs text-slate-400 mt-3">图 5.2.2 UI 示意（待生成）</p>
+                                
+                            </div>
+                            
+                            <div id="node-1-section-0" class="mb-6 scroll-mt-20 prd-scroll-target">
+                              <h3>5.2.3 功能需求说明</h3>
+                              <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg"><p>页面描述：按类型与状态浏览所有资产。
+作为员工，浏览资产列表，以便找到需要的资产</p>
+</div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="node-separator my-8 border-slate-300" />
+                </div>
+                
+                <div id="node-2" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20 prd-scroll-target">
+                    <h2>5.3 资产详情</h2>
+                    <div class="markdown-body text-sm bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-6">
+                            <div id="node-2-stories" class="mb-6 scroll-mt-20 prd-scroll-target"><h3>5.3.1 用户故事</h3></div>
+                          <div id="node-2-story-0" class="mb-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-500 shadow-sm scroll-mt-20">
+                              <div class="flex items-start justify-between mb-4">
+                                  <h3>【用户故事卡片 US-003】</h3>
+                                  <span class="text-xs text-slate-500 font-mono">5.3.1.1</span>
+                              </div>
+                              
+                              <div class="space-y-3">
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">🧑‍💻</span>
+                                          <span>角色</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">员工</p>
+                                  </div>
+                                  
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">🚩</span>
+                                          <span>目标</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">查看资产详细信息</p>
+                                  </div>
+                                  
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">💎</span>
+                                          <span>价值</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">判断是否需要申领</p>
+                                  </div>
+                                  
+                                  <div class="mt-4 pt-4 border-t border-blue-200">
+                                      <h4 class="text-base font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                          <span class="text-xl">✅</span>
+                                          <span>验收标准 (逻辑细节)</span>
+                                      </h4>
+                                      <ul class="ml-6 space-y-2">
+                                          
+                                                  <li class="text-sm text-slate-700 ">
+                                                      能成功加载资产详情
+                                                  </li>
+                                                
+                                      </ul>
+                                  </div>
+                              </div>
+                          </div>
+                        
+                            <div id="node-2-ui" class="mb-8 scroll-mt-20 prd-scroll-target">
+                                <h3>5.3.2 界面示意</h3>
+                                
+                                <div class="pc-ui-doc-flow bg-slate-50 flex items-center justify-center" style="min-height: 800px;">
+                                    <div class="text-center text-slate-400">
+                                        <div class="text-4xl mb-2">📱</div>
+                                        <p class="text-sm">暂无 UI 预览</p>
+                                    </div>
+                                </div>
+                                <p class="text-center text-xs text-slate-400 mt-3">图 5.3.2 UI 示意（待生成）</p>
+                                
+                            </div>
+                            
+                            <div id="node-2-section-0" class="mb-6 scroll-mt-20 prd-scroll-target">
+                              <h3>5.3.3 功能需求说明</h3>
+                              <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg"><p>页面描述：查看资产的详细信息与状态。
+作为员工，查看资产详细信息，以便判断是否需要申领</p>
+</div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="node-separator my-8 border-slate-300" />
+                </div>
+                
+                <div id="node-3" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20 prd-scroll-target">
+                    <h2>5.4 申领资产</h2>
+                    <div class="markdown-body text-sm bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-6">
+                            <div id="node-3-stories" class="mb-6 scroll-mt-20 prd-scroll-target"><h3>5.4.1 用户故事</h3></div>
+                          <div id="node-3-story-0" class="mb-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-500 shadow-sm scroll-mt-20">
+                              <div class="flex items-start justify-between mb-4">
+                                  <h3>【用户故事卡片 US-004】</h3>
+                                  <span class="text-xs text-slate-500 font-mono">5.4.1.1</span>
+                              </div>
+                              
+                              <div class="space-y-3">
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">🧑‍💻</span>
+                                          <span>角色</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">员工</p>
+                                  </div>
+                                  
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">🚩</span>
+                                          <span>目标</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">提交资产申领</p>
+                                  </div>
+                                  
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">💎</span>
+                                          <span>价值</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">获得资产使用权限</p>
+                                  </div>
+                                  
+                                  <div class="mt-4 pt-4 border-t border-blue-200">
+                                      <h4 class="text-base font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                          <span class="text-xl">✅</span>
+                                          <span>验收标准 (逻辑细节)</span>
+                                      </h4>
+                                      <ul class="ml-6 space-y-2">
+                                          
+                                                  <li class="text-sm text-slate-700 ">
+                                                      提交按钮可正常创建申领记录
+                                                  </li>
+                                                
+                                      </ul>
+                                  </div>
+                              </div>
+                          </div>
+                        
+                            <div id="node-3-ui" class="mb-8 scroll-mt-20 prd-scroll-target">
+                                <h3>5.4.2 界面示意</h3>
+                                
+                                <div class="pc-ui-doc-flow bg-slate-50 flex items-center justify-center" style="min-height: 800px;">
+                                    <div class="text-center text-slate-400">
+                                        <div class="text-4xl mb-2">📱</div>
+                                        <p class="text-sm">暂无 UI 预览</p>
+                                    </div>
+                                </div>
+                                <p class="text-center text-xs text-slate-400 mt-3">图 5.4.2 UI 示意（待生成）</p>
+                                
+                            </div>
+                            
+                            <div id="node-3-section-0" class="mb-6 scroll-mt-20 prd-scroll-target">
+                              <h3>5.4.3 功能需求说明</h3>
+                              <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg"><p>页面描述：提交资产申领请求。
+作为员工，提交资产申领，以便获得资产使用权限</p>
+</div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="node-separator my-8 border-slate-300" />
+                </div>
+                
+                <div id="node-4" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20 prd-scroll-target">
+                    <h2>5.5 申领记录</h2>
+                    <div class="markdown-body text-sm bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-6">
+                            <div id="node-4-stories" class="mb-6 scroll-mt-20 prd-scroll-target"><h3>5.5.1 用户故事</h3></div>
+                          <div id="node-4-story-0" class="mb-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-500 shadow-sm scroll-mt-20">
+                              <div class="flex items-start justify-between mb-4">
+                                  <h3>【用户故事卡片 US-005】</h3>
+                                  <span class="text-xs text-slate-500 font-mono">5.5.1.1</span>
+                              </div>
+                              
+                              <div class="space-y-3">
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">🧑‍💻</span>
+                                          <span>角色</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">员工</p>
+                                  </div>
+                                  
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">🚩</span>
+                                          <span>目标</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">查看申领状态</p>
+                                  </div>
+                                  
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">💎</span>
+                                          <span>价值</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">了解审批进度</p>
+                                  </div>
+                                  
+                                  <div class="mt-4 pt-4 border-t border-blue-200">
+                                      <h4 class="text-base font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                          <span class="text-xl">✅</span>
+                                          <span>验收标准 (逻辑细节)</span>
+                                      </h4>
+                                      <ul class="ml-6 space-y-2">
+                                          
+                                                  <li class="text-sm text-slate-700 ">
+                                                      能加载个人全部申领记录
+                                                  </li>
+                                                
+                                      </ul>
+                                  </div>
+                              </div>
+                          </div>
+                        
+                            <div id="node-4-ui" class="mb-8 scroll-mt-20 prd-scroll-target">
+                                <h3>5.5.2 界面示意</h3>
+                                
+                                <div class="pc-ui-doc-flow bg-slate-50 flex items-center justify-center" style="min-height: 800px;">
+                                    <div class="text-center text-slate-400">
+                                        <div class="text-4xl mb-2">📱</div>
+                                        <p class="text-sm">暂无 UI 预览</p>
+                                    </div>
+                                </div>
+                                <p class="text-center text-xs text-slate-400 mt-3">图 5.5.2 UI 示意（待生成）</p>
+                                
+                            </div>
+                            
+                            <div id="node-4-section-0" class="mb-6 scroll-mt-20 prd-scroll-target">
+                              <h3>5.5.3 功能需求说明</h3>
+                              <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg"><p>页面描述：查看资产申领状态。
+作为员工，查看申领状态，以便了解审批进度</p>
+</div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="node-separator my-8 border-slate-300" />
+                </div>
+                
+                <div id="node-5" class="mb-24 pt-8 border-t border-slate-200 scroll-mt-20 prd-scroll-target">
+                    <h2>5.6 资产管理</h2>
+                    <div class="markdown-body text-sm bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-6">
+                            <div id="node-5-stories" class="mb-6 scroll-mt-20 prd-scroll-target"><h3>5.6.1 用户故事</h3></div>
+                          <div id="node-5-story-0" class="mb-8 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-l-4 border-blue-500 shadow-sm scroll-mt-20">
+                              <div class="flex items-start justify-between mb-4">
+                                  <h3>【用户故事卡片 US-006】</h3>
+                                  <span class="text-xs text-slate-500 font-mono">5.6.1.1</span>
+                              </div>
+                              
+                              <div class="space-y-3">
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">🧑‍💻</span>
+                                          <span>角色</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">管理员</p>
+                                  </div>
+                                  
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">🚩</span>
+                                          <span>目标</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">修改资产信息</p>
+                                  </div>
+                                  
+                                  <div>
+                                      <h4 class="text-base font-semibold text-slate-700 mb-1 flex items-center gap-2">
+                                          <span class="text-xl">💎</span>
+                                          <span>价值</span>
+                                      </h4>
+                                      <p class="text-slate-800 ml-8">保持资产数据准确</p>
+                                  </div>
+                                  
+                                  <div class="mt-4 pt-4 border-t border-blue-200">
+                                      <h4 class="text-base font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                          <span class="text-xl">✅</span>
+                                          <span>验收标准 (逻辑细节)</span>
+                                      </h4>
+                                      <ul class="ml-6 space-y-2">
+                                          
+                                                  <li class="text-sm text-slate-700 ">
+                                                      保存后信息被更新
+                                                  </li>
+                                                
+                                      </ul>
+                                  </div>
+                              </div>
+                          </div>
+                        
+                            <div id="node-5-ui" class="mb-8 scroll-mt-20 prd-scroll-target">
+                                <h3>5.6.2 界面示意</h3>
+                                
+                                <div class="pc-ui-doc-flow bg-slate-50 flex items-center justify-center" style="min-height: 800px;">
+                                    <div class="text-center text-slate-400">
+                                        <div class="text-4xl mb-2">📱</div>
+                                        <p class="text-sm">暂无 UI 预览</p>
+                                    </div>
+                                </div>
+                                <p class="text-center text-xs text-slate-400 mt-3">图 5.6.2 UI 示意（待生成）</p>
+                                
+                            </div>
+                            
+                            <div id="node-5-section-0" class="mb-6 scroll-mt-20 prd-scroll-target">
+                              <h3>5.6.3 功能需求说明</h3>
+                              <div class="logic-block bg-slate-50 border-l-4 border-blue-500 p-4 rounded-r-lg"><p>页面描述：管理员对资产进行更新、维护等操作。
+作为管理员，修改资产信息，以便保持资产数据准确</p>
 </div>
                             </div>
                         </div>
@@ -4308,7 +4783,7 @@ var PRDPreviewUI = (() => {
           }
           console.log('🔧 [mountComponents] Starting component mounting...');
           
-          const nodesWithCode = [{"nodeId":"product_list_1_0","uiCode":"export default function Page() {\n  const templates = [\n    {\n      name: \"标准计算节点（推荐）\",\n      desc: \"适用于大多数业务：支持自动注册、健康检查与基础监控指标采集。\",\n      badge: \"推荐\",\n      fields: { os: \"Ubuntu 22.04 LTS\", runtime: \"Docker + containerd\", network: \"VPC-生产\", zone: \"华北-北京 B\" },\n    },\n    {\n      name: \"高性能 GPU 节点\",\n      desc: \"用于推理/训练：预装 NVIDIA 驱动与 CUDA，默认开启 GPU 监控。\",\n      badge: \"AI\",\n      fields: { os: \"Ubuntu 20.04 LTS\", runtime: \"Docker + NVIDIA\", network: \"VPC-生产\", zone: \"华东-上海 A\" },\n    },\n    {\n      name: \"边缘节点（轻量）\",\n      desc: \"适用于门店/边缘：更低资源占用，支持弱网重连与离线缓存。\",\n      badge: \"边缘\",\n      fields: { os: \"Debian 12\", runtime: \"containerd\", network: \"VPC-边缘\", zone: \"华南-广州 C\" },\n    },\n  ];\n\n  const recentNodes = [\n    { id: \"nd-202603-1082\", name: \"beijing-b-ops-07\", ip: \"10.12.34.7\", status: \"运行中\", owner: \"平台运维组\", updatedAt: \"2026-03-05 10:22\" },\n    { id: \"nd-202603-1075\", name: \"shanghai-a-gpu-03\", ip: \"10.21.8.19\", status: \"运行中\", owner: \"算法平台\", updatedAt: \"2026-03-04 18:09\" },\n    { id: \"nd-202603-1068\", name: \"guangzhou-c-edge-12\", ip: \"10.33.5.44\", status: \"待验收\", owner: \"门店技术支持\", updatedAt: \"2026-03-04 09:31\" },\n    { id: \"nd-202603-1059\", name: \"beijing-b-batch-02\", ip: \"10.12.40.26\", status: \"维护中\", owner: \"数据平台\", updatedAt: \"2026-03-03 14:55\" },\n    { id: \"nd-202603-1047\", name: \"shenzhen-a-core-01\", ip: \"10.41.2.11\", status: \"运行中\", owner: \"交易系统\", updatedAt: \"2026-03-02 20:17\" },\n    { id: \"nd-202603-1038\", name: \"beijing-a-cache-05\", ip: \"10.11.18.9\", status: \"已下线\", owner: \"平台运维组\", updatedAt: \"2026-03-01 11:06\" },\n  ];\n\n  const statusBadge = (status: string) => {\n    if (status === \"运行中\") return <Badge className=\"bg-emerald-600 text-white\">运行中</Badge>;\n    if (status === \"待验收\") return <Badge className=\"bg-amber-500 text-white\">待验收</Badge>;\n    if (status === \"维护中\") return <Badge className=\"bg-slate-700 text-white\">维护中</Badge>;\n    return <Badge className=\"bg-slate-200 text-slate-700\">已下线</Badge>;\n  };\n\n  const quickChecks = [\n    { k: \"SSH 连通性\", v: \"建议开放 22/自定义端口（仅白名单）\" },\n    { k: \"时钟同步\", v: \"建议开启 NTP，时间漂移 < 1s\" },\n    { k: \"磁盘空间\", v: \"系统盘 ≥ 80GB，数据盘按业务规划\" },\n    { k: \"安全基线\", v: \"禁用弱口令，启用最小权限与审计\" },\n    { k: \"监控采集\", v: \"节点 Exporter + 日志采集 Agent（可选）\" },\n  ];\n\n  return (\n    <div className={cn(\"flex flex-col h-full min-h-full bg-gray-50\")}>\n      <AppBar\n        title=\"新节点\"\n        right={\n          <div className=\"flex items-center gap-2\">\n            <Button variant=\"secondary\" className=\"min-h-[36px]\">\n              取消\n            </Button>\n            <Button className=\"min-h-[36px]\">创建节点</Button>\n          </div>\n        }\n      />\n\n      <div className=\"flex-1 min-h-0 overflow-y-auto\">\n        <div className=\"max-w-7xl mx-auto w-full px-6 py-6\">\n          <div className=\"flex gap-6\">\n            <Sidebar className=\"min-w-[240px]\">\n              <div className=\"px-3 py-2\">\n                <div className=\"text-sm font-medium text-slate-900\">创建流程</div>\n                <div className=\"text-xs text-slate-500 mt-1 whitespace-normal\">按步骤补充信息，右侧会同步展示校验与建议。</div>\n              </div>\n              <Separator />\n              <SidebarItem active>1. 基本信息</SidebarItem>\n              <SidebarItem>2. 规格与镜像</SidebarItem>\n              <SidebarItem>3. 网络与安全</SidebarItem>\n              <SidebarItem>4. 标签与监控</SidebarItem>\n              <SidebarItem>5. 预览与提交</SidebarItem>\n              <div className=\"px-3 py-3\">\n                <Alert>\n                  <div className=\"text-sm font-medium text-slate-900\">小提示</div>\n                  <div className=\"text-sm text-slate-600 mt-1 whitespace-normal\">\n                    如需批量创建，可先保存为模板；创建后建议立即绑定负责人并开启监控。\n                  </div>\n                </Alert>\n              </div>\n            </Sidebar>\n\n            <div className=\"flex-1 min-w-0\">\n              <PageHeader\n                title=\"新建节点\"\n                description=\"用于将新服务器纳入平台管理：登记信息、选择模板、配置网络与安全策略。\"\n              />\n\n              <div className=\"grid grid-cols-12 gap-6 mt-6\">\n                <div className=\"col-span-8 space-y-6\">\n                  <Card>\n                    <CardHeader>\n                      <CardTitle>基本信息</CardTitle>\n                    </CardHeader>\n                    <CardContent>\n                      <div className=\"grid grid-cols-2 gap-4\">\n                        <div className=\"space-y-2\">\n                          <Label>节点名称</Label>\n                          <Input defaultValue=\"beijing-b-core-08\" placeholder=\"例如：beijing-b-core-08\" />\n                          <div className=\"text-xs text-slate-500 whitespace-normal\">\n                            建议包含地域/可用区/用途，例如：beijing-b-ops-07\n                          </div>\n                        </div>\n                        <div className=\"space-y-2\">\n                          <Label>所属项目</Label>\n                          <Input defaultValue=\"生产环境-交易平台\" placeholder=\"例如：生产环境-交易平台\" />\n                        </div>\n\n                        <div className=\"space-y-2\">\n                          <Label>内网 IP</Label>\n                          <Input defaultValue=\"10.12.36.18\" placeholder=\"例如：10.12.36.18\" />\n                        </div>\n                        <div className=\"space-y-2\">\n                          <Label>负责人</Label>\n                          <Input defaultValue=\"王子涵（平台运维组）\" placeholder=\"例如：王子涵（平台运维组）\" />\n                        </div>\n\n                        <div className=\"space-y-2 col-span-2\">\n                          <Label>用途说明</Label>\n                          <Textarea\n                            defaultValue=\"承载订单服务与风控服务的核心计算节点，要求高可用与稳定性；夜间会有批处理任务，建议开启 CPU/内存与磁盘 IO 监控告警。\"\n                            className=\"min-h-[96px]\"\n                            placeholder=\"描述该节点的业务用途、SLA、特殊要求等\"\n                          />\n                        </div>\n                      </div>\n\n                      <Separator className=\"my-5\" />\n\n                      <div className=\"grid grid-cols-2 gap-4\">\n                        <div className=\"space-y-2\">\n                          <Label>自动注册到集群</Label>\n                          <div className=\"flex items-center justify-between gap-4 rounded-md border border-slate-200 bg-white p-3\">\n                            <div className=\"min-w-0\">\n                              <div className=\"text-sm font-medium text-slate-900\">启用自动注册</div>\n                              <div className=\"text-xs text-slate-500 whitespace-normal\">创建后自动下发 Agent，完成心跳与监控接入。</div>\n                            </div>\n                            <Switch defaultChecked />\n                          </div>\n                        </div>\n                        <div className=\"space-y-2\">\n                          <Label>保护模式</Label>\n                          <div className=\"flex items-center justify-between gap-4 rounded-md border border-slate-200 bg-white p-3\">\n                            <div className=\"min-w-0\">\n                              <div className=\"text-sm font-medium text-slate-900\">禁止误删</div>\n                              <div className=\"text-xs text-slate-500 whitespace-normal\">开启后需要二次确认才能下线/删除节点。</div>\n                            </div>\n                            <Switch defaultChecked />\n                          </div>\n                        </div>\n                      </div>\n                    </CardContent>\n                    <CardFooter className=\"flex items-center justify-between\">\n                      <div className=\"text-sm text-slate-600 whitespace-normal\">\n                        提交前将自动进行网络连通性与安全基线检查（约 10–30 秒）。\n                      </div>\n                      <div className=\"flex items-center gap-2\">\n                        <Button variant=\"secondary\">保存草稿</Button>\n                        <Button>下一步</Button>\n                      </div>\n                    </CardFooter>\n                  </Card>\n\n                  <Card>\n                    <CardHeader>\n                      <CardTitle>模板与规格</CardTitle>\n                    </CardHeader>\n                    <CardContent>\n                      <div className=\"grid grid-cols-3 gap-4\">\n                        {templates.map((t) => (\n                          <div key={t.name} className=\"rounded-lg border border-slate-200 bg-white p-4\">\n                            <div className=\"flex items-start justify-between gap-3\">\n                              <div className=\"min-w-0\">\n                                <div className=\"text-sm font-semibold text-slate-900\">{t.name}</div>\n                                <div className=\"text-xs text-slate-500 mt-1 whitespace-normal\">{t.desc}</div>\n                              </div>\n                              <Badge className={cn(t.badge === \"推荐\" ? \"bg-indigo-600 text-white\" : t.badge === \"AI\" ? \"bg-fuchsia-600 text-white\" : \"bg-slate-700 text-white\")}>\n                                {t.badge}\n                              </Badge>\n                            </div>\n\n                            <Separator className=\"my-3\" />\n\n                            <div className=\"space-y-2\">\n                              <div className=\"flex items-center justify-between gap-3\">\n                                <div className=\"text-xs text-slate-500\">操作系统</div>\n                                <div className=\"text-xs font-medium text-slate-900\">{t.fields.os}</div>\n                              </div>\n                              <div className=\"flex items-center justify-between gap-3\">\n                                <div className=\"text-xs text-slate-500\">运行时</div>\n                                <div className=\"text-xs font-medium text-slate-900\">{t.fields.runtime}</div>\n                              </div>\n                              <div className=\"flex items-center justify-between gap-3\">\n                                <div className=\"text-xs text-slate-500\">网络</div>\n                                <div className=\"text-xs font-medium text-slate-900\">{t.fields.network}</div>\n                              </div>\n                              <div className=\"flex items-center justify-between gap-3\">\n                                <div className=\"text-xs text-slate-500\">可用区</div>\n                                <div className=\"text-xs font-medium text-slate-900\">{t.fields.zone}</div>\n                              </div>\n                            </div>\n\n                            <div className=\"mt-4 flex items-center gap-2\">\n                              <Button className=\"w-full\">使用该模板</Button>\n                            </div>\n                          </div>\n                        ))}\n                      </div>\n\n                      <Separator className=\"my-5\" />\n\n                      <div className=\"grid grid-cols-3 gap-4\">\n                        <div className=\"space-y-2\">\n                          <Label>CPU（核）</Label>\n                          <Input defaultValue=\"16\" />\n                        </div>\n                        <div className=\"space-y-2\">\n                          <Label>内存（GB）</Label>\n                          <Input defaultValue=\"64\" />\n                        </div>\n                        <div className=\"space-y-2\">\n                          <Label>系统盘（GB）</Label>\n                          <Input defaultValue=\"100\" />\n                        </div>\n                        <div className=\"space-y-2 col-span-2\">\n                          <Label>镜像</Label>\n                          <Input defaultValue=\"img-prod-ubuntu22.04-v2026.02.18\" />\n                          <div className=\"text-xs text-slate-500 whitespace-normal\">镜像包含基础安全加固、日志采集与常用运维工具。</div>\n                        </div>\n                        <div className=\"space-y-2\">\n                          <Label>机型</Label>\n                          <Input defaultValue=\"c6.4xlarge（通用型）\" />\n                        </div>\n                      </div>\n                    </CardContent>\n                  </Card>\n\n                  <Card>\n                    <CardHeader>\n                      <CardTitle>最近创建的节点（参考）</CardTitle>\n                    </CardHeader>\n                    <CardContent>\n                      <div className=\"space-y-2\">\n                        {recentNodes.slice(0, 6).map((n) => (\n                          <ListItem\n                            key={n.id}\n                            title={\n                              <div className=\"flex items-center gap-2 min-w-0\">\n                                <div className=\"font-medium text-slate-900 truncate\">{n.name}</div>\n                                <div className=\"text-xs text-slate-500 shrink-0\">{n.ip}</div>\n                              </div>\n                            }\n                            description={\n                              <div className=\"flex items-center gap-2 flex-wrap\">\n                                {statusBadge(n.status)}\n                                <div className=\"text-sm text-slate-600 whitespace-normal\">负责人：{n.owner}</div>\n                                <div className=\"text-xs text-slate-500\">更新：{n.updatedAt}</div>\n                              </div>\n                            }\n                            right={\n                              <div className=\"flex items-center gap-2\">\n                                <Button variant=\"secondary\" className=\"min-h-[36px]\">\n                                  复制配置\n                                </Button>\n                                <Button className=\"min-h-[36px]\">查看</Button>\n                              </div>\n                            }\n                          />\n                        ))}\n                      </div>\n                    </CardContent>\n                  </Card>\n                </div>\n\n                <div className=\"col-span-4 space-y-6\">\n                  <StatCard title=\"创建检查进度\" value=\"已完成 2/5\" description=\"基本信息已校验，网络与安全待配置\" />\n                  <Card>\n                    <CardHeader>\n                      <CardTitle>检查清单（建议）</CardTitle>\n                    </CardHeader>\n                    <CardContent>\n                      <div className=\"space-y-3\">\n                        {quickChecks.map((c) => (\n                          <div key={c.k} className=\"rounded-md border border-slate-200 bg-white p-3\">\n                            <div className=\"text-sm font-medium text-slate-900\">{c.k}</div>\n                            <div className=\"text-xs text-slate-500 mt-1 whitespace-normal\">{c.v}</div>\n                          </div>\n                        ))}\n                      </div>\n\n                      <Separator className=\"my-5\" />\n\n                      <div className=\"space-y-3\">\n                        <div className=\"text-sm font-medium text-slate-900\">风险提示</div>\n                        <Alert>\n                          <div className=\"text-sm font-medium text-slate-900\">检测到：外网登录风险</div>\n                          <div className=\"text-sm text-slate-600 mt-1 whitespace-normal\">\n                            若开启公网 SSH，请务必启用堡垒机/双因子，并限制来源 IP；建议默认关闭公网登录。\n                          </div>\n                        </Alert>\n                        <div className=\"rounded-md border border-slate-200 bg-white p-3\">\n                          <div className=\"flex items-center justify-between gap-3\">\n                            <div className=\"min-w-0\">\n                              <div className=\"text-sm font-medium text-slate-900\">开启公网 SSH</div>\n                              <div className=\"text-xs text-slate-500 whitespace-normal\">仅用于应急场景，建议通过堡垒机访问。</div>\n                            </div>\n                            <Switch />\n                          </div>\n                        </div>\n                      </div>\n                    </CardContent>\n                    <CardFooter className=\"flex flex-col items-stretch gap-2\">\n                      <Button variant=\"secondary\" className=\"w-full\">\n                        运行预检查\n                      </Button>\n                      <Button className=\"w-full\">预览配置</Button>\n                      <div className=\"text-xs text-slate-500 whitespace-normal\">\n                        预检查不会修改任何资源，仅校验网络连通与安全策略建议。\n                      </div>\n                    </CardFooter>\n                  </Card>\n\n                  <Card>\n                    <CardHeader>\n                      <CardTitle>联系人与通知</CardTitle>\n                    </CardHeader>\n                    <CardContent>\n                      <div className=\"space-y-3\">\n                        <div className=\"space-y-2\">\n                          <Label>告警接收人</Label>\n                          <Input defaultValue=\"告警群：交易平台-核心服务（企微）\" />\n                        </div>\n                        <div className=\"space-y-2\">\n                          <Label>升级策略</Label>\n                          <Input defaultValue=\"P1：5 分钟内电话 + 群通知；P2：群通知；P3：仅邮件\" />\n                        </div>\n                        <div className=\"space-y-2\">\n                          <Label>备注</Label>\n                          <Textarea defaultValue=\"节点创建完成后请在 24 小时内完成验收：压测、重启演练、备份策略确认。\" className=\"min-h-[80px]\" />\n                        </div>\n                      </div>\n                    </CardContent>\n                  </Card>\n                </div>\n              </div>\n\n              <div className=\"mt-6\">\n                <Separator />\n                <div className=\"flex items-center justify-between py-4\">\n                  <div className=\"text-sm text-slate-600 whitespace-normal\">\n                    最后更新：2026-03-05 10:28 · 操作人：王子涵（平台运维组）\n                  </div>\n                  <div className=\"flex items-center gap-2\">\n                    <Button variant=\"secondary\">返回列表</Button>\n                    <Button>提交创建</Button>\n                  </div>\n                </div>\n              </div>\n            </div>\n          </div>\n\n          <div className=\"pb-8\" />\n        </div>\n      </div>\n    </div>\n  );\n}","title":"商品列表","isHtml":false}];
+          const nodesWithCode = [{"nodeId":"dashboard_0","uiCode":"export default function App() {\n  const overviewStats = [\n    { title: \"资产总数\", value: \"168\", delta: \"近 30 天 +12\", tone: \"primary\" as const },\n    { title: \"运行中\", value: \"142\", delta: \"稳定运行\", tone: \"success\" as const },\n    { title: \"需关注\", value: \"9\", delta: \"近 7 天 +2\", tone: \"warning\" as const },\n    { title: \"已停用\", value: \"17\", delta: \"可回收\", tone: \"neutral\" as const },\n  ];\n\n  const assets = [\n    {\n      id: \"AST-240318-001\",\n      name: \"华北-核心交换机-01\",\n      type: \"网络设备\",\n      owner: \"网络运维组\",\n      location: \"北京亦庄 · A01 机柜\",\n      status: \"运行中\",\n      risk: \"低\",\n      updatedAt: \"2026-03-18 09:12\",\n    },\n    {\n      id: \"AST-240318-002\",\n      name: \"财务共享数据库-主库\",\n      type: \"数据库\",\n      owner: \"财务系统组\",\n      location: \"华北云 · VPC-fin-prod\",\n      status: \"需关注\",\n      risk: \"中\",\n      updatedAt: \"2026-03-18 08:40\",\n    },\n    {\n      id: \"AST-240318-003\",\n      name: \"工单系统应用集群\",\n      type: \"应用服务\",\n      owner: \"企业应用组\",\n      location: \"上海机房 · K8s-prod\",\n      status: \"运行中\",\n      risk: \"低\",\n      updatedAt: \"2026-03-17 18:26\",\n    },\n    {\n      id: \"AST-240318-004\",\n      name: \"大数据任务调度-调度器\",\n      type: \"计算节点\",\n      owner: \"数据平台组\",\n      location: \"杭州机房 · DP-Cluster-3\",\n      status: \"需关注\",\n      risk: \"高\",\n      updatedAt: \"2026-03-18 07:55\",\n    },\n    {\n      id: \"AST-240318-005\",\n      name: \"研发制品库-镜像仓库\",\n      type: \"中间件\",\n      owner: \"平台工程组\",\n      location: \"华南云 · registry-prod\",\n      status: \"运行中\",\n      risk: \"低\",\n      updatedAt: \"2026-03-18 09:03\",\n    },\n    {\n      id: \"AST-240318-006\",\n      name: \"客服外呼-语音网关\",\n      type: \"网络设备\",\n      owner: \"客服技术组\",\n      location: \"深圳机房 · B12 机柜\",\n      status: \"已停用\",\n      risk: \"低\",\n      updatedAt: \"2026-03-10 14:22\",\n    },\n    {\n      id: \"AST-240318-007\",\n      name: \"统一登录 SSO 服务\",\n      type: \"应用服务\",\n      owner: \"安全与身份组\",\n      location: \"华北云 · IAM-prod\",\n      status: \"运行中\",\n      risk: \"低\",\n      updatedAt: \"2026-03-18 08:58\",\n    },\n  ];\n\n  const changes = [\n    {\n      id: \"CHG-20260318-013\",\n      title: \"财务共享数据库-主库：慢查询阈值上调与索引重建\",\n      meta: \"申请人：李梓 · 变更窗口：03-18 22:00–23:00\",\n      status: \"待审批\",\n      impact: \"影响：可能短时抖动（≤ 3 分钟）\",\n    },\n    {\n      id: \"CHG-20260317-087\",\n      title: \"工单系统应用集群：扩容 2 个实例（高峰保障）\",\n      meta: \"执行人：周启航 · 已完成：03-17 19:10\",\n      status: \"已完成\",\n      impact: \"影响：无\",\n    },\n    {\n      id: \"CHG-20260316-044\",\n      title: \"统一登录 SSO 服务：证书自动续期策略调整\",\n      meta: \"申请人：王思远 · 已归档：03-16 16:30\",\n      status: \"已归档\",\n      impact: \"影响：无\",\n    },\n    {\n      id: \"CHG-20260315-029\",\n      title: \"华北-核心交换机-01：固件升级预检查\",\n      meta: \"执行人：赵昕 · 进行中：03-18 09:05\",\n      status: \"进行中\",\n      impact: \"影响：无（预检查）\",\n    },\n    {\n      id: \"CHG-20260314-011\",\n      title: \"研发制品库-镜像仓库：存储清理策略（保留 90 天）\",\n      meta: \"申请人：陈雨彤 · 已完成：03-14 11:20\",\n      status: \"已完成\",\n      impact: \"影响：无\",\n    },\n  ];\n\n  const getStatusBadge = (status: string) => {\n    const base =\n      \"rounded-md px-2 py-1 text-xs font-medium border\";\n    if (status === \"运行中\")\n      return <Badge className={cn(base, \"bg-blue-50 text-blue-700 border-blue-200\")}>{status}</Badge>;\n    if (status === \"需关注\")\n      return <Badge className={cn(base, \"bg-amber-50 text-amber-700 border-amber-200\")}>{status}</Badge>;\n    if (status === \"已停用\")\n      return <Badge className={cn(base, \"bg-gray-100 text-gray-800 border-gray-200\")}>{status}</Badge>;\n    if (status === \"待审批\")\n      return <Badge className={cn(base, \"bg-blue-50 text-blue-700 border-blue-200\")}>{status}</Badge>;\n    if (status === \"进行中\")\n      return <Badge className={cn(base, \"bg-purple-50 text-purple-700 border-purple-200\")}>{status}</Badge>;\n    if (status === \"已完成\")\n      return <Badge className={cn(base, \"bg-emerald-50 text-emerald-700 border-emerald-200\")}>{status}</Badge>;\n    if (status === \"已归档\")\n      return <Badge className={cn(base, \"bg-gray-100 text-gray-800 border-gray-200\")}>{status}</Badge>;\n    return <Badge className={cn(base, \"bg-gray-100 text-gray-800 border-gray-200\")}>{status}</Badge>;\n  };\n\n  return (\n    <div className={cn(\"w-full overflow-x-hidden flex flex-col h-full min-h-full bg-gray-50\")}>\n      <NavBar\n        title=\"资产总览\"\n        right={\n          <Button\n            className=\"rounded-md shadow-md bg-blue-500 hover:bg-blue-600 transition cursor-pointer min-h-[44px]\"\n            aria-label=\"新建资产\"\n          >\n            新建\n          </Button>\n        }\n      />\n\n      <main className=\"flex-1 min-h-0 overflow-y-auto px-4 pb-6\">\n        <div className=\"max-w-[375px] mx-auto w-full\">\n          <Card className=\"mt-4 bg-white rounded-lg shadow-sm border border-gray-200\">\n            <CardHeader className=\"p-4\">\n              <CardTitle className=\"text-gray-900 text-base font-semibold\">快速检索</CardTitle>\n            </CardHeader>\n            <CardContent className=\"p-4 pt-0 space-y-3\">\n              <div className=\"space-y-2\">\n                <Label className=\"text-gray-700\" htmlFor=\"q\">\n                  资产名称 / 编号\n                </Label>\n                <Input\n                  id=\"q\"\n                  placeholder=\"例如：SSO、AST-240318-002\"\n                  className=\"rounded-md min-h-[44px] bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2\"\n                />\n              </div>\n              <div className=\"space-y-2\">\n                <Label className=\"text-gray-700\" htmlFor=\"owner\">\n                  负责团队\n                </Label>\n                <Input\n                  id=\"owner\"\n                  placeholder=\"例如：平台工程组\"\n                  className=\"rounded-md min-h-[44px] bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2\"\n                />\n              </div>\n              <div className=\"flex gap-3\">\n                <Button\n                  className=\"flex-1 rounded-md shadow-md bg-blue-500 hover:bg-blue-600 transition cursor-pointer min-h-[44px]\"\n                >\n                  查询\n                </Button>\n                <Button\n                  variant=\"secondary\"\n                  className=\"flex-1 rounded-md shadow-md bg-purple-500 hover:bg-purple-600 text-white transition cursor-pointer min-h-[44px]\"\n                >\n                  导出\n                </Button>\n              </div>\n              <Alert className=\"rounded-md border border-gray-200 bg-white\">\n                <div className=\"text-sm text-gray-700 whitespace-normal\">\n                  提示：支持按资产编号、名称模糊搜索；“需关注”资产建议优先处理。\n                </div>\n              </Alert>\n            </CardContent>\n          </Card>\n\n          <div className=\"mt-4 grid grid-cols-2 gap-4\">\n            {overviewStats.map((s) => (\n              <StatCard\n                key={s.title}\n                title={s.title}\n                value={s.value}\n                description={s.delta}\n                className=\"rounded-lg shadow-sm bg-white border border-gray-200\"\n              />\n            ))}\n          </div>\n\n          <TabsList className=\"mt-4 w-full rounded-md bg-white border border-gray-200 shadow-sm p-1\">\n            <TabsTrigger className=\"rounded-md min-h-[44px] cursor-pointer transition\" value=\"assets\">\n              资产列表\n            </TabsTrigger>\n            <TabsTrigger className=\"rounded-md min-h-[44px] cursor-pointer transition\" value=\"changes\">\n              变更记录\n            </TabsTrigger>\n          </TabsList>\n\n          <TabsContent value=\"assets\">\n            <Card className=\"mt-4 bg-white rounded-lg shadow-sm border border-gray-200\">\n              <CardHeader className=\"p-4\">\n                <div className=\"flex items-start justify-between gap-3\">\n                  <div className=\"min-w-0\">\n                    <CardTitle className=\"text-gray-900 text-base font-semibold\">重点资产</CardTitle>\n                    <div className=\"mt-1 text-sm text-gray-600 whitespace-normal\">\n                      覆盖关键系统与核心基础设施，按最近更新时间排序。\n                    </div>\n                  </div>\n                  <Button\n                    variant=\"secondary\"\n                    className=\"rounded-md shadow-md bg-purple-500 hover:bg-purple-600 text-white transition cursor-pointer min-h-[44px] px-4\"\n                    aria-label=\"筛选资产\"\n                  >\n                    筛选\n                  </Button>\n                </div>\n              </CardHeader>\n\n              <CardContent className=\"p-2\">\n                <div className=\"space-y-2\">\n                  {assets.map((a) => (\n                    <ListItem\n                      key={a.id}\n                      title={\n                        <div className=\"flex items-center gap-2 min-w-0\">\n                          <div className=\"truncate text-gray-900 font-medium\">{a.name}</div>\n                          {getStatusBadge(a.status)}\n                        </div>\n                      }\n                      description={\n                        <div className=\"mt-1 space-y-1 whitespace-normal\">\n                          <div className=\"text-sm text-gray-600\">\n                            编号：<span className=\"text-gray-900\">{a.id}</span> · 类型：{a.type}\n                          </div>\n                          <div className=\"text-sm text-gray-600\">\n                            负责：{a.owner} · 位置：{a.location}\n                          </div>\n                          <div className=\"text-sm text-gray-600\">\n                            风险：<span className={cn(a.risk === \"高\" ? \"text-red-600\" : a.risk === \"中\" ? \"text-amber-700\" : \"text-emerald-700\")}>{a.risk}</span>\n                            <span className=\"text-gray-500\"> · </span>\n                            更新：{a.updatedAt}\n                          </div>\n                        </div>\n                      }\n                      right={\n                        <div className=\"flex flex-col items-end gap-2\">\n                          <Button\n                            className=\"rounded-md shadow-md bg-blue-500 hover:bg-blue-600 transition cursor-pointer min-h-[44px] px-4\"\n                            aria-label={`查看 ${a.name}`}\n                          >\n                            查看\n                          </Button>\n                          <Button\n                            variant=\"secondary\"\n                            className=\"rounded-md shadow-md bg-purple-500 hover:bg-purple-600 text-white transition cursor-pointer min-h-[44px] px-4\"\n                            aria-label={`工单 ${a.name}`}\n                          >\n                            工单\n                          </Button>\n                        </div>\n                      }\n                      className=\"rounded-md border border-gray-200 bg-white\"\n                    />\n                  ))}\n                </div>\n              </CardContent>\n\n              <CardFooter className=\"p-4 pt-2\">\n                <div className=\"w-full flex items-center justify-between gap-3\">\n                  <div className=\"text-sm text-gray-600\">显示 1–7 / 168</div>\n                  <Button\n                    className=\"rounded-md shadow-md bg-blue-500 hover:bg-blue-600 transition cursor-pointer min-h-[44px] px-4\"\n                    aria-label=\"加载更多资产\"\n                  >\n                    加载更多\n                  </Button>\n                </div>\n              </CardFooter>\n            </Card>\n\n            <Card className=\"mt-4 bg-white rounded-lg shadow-sm border border-gray-200\">\n              <CardHeader className=\"p-4\">\n                <CardTitle className=\"text-gray-900 text-base font-semibold\">健康度概览</CardTitle>\n              </CardHeader>\n              <CardContent className=\"p-4 pt-0 space-y-4\">\n                <div className=\"space-y-2\">\n                  <div className=\"flex items-center justify-between gap-3\">\n                    <div className=\"text-sm text-gray-700\">网络设备可用率</div>\n                    <div className=\"text-sm text-gray-900 font-medium\">99.92%</div>\n                  </div>\n                  <Progress value={92} className=\"h-2\" />\n                  <div className=\"text-xs text-gray-600 whitespace-normal\">\n                    统计口径：最近 7 天监控数据；剔除计划内停机窗口。\n                  </div>\n                </div>\n\n                <Separator className=\"bg-gray-200\" />\n\n                <div className=\"space-y-2\">\n                  <div className=\"flex items-center justify-between gap-3\">\n                    <div className=\"text-sm text-gray-700\">关键业务 SLO 达标</div>\n                    <div className=\"text-sm text-gray-900 font-medium\">96.4%</div>\n                  </div>\n                  <Progress value={86} className=\"h-2\" />\n                  <div className=\"text-xs text-gray-600 whitespace-normal\">\n                    未达标项：财务共享数据库（慢查询）、调度器（峰值 CPU）。\n                  </div>\n                </div>\n\n                <Separator className=\"bg-gray-200\" />\n\n                <div className=\"space-y-2\">\n                  <div className=\"flex items-center justify-between gap-3\">\n                    <div className=\"text-sm text-gray-700\">安全基线覆盖</div>\n                    <div className=\"text-sm text-gray-900 font-medium\">88/102</div>\n                  </div>\n                  <Progress value={78} className=\"h-2\" />\n                  <div className=\"text-xs text-gray-600 whitespace-normal\">\n                    建议优先补齐：账号最小权限、备份加密、证书轮换策略。\n                  </div>\n                </div>\n              </CardContent>\n            </Card>\n          </TabsContent>\n\n          <TabsContent value=\"changes\">\n            <Card className=\"mt-4 bg-white rounded-lg shadow-sm border border-gray-200\">\n              <CardHeader className=\"p-4\">\n                <div className=\"flex items-start justify-between gap-3\">\n                  <div className=\"min-w-0\">\n                    <CardTitle className=\"text-gray-900 text-base font-semibold\">近期变更</CardTitle>\n                    <div className=\"mt-1 text-sm text-gray-600 whitespace-normal\">\n                      用于追踪关键资产变更与审计留痕。\n                    </div>\n                  </div>\n                  <Button\n                    className=\"rounded-md shadow-md bg-blue-500 hover:bg-blue-600 transition cursor-pointer min-h-[44px] px-4\"\n                    aria-label=\"发起变更\"\n                  >\n                    发起\n                  </Button>\n                </div>\n              </CardHeader>\n\n              <CardContent className=\"p-2\">\n                <div className=\"space-y-2\">\n                  {changes.map((c) => (\n                    <ListItem\n                      key={c.id}\n                      title={\n                        <div className=\"flex items-center gap-2 min-w-0\">\n                          <div className=\"truncate text-gray-900 font-medium\">{c.title}</div>\n                          {getStatusBadge(c.status)}\n                        </div>\n                      }\n                      description={\n                        <div className=\"mt-1 space-y-1 whitespace-normal\">\n                          <div className=\"text-sm text-gray-600\">\n                            记录号：<span className=\"text-gray-900\">{c.id}</span>\n                          </div>\n                          <div className=\"text-sm text-gray-600\">{c.meta}</div>\n                          <div className=\"text-sm text-gray-600\">{c.impact}</div>\n                        </div>\n                      }\n                      right={\n                        <Button\n                          variant=\"secondary\"\n                          className=\"rounded-md shadow-md bg-purple-500 hover:bg-purple-600 text-white transition cursor-pointer min-h-[44px] px-4\"\n                          aria-label={`查看变更 ${c.id}`}\n                        >\n                          详情\n                        </Button>\n                      }\n                      className=\"rounded-md border border-gray-200 bg-white\"\n                    />\n                  ))}\n                </div>\n              </CardContent>\n\n              <CardFooter className=\"p-4 pt-2\">\n                <div className=\"w-full flex items-center justify-between gap-3\">\n                  <div className=\"text-sm text-gray-600\">显示 1–5 / 42</div>\n                  <Button\n                    className=\"rounded-md shadow-md bg-blue-500 hover:bg-blue-600 transition cursor-pointer min-h-[44px] px-4\"\n                    aria-label=\"加载更多变更\"\n                  >\n                    加载更多\n                  </Button>\n                </div>\n              </CardFooter>\n            </Card>\n\n            <Card className=\"mt-4 bg-white rounded-lg shadow-sm border border-gray-200\">\n              <CardHeader className=\"p-4\">\n                <CardTitle className=\"text-gray-900 text-base font-semibold\">审计与合规提醒</CardTitle>\n              </CardHeader>\n              <CardContent className=\"p-4 pt-0 space-y-3\">\n                <Alert className=\"rounded-md border border-gray-200 bg-white\">\n                  <div className=\"text-sm text-gray-700 whitespace-normal\">\n                    03-18 期间存在 2 条“待审批”变更，建议在变更窗口开始前完成审批与回滚预案确认。\n                  </div>\n                </Alert>\n                <Alert className=\"rounded-md border border-gray-200 bg-white\">\n                  <div className=\"text-sm text-gray-700 whitespace-normal\">\n                    本周安全基线未覆盖项 14 条：建议将“证书轮换策略”纳入统一登录与网关类资产的变更流程。\n                  </div>\n                </Alert>\n                <Alert className=\"rounded-md border border-gray-200 bg-white\">\n                  <div className=\"text-sm text-gray-700 whitespace-normal\">\n                    资产标签规范：生产环境资产需补全“系统归属、等级、数据分类”三个字段，便于审计抽查。\n                  </div>\n                </Alert>\n              </CardContent>\n              <CardFooter className=\"p-4 pt-2\">\n                <Button\n                  variant=\"secondary\"\n                  className=\"w-full rounded-md shadow-md bg-purple-500 hover:bg-purple-600 text-white transition cursor-pointer min-h-[44px]\"\n                  aria-label=\"查看合规指引\"\n                >\n                  查看合规指引\n                </Button>\n              </CardFooter>\n            </Card>\n          </TabsContent>\n\n          <div className=\"mt-6\" />\n        </div>\n      </main>\n\n      <BottomNav className=\"bg-white border-t border-gray-200\">\n        <BottomNavItem label=\"总览\" active />\n        <BottomNavItem label=\"资产\" />\n        <BottomNavItem label=\"告警\" />\n        <BottomNavItem label=\"我的\" />\n      </BottomNav>\n    </div>\n  );\n}","title":"资产总览","isHtml":false}];
 
           console.log('📊 [mountComponents] Found ' + nodesWithCode.length + ' nodes with UI code');
           

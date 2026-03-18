@@ -170,10 +170,10 @@ export async function mockCallObject<T extends z.ZodTypeAny>(params: {
 
   await new Promise(resolve => setTimeout(resolve, 10 + Math.random() * 40));
 
-  // For generateGraph, return a simple graph structure
-  if (params.actionName?.includes('generateGraph') || params.actionName?.includes('analyzeInputClarity')) {
-    // Return a mock graph structure
+  // For generateGraph, return GraphResultSchema shape (type + global + nodes + edges)
+  if (params.actionName?.includes('generateGraph')) {
     const mockGraphData = {
+      type: 'graph_generated' as const,
       global: {
         userJourneys: [
           {
@@ -214,10 +214,21 @@ export async function mockCallObject<T extends z.ZodTypeAny>(params: {
             consumesEvent: [],
           },
         },
+        {
+          id: 'page_2',
+          type: 'page',
+          pageType: 'View',
+          label: '详情页',
+          description: '展示详情',
+          userStories: [],
+          businessContext: { domain: '', role: '用户', goal: '查看' },
+          dataQueries: [],
+          traceability: {},
+        },
       ],
-      edges: [],
+      edges: [{ source: 'page_1', target: 'page_2', label: '查看详情' }],
     } as z.infer<T>;
-    
+
     return {
       ok: true,
       data: mockGraphData,
@@ -230,6 +241,23 @@ export async function mockCallObject<T extends z.ZodTypeAny>(params: {
     };
   }
   
+  if (params.actionName === 'nodeEditSpecUserChat') {
+    const mockSpec = {
+      kind: 'updated' as const,
+      title: 'Mock 页面',
+      requirements: [
+        'Mock：根据当前说明与附件整理的需求条目一',
+        'Mock：需求条目二（关闭 LLM_MOCK 后由真实模型生成）',
+      ],
+    } as z.infer<T>;
+    return {
+      ok: true,
+      data: mockSpec,
+      raw: JSON.stringify(mockSpec),
+      metrics: { queuedMs: 0, dedupHit: false, totalMs: 20 },
+    };
+  }
+
   // For InputClarityAnalysis, return high confidence
   if (params.actionName?.includes('analyzeInputClarity') || (params.schema as { shape?: { confidence?: unknown } })?.shape?.confidence) {
     const mockAnalysis = {

@@ -24,10 +24,166 @@ import type {
 import { getLayoutedElements, DEFAULT_NODE_WIDTH, DEFAULT_NODE_HEIGHT } from '@/lib/layout';
 import type { UIThemeConfig, StylePresetId } from '@/types/theme';
 import { defaultTheme, STYLE_PRESET_IDS } from '@/types/theme';
+import {
+  type DesignSystemSnapshot,
+  safeParseDesignSystemSnapshot,
+} from '@/types/design-system-snapshot';
 import { preview } from '@/lib/safe/preview';
 import { log, logError, logWarn } from '@/lib/logger';
 
 type BlueprintTabType = 'profile' | 'business' | 'interaction' | 'data' | 'topology' | 'rules' | 'events' | 'userStories';
+
+/** 工具栏「保存项目」JSON v3：设计系统 + 项目画像/规则/风格/主题（v2 仍可读） */
+export type CanvasProjectFileExport = {
+  canvasExportVersion: 3;
+  nodes: FractalNode[];
+  edges: Edge[];
+  designSystemSnapshot: DesignSystemSnapshot | null;
+  designSystemLocked: boolean;
+  projectMeta: ProjectMeta;
+  globalRules: GlobalRules;
+  stylePreset: StylePresetId;
+  viewportPreset: 'mobile' | 'desktop';
+  aiConfig: AIConfig;
+  currentTheme: UIThemeConfig;
+};
+
+export type CanvasProjectFileInput = {
+  nodes: FractalNode[];
+  edges: Edge[];
+  canvasExportVersion?: number;
+  designSystemSnapshot?: unknown;
+  designSystemLocked?: boolean;
+  projectMeta?: unknown;
+  globalRules?: unknown;
+  stylePreset?: string;
+  viewportPreset?: string;
+  aiConfig?: unknown;
+  currentTheme?: unknown;
+};
+
+function parseProjectMetaFromFile(raw: unknown): ProjectMeta | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const s = (k: string) => (typeof o[k] === 'string' ? (o[k] as string) : undefined);
+  return {
+    projectName:
+      typeof o.projectName === 'string' && o.projectName.trim() ? o.projectName : '未命名项目',
+    industry: s('industry') ?? '',
+    targetAudience: s('targetAudience') ?? '',
+    description: s('description') ?? '',
+    version: s('version') ?? '1.0.0',
+    applicationScope: s('applicationScope'),
+    coreObjectScale: s('coreObjectScale'),
+    keyRequiredFunctions: s('keyRequiredFunctions'),
+    integratedSystems: s('integratedSystems'),
+    complianceConstraints: s('complianceConstraints'),
+    rolesAndPermissions: s('rolesAndPermissions'),
+  };
+}
+
+function parseGlobalRulesFromFile(raw: unknown): GlobalRules | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const str = (k: keyof GlobalRules) => (typeof o[k] === 'string' ? (o[k] as string) : '');
+  return {
+    performance: str('performance'),
+    security: str('security'),
+    compatibility: str('compatibility'),
+    errorHandling: str('errorHandling'),
+    dataTracking: str('dataTracking'),
+  };
+}
+
+function parseAIConfigFromFile(raw: unknown, fallback: AIConfig): AIConfig | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  return {
+    visionModel: typeof o.visionModel === 'string' ? o.visionModel : fallback.visionModel,
+    textModel: typeof o.textModel === 'string' ? o.textModel : fallback.textModel,
+  };
+}
+
+function parseThemeFromFile(raw: unknown): UIThemeConfig | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Partial<UIThemeConfig>;
+  if (typeof r.vibe !== 'string') return null;
+  const dc = defaultTheme.colors;
+  const rc = r.colors;
+  const bg = rc?.background;
+  const tx = rc?.text;
+  return {
+    colors: {
+      primary: typeof rc?.primary === 'string' ? rc.primary : dc.primary,
+      secondary: typeof rc?.secondary === 'string' ? rc.secondary : dc.secondary,
+      background: {
+        light: bg && typeof bg === 'object' && typeof bg.light === 'string' ? bg.light : dc.background.light,
+        dark: bg && typeof bg === 'object' && typeof bg.dark === 'string' ? bg.dark : dc.background.dark,
+      },
+      surface: typeof rc?.surface === 'string' ? rc.surface : dc.surface,
+      text: {
+        primary: tx && typeof tx === 'object' && typeof tx.primary === 'string' ? tx.primary : dc.text.primary,
+        secondary: tx && typeof tx === 'object' && typeof tx.secondary === 'string' ? tx.secondary : dc.text.secondary,
+      },
+      border: typeof rc?.border === 'string' ? rc.border : dc.border,
+    },
+    shape: {
+      borderRadius: {
+        sm: r.shape?.borderRadius?.sm ?? defaultTheme.shape.borderRadius.sm,
+        md: r.shape?.borderRadius?.md ?? defaultTheme.shape.borderRadius.md,
+        lg: r.shape?.borderRadius?.lg ?? defaultTheme.shape.borderRadius.lg,
+        full: r.shape?.borderRadius?.full ?? defaultTheme.shape.borderRadius.full,
+      },
+      borderWidth: r.shape?.borderWidth ?? defaultTheme.shape.borderWidth,
+    },
+    typography: {
+      fontFamily: r.typography?.fontFamily ?? defaultTheme.typography.fontFamily,
+      baseSize: r.typography?.baseSize ?? defaultTheme.typography.baseSize,
+      density: r.typography?.density ?? defaultTheme.typography.density,
+    },
+    shadows: {
+      cardShadow: r.shadows?.cardShadow ?? defaultTheme.shadows.cardShadow,
+      buttonShadow: r.shadows?.buttonShadow ?? defaultTheme.shadows.buttonShadow,
+    },
+    vibe: r.vibe,
+  };
+}
+
+function emptyV3ProjectExport(): CanvasProjectFileExport {
+  const vision =
+    typeof process !== 'undefined' && process.env.NEXT_PUBLIC_AI_VISION_MODEL
+      ? process.env.NEXT_PUBLIC_AI_VISION_MODEL
+      : 'gpt-5.1-chat-2025-11-13';
+  const text =
+    typeof process !== 'undefined' && process.env.NEXT_PUBLIC_AI_TEXT_MODEL
+      ? process.env.NEXT_PUBLIC_AI_TEXT_MODEL
+      : 'gpt-5.1-chat-2025-11-13';
+  return {
+    canvasExportVersion: 3,
+    nodes: [],
+    edges: [],
+    designSystemSnapshot: null,
+    designSystemLocked: false,
+    projectMeta: {
+      projectName: '未命名项目',
+      industry: '通用互联网',
+      targetAudience: '通用用户',
+      description: '',
+      version: '1.0.0',
+    },
+    globalRules: {
+      performance: '',
+      security: '',
+      compatibility: '',
+      errorHandling: '',
+      dataTracking: '',
+    },
+    stylePreset: 'neutral',
+    viewportPreset: 'mobile',
+    aiConfig: { visionModel: vision, textModel: text },
+    currentTheme: JSON.parse(JSON.stringify(defaultTheme)) as UIThemeConfig,
+  };
+}
 
 /** 澄清选项（AI 追问时的可选项） */
 export interface ClarificationOption {
@@ -99,8 +255,8 @@ interface CanvasStore extends CanvasState {
   addChildNode: () => void; // 添加子节点（Tab 快捷键）
   addSiblingNode: () => void; // 添加同级节点（Enter 快捷键）
   clearCanvas: () => void;
-  loadProject: (data: { nodes: FractalNode[]; edges: Edge[] }) => void;
-  exportProject: () => { nodes: FractalNode[]; edges: Edge[] };
+  loadProject: (data: CanvasProjectFileInput) => void;
+  exportProject: () => CanvasProjectFileExport;
   // Theme Management
   setTheme: (theme: UIThemeConfig) => void;
   // Global Rules Management
@@ -116,6 +272,38 @@ interface CanvasStore extends CanvasState {
   /** 选择平台并锁定：之后全局不再显示移动/桌面切换 */
   lockViewport: (preset: 'mobile' | 'desktop') => void;
   setStylePreset: (preset: StylePresetId) => void;
+  /** 智能推荐生成的设计系统快照（可锁定复用） */
+  designSystemSnapshot: DesignSystemSnapshot | null;
+  designSystemLocked: boolean;
+  /** 最近的设计系统快照历史（用于回退），越新越靠前 */
+  designSystemHistory: DesignSystemSnapshot[];
+  /** 设计系统解析状态机（UX：可决策、可恢复） */
+  designSystemResolveState: {
+    status: 'idle' | 'resolving' | 'succeeded' | 'failed';
+    engine?: 'auto' | 'ts' | 'python' | 'llm';
+    message?: string;
+    suggestedNext?: Array<'ts' | 'llm' | 'python' | 'auto'>;
+    updatedAt?: string;
+  };
+  /** 兼容/迁移用途：不要在业务代码里直接调用 */
+  __unsafeSetDesignSystemSnapshot: (s: DesignSystemSnapshot | null) => void;
+  setDesignSystemLocked: (locked: boolean) => void;
+  /** 单一写入点：提交设计系统快照（入栈历史 + 更新状态机 + 可选锁定策略） */
+  commitDesignSystemSnapshot: (args: {
+    snapshot: DesignSystemSnapshot | null;
+    reason: 'ui_generate' | 'resolve_api' | 'manual_reset' | 'rollback';
+    engine?: 'auto' | 'ts' | 'python' | 'llm';
+    lockAfter?: boolean;
+    message?: string;
+  }) => void;
+  /** 单一写入点：清空/重置设计系统（解锁+清空+状态机） */
+  resetDesignSystem: (args?: { message?: string }) => void;
+  rollbackDesignSystemSnapshot: () => void;
+  setDesignSystemResolveState: (
+    next: Partial<CanvasStore['designSystemResolveState']> & {
+      status: CanvasStore['designSystemResolveState']['status'];
+    }
+  ) => void;
   // 对话窗口（Stitch 风格）与澄清
   conversationPanelOpen: boolean;
   conversationMessages: ConversationMessage[];
@@ -137,6 +325,14 @@ interface CanvasStore extends CanvasState {
   /** 首页触发生成时的附件（与 pendingCreatePrompt 同时使用） */
   pendingCreateMedia: { mediaBase64: string; mediaType: 'image' | 'video' } | null;
   setPendingCreateMedia: (v: { mediaBase64: string; mediaType: 'image' | 'video' } | null) => void;
+  /** 节点编辑页当前 Tab：UI/需求/实现/测试，画布或未开详情时为 null */
+  nodeEditActiveTab: 'view' | 'spec' | 'impl' | 'test' | null;
+  setNodeEditActiveTab: (t: 'view' | 'spec' | 'impl' | 'test' | null) => void;
+  /** 需求 Tab 多轮澄清会话 */
+  nodeEditSpecClarify: { nodeId: string; rounds: string[] } | null;
+  setNodeEditSpecClarify: (v: { nodeId: string; rounds: string[] } | null) => void;
+  pendingNodeEditSpecFollowUp: { nodeId: string; rounds: string[] } | null;
+  setPendingNodeEditSpecFollowUp: (v: { nodeId: string; rounds: string[] } | null) => void;
 }
 
 /** 为节点补全 width/height，避免生产环境首帧 ResizeObserver 未就绪时边连接点错位（连线与节点视觉脱节） */
@@ -246,7 +442,7 @@ export const useCanvasStore = create<CanvasStore>()(
           addSiblingNode: () => {},
           clearCanvas: () => {},
           loadProject: () => {},
-          exportProject: () => ({ nodes: [], edges: [] }),
+          exportProject: () => emptyV3ProjectExport(),
           setTheme: () => {},
           updateGlobalRules: () => {},
           updateProjectMeta: () => {},
@@ -256,6 +452,16 @@ export const useCanvasStore = create<CanvasStore>()(
           setViewportPreset: () => {},
           lockViewport: () => {},
           setStylePreset: () => {},
+          designSystemSnapshot: null,
+          designSystemLocked: false,
+          designSystemHistory: [],
+          designSystemResolveState: { status: 'idle' },
+          __unsafeSetDesignSystemSnapshot: () => {},
+          setDesignSystemLocked: () => {},
+          commitDesignSystemSnapshot: () => {},
+          resetDesignSystem: () => {},
+          rollbackDesignSystemSnapshot: () => {},
+          setDesignSystemResolveState: () => {},
           conversationPanelOpen: true,
           conversationMessages: [],
           pendingClarificationContext: null,
@@ -273,6 +479,12 @@ export const useCanvasStore = create<CanvasStore>()(
           pendingCreateMedia: null,
           setPendingCreateMedia: () => {},
           setAiCreatePending: () => {},
+          nodeEditActiveTab: null,
+          setNodeEditActiveTab: () => {},
+          nodeEditSpecClarify: null,
+          setNodeEditSpecClarify: () => {},
+          pendingNodeEditSpecFollowUp: null,
+          setPendingNodeEditSpecFollowUp: () => {},
           currentTheme: defaultTheme,
           stylePreset: 'neutral',
           projectMeta: {
@@ -402,6 +614,9 @@ export const useCanvasStore = create<CanvasStore>()(
         blueprintInitialTab: undefined,
         blueprintInitialData: undefined,
         conversationPanelOpen: true,
+        nodeEditActiveTab: null,
+        nodeEditSpecClarify: null,
+        pendingNodeEditSpecFollowUp: null,
         conversationMessages: [],
         pendingClarificationContext: null,
         pendingClarificationReply: null,
@@ -413,8 +628,13 @@ export const useCanvasStore = create<CanvasStore>()(
         projectMeta: initialProjectMeta,
         globalRules: initialGlobalRules,
         aiConfig: initialAIConfig,
+        designSystemSnapshot: null,
+        designSystemLocked: false,
+        designSystemHistory: [],
+        designSystemResolveState: { status: 'idle' },
 
         // Actions
+        // design system write operations are centralized below (single write point)
   addNode: (node: FractalNode) => {
     set((state) => {
       // 1. Check if there's a selected node
@@ -953,6 +1173,9 @@ export const useCanvasStore = create<CanvasStore>()(
     set({
       isDetailPanelOpen: false,
       selectedNodeId: null, // Clear selection when closing panel
+      nodeEditActiveTab: null,
+      nodeEditSpecClarify: null,
+      pendingNodeEditSpecFollowUp: null,
     });
   },
 
@@ -1274,16 +1497,80 @@ export const useCanvasStore = create<CanvasStore>()(
       edges: [],
       selectedNodeId: null,
       isDetailPanelOpen: false,
+      designSystemSnapshot: null,
+      designSystemLocked: false,
     });
   },
 
-  loadProject: (data: { nodes: FractalNode[]; edges: Edge[] }) => {
-    set({
+  loadProject: (data) => {
+    const base = {
       nodes: (data.nodes || []).map(ensureNodeDimensions),
       edges: data.edges || [],
-      selectedNodeId: null,
+      selectedNodeId: null as string | null,
       isDetailPanelOpen: false,
-    });
+    };
+    const isV3 = data.canvasExportVersion === 3;
+    const presetIds = STYLE_PRESET_IDS as readonly string[];
+
+    if (isV3) {
+      const fb = get?.()?.aiConfig ?? initialAIConfig;
+      const stylePreset: StylePresetId =
+        typeof data.stylePreset === 'string' && presetIds.includes(data.stylePreset)
+          ? (data.stylePreset as StylePresetId)
+          : 'neutral';
+      let designSystemSnapshot: DesignSystemSnapshot | null = null;
+      let designSystemLocked = false;
+      if (stylePreset !== 'auto') {
+        designSystemSnapshot = null;
+        designSystemLocked = false;
+      } else if (
+        !Object.prototype.hasOwnProperty.call(data, 'designSystemSnapshot') ||
+        data.designSystemSnapshot == null
+      ) {
+        designSystemSnapshot = null;
+        designSystemLocked = false;
+      } else {
+        const p = safeParseDesignSystemSnapshot(data.designSystemSnapshot);
+        if (p.ok) {
+          designSystemSnapshot = p.data;
+          designSystemLocked = data.designSystemLocked === true;
+        }
+      }
+      set((state) => ({
+        ...state,
+        ...base,
+        projectMeta: parseProjectMetaFromFile(data.projectMeta) ?? initialProjectMeta,
+        globalRules: parseGlobalRulesFromFile(data.globalRules) ?? initialGlobalRules,
+        stylePreset,
+        viewportPreset: data.viewportPreset === 'desktop' ? 'desktop' : 'mobile',
+        aiConfig: parseAIConfigFromFile(data.aiConfig, fb) ?? fb,
+        currentTheme: parseThemeFromFile(data.currentTheme) ?? defaultTheme,
+        designSystemSnapshot,
+        designSystemLocked,
+      }));
+      return;
+    }
+
+    const patch: typeof base & {
+      designSystemSnapshot?: DesignSystemSnapshot | null;
+      designSystemLocked?: boolean;
+    } = { ...base };
+    if (Object.prototype.hasOwnProperty.call(data, 'designSystemSnapshot')) {
+      if (data.designSystemSnapshot == null) {
+        patch.designSystemSnapshot = null;
+        patch.designSystemLocked = false;
+      } else {
+        const p = safeParseDesignSystemSnapshot(data.designSystemSnapshot);
+        if (p.ok) {
+          patch.designSystemSnapshot = p.data;
+          patch.designSystemLocked = data.designSystemLocked === true;
+        } else {
+          patch.designSystemSnapshot = null;
+          patch.designSystemLocked = false;
+        }
+      }
+    }
+    set(patch);
   },
 
   exportProject: () => {
@@ -1291,15 +1578,24 @@ export const useCanvasStore = create<CanvasStore>()(
       const state = get?.();
       if (state == null) {
         console.warn('Canvas store getState not available in exportProject');
-        return { nodes: [], edges: [] };
+        return emptyV3ProjectExport();
       }
       return {
-        nodes: state?.nodes || [],
-        edges: state?.edges || [],
+        canvasExportVersion: 3 as const,
+        nodes: state.nodes || [],
+        edges: state.edges || [],
+        designSystemSnapshot: state.designSystemSnapshot ?? null,
+        designSystemLocked: state.designSystemLocked ?? false,
+        projectMeta: { ...state.projectMeta },
+        globalRules: { ...state.globalRules },
+        stylePreset: state.stylePreset,
+        viewportPreset: state.viewportPreset,
+        aiConfig: { ...state.aiConfig },
+        currentTheme: JSON.parse(JSON.stringify(state.currentTheme)) as UIThemeConfig,
       };
     } catch (error) {
       console.error('Error in exportProject:', error);
-      return { nodes: [], edges: [] };
+      return emptyV3ProjectExport();
     }
   },
 
@@ -1309,8 +1605,69 @@ export const useCanvasStore = create<CanvasStore>()(
   },
 
   setStylePreset: (preset: StylePresetId) => {
-    set({ stylePreset: preset });
+    set((state) => ({
+      stylePreset: preset,
+      ...(preset !== 'auto' ? { designSystemLocked: false } : {}),
+    }));
   },
+
+  __unsafeSetDesignSystemSnapshot: (s) => set({ designSystemSnapshot: s }),
+  setDesignSystemLocked: (locked) =>
+    set((state) => ({
+      designSystemLocked: locked && state.designSystemSnapshot != null ? locked : false,
+    })),
+  commitDesignSystemSnapshot: (args) =>
+    set((state) => {
+      const nextHistory =
+        state.designSystemSnapshot != null
+          ? [state.designSystemSnapshot, ...(state.designSystemHistory ?? [])].slice(0, 10)
+          : state.designSystemHistory ?? [];
+      const lockAfter = args.lockAfter === true;
+      return {
+        designSystemSnapshot: args.snapshot,
+        designSystemHistory: nextHistory,
+        designSystemLocked: lockAfter && args.snapshot != null ? true : false,
+        designSystemResolveState: {
+          status: args.snapshot != null ? 'succeeded' : 'idle',
+          engine: args.engine,
+          message: args.message,
+          suggestedNext: [],
+          updatedAt: new Date().toISOString(),
+        },
+      };
+    }),
+  resetDesignSystem: (args) =>
+    set((state) => ({
+      designSystemSnapshot: null,
+      designSystemLocked: false,
+      designSystemResolveState: {
+        status: 'idle',
+        engine: undefined,
+        message: args?.message ?? 'reset',
+        suggestedNext: [],
+        updatedAt: new Date().toISOString(),
+      },
+      designSystemHistory: state.designSystemHistory ?? [],
+    })),
+  rollbackDesignSystemSnapshot: () =>
+    set((state) => {
+      const prev = (state.designSystemHistory ?? [])[0];
+      if (!prev) return {};
+      const rest = (state.designSystemHistory ?? []).slice(1);
+      return {
+        designSystemSnapshot: prev,
+        designSystemHistory: rest,
+        designSystemLocked: state.designSystemLocked && prev != null ? true : false,
+      };
+    }),
+  setDesignSystemResolveState: (next) =>
+    set((state) => ({
+      designSystemResolveState: {
+        ...state.designSystemResolveState,
+        ...next,
+        updatedAt: new Date().toISOString(),
+      },
+    })),
 
   // Project Meta Management
   updateProjectMeta: (meta: Partial<ProjectMeta>) => {
@@ -1396,11 +1753,16 @@ export const useCanvasStore = create<CanvasStore>()(
   setPendingClarificationReply: (reply: string | null) => {
     set({ pendingClarificationReply: reply });
   },
+  setNodeEditActiveTab: (t) => set({ nodeEditActiveTab: t }),
+  setNodeEditSpecClarify: (v) => set({ nodeEditSpecClarify: v }),
+  setPendingNodeEditSpecFollowUp: (v) => set({ pendingNodeEditSpecFollowUp: v }),
   clearConversation: () => {
     set({
       conversationMessages: [],
       pendingClarificationContext: null,
       pendingClarificationReply: null,
+      nodeEditSpecClarify: null,
+      pendingNodeEditSpecFollowUp: null,
     });
   },
   setAiCreatePending: (v: boolean) => {
@@ -1426,15 +1788,19 @@ export const useCanvasStore = create<CanvasStore>()(
         globalRules: state.globalRules,
         aiConfig: state.aiConfig,
         viewportPreset: state.viewportPreset,
-        viewportLocked: state.viewportLocked,
+        designSystemSnapshot: state.designSystemSnapshot,
+        designSystemLocked: state.designSystemLocked,
+        // 不持久化 viewportLocked：刷新后以 viewportPreset 为准，避免上次「Web」导致本次选「应用」仍显示桌面端
         // 不持久化 selectedNodeId，每次刷新时重置
       }) as any,
       // 跳过 SSR 时的 hydration
       skipHydration: true, // 手动控制 hydration，避免阻塞
-      // 添加存储检查，防止在服务器端或 localStorage 不可用时出错
-      // 必须始终提供 storage 对象，否则 persist 会调用 undefined.get/getItem 报错
-      storage: (typeof window !== 'undefined' && window.localStorage)
-        ? {
+      // 必须始终提供有效的 storage 对象（含 getItem/setItem/removeItem），否则 persist 内部可能报错 "reading 'get'"
+      storage: (() => {
+        if (typeof window === 'undefined' || !window.localStorage) {
+          return { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+        }
+        return {
         getItem: (name: string) => {
           try {
             if (typeof window === 'undefined' || !window.localStorage) return null;
@@ -1509,12 +1875,8 @@ export const useCanvasStore = create<CanvasStore>()(
             console.warn('Failed to remove item from localStorage:', error);
           }
         },
-      } as any
-        : {
-            getItem: () => null,
-            setItem: () => {},
-            removeItem: () => {},
-          },
+      };
+      })(),
       // 添加版本控制，如果数据结构改变，清除旧数据
       version: 1,
       migrate: (persistedState: any, version: number) => {
@@ -1560,6 +1922,15 @@ export const useCanvasStore = create<CanvasStore>()(
           }
           if (persistedState.viewportLocked !== undefined && persistedState.viewportLocked !== null && !['mobile', 'desktop'].includes(persistedState.viewportLocked)) {
             persistedState.viewportLocked = null;
+          }
+          if (persistedState.designSystemSnapshot === undefined) {
+            persistedState.designSystemSnapshot = null;
+          }
+          if (persistedState.designSystemLocked === undefined) {
+            persistedState.designSystemLocked = false;
+          }
+          if (persistedState.designSystemLocked && !persistedState.designSystemSnapshot) {
+            persistedState.designSystemLocked = false;
           }
         }
 

@@ -1,18 +1,50 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { FilePlus, Save, FolderOpen, PlusSquare, BookOpen, Download, ChevronDown, Globe, FileText, FileCode, ClipboardList, TestTube2, Cpu, BookMarked } from 'lucide-react';
+import {
+  FilePlus,
+  Save,
+  FolderOpen,
+  PlusSquare,
+  BookOpen,
+  Download,
+  ChevronDown,
+  Globe,
+  FileText,
+  FileCode,
+  ClipboardList,
+  TestTube2,
+  Cpu,
+  BookMarked,
+  Sparkles,
+} from 'lucide-react';
 import { useCanvasStore } from '@/store/canvas-store';
 import { ProjectBlueprint } from './ProjectBlueprint';
+import { DesignSystemReadOnlyPanel } from './DesignSystemReadOnlyPanel';
 import { toast } from 'sonner';
-import { exportToFullPrdHtml, exportToWord, exportTestReport, exportSystemDesignDoc, exportUserManual } from '@/utils/prdGenerator';
 import { exportToEnterpriseWord } from '@/utils/wordGenerator';
 import { captureNodePreviews } from '@/utils/capture-node-preview';
 import { isHtmlCode } from '@/utils/html-body-extractor';
 export function ProjectToolbar() {
-  const { clearCanvas, exportProject, loadProject, addBlankNode, isDetailPanelOpen, nodes, edges, projectMeta, globalRules, selectedNodeId, updateNodeData } = useCanvasStore();
+  const {
+    clearCanvas,
+    exportProject,
+    loadProject,
+    addBlankNode,
+    isDetailPanelOpen,
+    nodes,
+    edges,
+    projectMeta,
+    globalRules,
+    selectedNodeId,
+    updateNodeData,
+    designSystemSnapshot,
+    designSystemLocked,
+    stylePreset,
+  } = useCanvasStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isBlueprintOpen, setIsBlueprintOpen] = useState(false);
+  const [isDesignSystemPanelOpen, setIsDesignSystemPanelOpen] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
@@ -117,8 +149,9 @@ export function ProjectToolbar() {
       e.stopPropagation();
     }
 
-    // 检查是否有选中的节点
-    const { selectedNodeId } = useCanvasStore.getState();
+    // 检查是否有选中的节点（getState 在 store 未就绪时可能不可用）
+    const state = typeof useCanvasStore?.getState === 'function' ? useCanvasStore.getState() : null;
+    const selectedNodeId = state?.selectedNodeId ?? null;
     if (!selectedNodeId) {
       toast.warning('请先选择一个节点作为父节点');
       return;
@@ -174,6 +207,7 @@ export function ProjectToolbar() {
         ? await captureNodePreviews(nodePreviewInputs, { timeoutPerNode: 10000, concurrency: 1 })
         : undefined;
       toast.dismiss(toastId);
+      const { exportToFullPrdHtml } = await import('@/utils/prdGenerator');
       await exportToFullPrdHtml({
         projectMeta,
         globalRules,
@@ -184,6 +218,8 @@ export function ProjectToolbar() {
         topologyImage: undefined,
         swimlaneChart: undefined,
         dataDictionary: undefined,
+        designSystemSnapshot: designSystemSnapshot ?? undefined,
+        designSystemLocked,
       });
       toast.success('Full PRD HTML 导出成功！');
     } catch (error) {
@@ -199,6 +235,7 @@ export function ProjectToolbar() {
     setIsExportMenuOpen(false);
     try {
       const markdown = await generatePRDMarkdown();
+      const { exportToWord } = await import('@/utils/prdGenerator');
       await exportToWord({
         projectMeta,
         markdownContent: markdown,
@@ -246,6 +283,7 @@ export function ProjectToolbar() {
   const handleExportTestReport = async () => {
     setIsExportMenuOpen(false);
     try {
+      const { exportTestReport } = await import('@/utils/prdGenerator');
       await exportTestReport({ projectMeta, nodes });
       toast.success('测试报告导出成功！');
     } catch (error) {
@@ -259,6 +297,7 @@ export function ProjectToolbar() {
   const handleExportSystemDesign = async () => {
     setIsExportMenuOpen(false);
     try {
+      const { exportSystemDesignDoc } = await import('@/utils/prdGenerator');
       await exportSystemDesignDoc({ projectMeta, nodes });
       toast.success('系统设计说明导出成功！');
     } catch (error) {
@@ -272,6 +311,7 @@ export function ProjectToolbar() {
   const handleExportUserManual = async () => {
     setIsExportMenuOpen(false);
     try {
+      const { exportUserManual } = await import('@/utils/prdGenerator');
       await exportUserManual({ projectMeta, nodes });
       toast.success('使用说明书导出成功！');
     } catch (error) {
@@ -323,8 +363,8 @@ export function ProjectToolbar() {
   useEffect(() => {
     const checkPresentationMode = () => {
       // 检查是否有演示模式的遮罩层（通过 data 属性或 z-index）
-      const presentationOverlay = document.querySelector('[data-presentation-mode="true"]') || 
-                                  document.querySelector('[style*="z-index: 10000"], [style*="z-[10000"], [style*="zIndex: 10000"]');
+      // 仅用 data 标记；勿用 style 含「10000」匹配（会误伤 z-index:10001、10020 等内联样式子串）
+      const presentationOverlay = document.querySelector('[data-presentation-mode="true"]');
       const isActive = !!presentationOverlay;
       setIsPresentationMode(isActive);
       
@@ -443,6 +483,20 @@ export function ProjectToolbar() {
           <BookOpen className="w-4 h-4" />
         </button>
 
+        <button
+          type="button"
+          onClick={() => setIsDesignSystemPanelOpen(true)}
+          className={`p-2 rounded-md transition-colors duration-150 focus-ring ${
+            designSystemSnapshot
+              ? 'text-cyan-400 hover:text-cyan-300 hover:bg-zinc-800'
+              : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+          }`}
+          title="查看当前设计系统（只读）"
+          aria-label="设计系统只读面板"
+        >
+          <Sparkles className="w-4 h-4" />
+        </button>
+
         {/* Separator */}
         <div className="w-px h-6 bg-zinc-700 mx-1" />
 
@@ -528,6 +582,16 @@ export function ProjectToolbar() {
         <ProjectBlueprint
           isOpen={isBlueprintOpen}
           onClose={() => setIsBlueprintOpen(false)}
+        />
+      )}
+
+      {isDesignSystemPanelOpen && (
+        <DesignSystemReadOnlyPanel
+          isOpen={isDesignSystemPanelOpen}
+          onClose={() => setIsDesignSystemPanelOpen(false)}
+          snapshot={designSystemSnapshot}
+          designSystemLocked={designSystemLocked}
+          stylePreset={stylePreset ?? 'neutral'}
         />
       )}
     </div>

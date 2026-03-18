@@ -16,35 +16,40 @@
   <script src="https://unpkg.com/gsap@3.12.2/dist/gsap.min.js"></script>
   <script src="https://unpkg.com/gsap@3.12.2/dist/ScrollTrigger.min.js"></script>
   <script>
-    tailwind.config = {
-      dark: 'class',
-      theme: {
-        extend: {
-          colors: {
-            deep: { DEFAULT: '#0b0f19', 950: '#070a12' },
-            cosmos: {
-              400: '#22d3ee',
-              500: '#0ea5e9',
-              600: '#0284c7',
-              glow: 'rgba(14, 165, 233, 0.25)',
-              dim: 'rgba(14, 165, 233, 0.08)',
+    // 在 headless/离线环境下，CDN 可能不可达；避免因为 tailwind 全局缺失导致页面崩溃。
+    if (typeof tailwind !== 'undefined' && tailwind && typeof tailwind === 'object') {
+      tailwind.config = {
+        dark: 'class',
+        theme: {
+          extend: {
+            colors: {
+              deep: { DEFAULT: '#0b0f19', 950: '#070a12' },
+              cosmos: {
+                400: '#22d3ee',
+                500: '#0ea5e9',
+                600: '#0284c7',
+                glow: 'rgba(14, 165, 233, 0.25)',
+                dim: 'rgba(14, 165, 233, 0.08)',
+              },
+              violet: { 400: '#a78bfa', 500: '#8b5cf6' },
             },
-            violet: { 400: '#a78bfa', 500: '#8b5cf6' },
-          },
-          fontFamily: { display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'], body: ['"DM Sans"', 'system-ui', 'sans-serif'] },
-          animation: {
-            'fade-up': 'fadeUp 0.5s ease-out forwards',
-            'pulse-glow': 'pulseGlow 2.5s ease-in-out infinite',
-            'orb': 'orb 18s ease-in-out infinite',
-          },
-          keyframes: {
-            fadeUp: { '0%': { opacity: '0', transform: 'translateY(20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
-            pulseGlow: { '0%, 100%': { opacity: '0.6', boxShadow: '0 0 24px rgba(14,165,233,0.2)' }, '50%': { opacity: '1', boxShadow: '0 0 32px rgba(14,165,233,0.35)' } },
-            orb: { '0%, 100%': { transform: 'translate(0,0) scale(1)' }, '33%': { transform: 'translate(8%, -5%) scale(1.05)' }, '66%': { transform: 'translate(-5%, 5%) scale(0.98)' } },
+            fontFamily: { display: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'], body: ['"DM Sans"', 'system-ui', 'sans-serif'] },
+            animation: {
+              'fade-up': 'fadeUp 0.5s ease-out forwards',
+              'pulse-glow': 'pulseGlow 2.5s ease-in-out infinite',
+              'orb': 'orb 18s ease-in-out infinite',
+            },
+            keyframes: {
+              fadeUp: { '0%': { opacity: '0', transform: 'translateY(20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+              pulseGlow: { '0%, 100%': { opacity: '0.6', boxShadow: '0 0 24px rgba(14,165,233,0.2)' }, '50%': { opacity: '1', boxShadow: '0 0 32px rgba(14,165,233,0.35)' } },
+              orb: { '0%, 100%': { transform: 'translate(0,0) scale(1)' }, '33%': { transform: 'translate(8%, -5%) scale(1.05)' }, '66%': { transform: 'translate(-5%, 5%) scale(0.98)' } },
+            },
           },
         },
-      },
-    };
+      };
+    } else {
+      document.documentElement.classList.add('js-fallback');
+    }
   </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />

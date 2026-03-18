@@ -11,7 +11,7 @@ import type { ProjectMeta, GlobalRules } from '@/types/fractal';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    let { nodes, projectMeta, globalRules } = body;
+    let { nodes, projectMeta, globalRules, designSystemSnapshot, designSystemLocked } = body;
     if (!nodes || !Array.isArray(nodes) || nodes.length === 0) {
       return NextResponse.json({ ok: false, error: 'nodes 必填且为非空数组' }, { status: 400 });
     }
@@ -45,6 +45,8 @@ export async function POST(request: NextRequest) {
         dataTracking: rules.dataTracking ?? '',
       },
       nodes: normalizedNodes,
+      designSystemSnapshot,
+      designSystemLocked: designSystemLocked === true,
     });
     return NextResponse.json({ ok: true, html });
   } catch (error) {

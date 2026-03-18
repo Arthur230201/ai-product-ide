@@ -11,10 +11,41 @@
 import { spawn } from 'child_process';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { existsSync, readFileSync } from 'fs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 const outPath = join(root, 'scripts/iteration-reports/prd-artifacts/exported-prd.html');
+
+function loadEnvFileIfExists(filePath) {
+  try {
+    if (!existsSync(filePath)) return;
+    const raw = readFileSync(filePath, 'utf8');
+    for (const line of raw.split('\n')) {
+      const s = line.trim();
+      if (!s || s.startsWith('#')) continue;
+      const idx = s.indexOf('=');
+      if (idx <= 0) continue;
+      const k = s.slice(0, idx).trim();
+      let v = s.slice(idx + 1).trim();
+      if (!k) continue;
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) v = v.slice(1, -1);
+      if (!process.env[k] && v) process.env[k] = v;
+    }
+  } catch (_) {}
+}
+
+async function assertServerReachable(baseUrl) {
+  const url = baseUrl.replace(/\/$/, '') + '/';
+  for (let i = 0; i < 25; i += 1) {
+    try {
+      const r = await fetch(url, { method: 'GET' });
+      if (r.ok) return;
+    } catch (_) {}
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  throw new Error(`BASE_URL 不可达：${url}（请先启动应用，例如：npm run dev）`);
+}
 
 async function run(cmd, args, env = {}) {
   return new Promise((resolve, reject) => {
@@ -30,12 +61,39 @@ async function run(cmd, args, env = {}) {
 async function main() {
   const baseUrl = process.env.BASE_URL || process.argv[2] || 'http://localhost:3000';
   console.log('[run-full-flow] BASE_URL=', baseUrl);
+  // 兼容：脚本以 node 直接运行时不会自动加载 `.env.local`
+  loadEnvFileIfExists(join(root, '.env.local'));
+  loadEnvFileIfExists(join(root, '.env'));
+  if (!process.env.OPENAI_API_KEY || !String(process.env.OPENAI_API_KEY).trim()) {
+    console.error('[run-full-flow] 缺少 OPENAI_API_KEY：本脚本依赖真实 LLM 调用（见 e2e/full-flow-export-html.spec.ts）。');
+    process.exit(1);
+  }
+  try {
+    await assertServerReachable(baseUrl);
+  } catch (e) {
+    console.error('[run-full-flow]', e.message);
+    process.exit(1);
+  }
   console.log('[run-full-flow] Step 1: 执行 E2E 全流程（输入 -> 图 -> UI -> 增加交互 -> 导出 HTML）…');
 
   try {
-    await run('npx', ['playwright', 'test', 'e2e/full-flow-export-html.spec.ts', '--reporter=line'], {
-      BASE_URL: baseUrl,
-    });
+    await run(
+      'npx',
+      [
+        'playwright',
+        'test',
+        'e2e/full-flow-export-html.spec.ts',
+        '--config=playwright.fullflow.config.ts',
+        '--reporter=list',
+        '--retries=0',
+        '--workers=1',
+      ],
+      {
+        BASE_URL: baseUrl,
+        // 防止继承 CI=true 导致 playwright 自动重试，掩盖失败原因并拖慢反馈
+        CI: '',
+      }
+    );
   } catch (e) {
     console.error('[run-full-flow] E2E 失败:', e.message);
     process.exit(1);

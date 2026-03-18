@@ -4,27 +4,22 @@ import { asBlob } from 'html-docx-js-typescript';
 import type { ProjectMeta, GlobalRules } from '@/types/fractal';
 import type { FractalNode } from '@/types/fractal';
 import type { Edge } from 'reactflow';
-import { extractBodyContent, extractStylesFromHtml, isHtmlCode } from './html-body-extractor';
+import { extractBodyContent, extractStylesFromHtml, isHtmlCode, isPlaceholderUiCode } from './html-body-extractor';
 import { PREVIEW_UI_PRD_BUNDLE, PREVIEW_UI_PRD_BUNDLE_CALL } from '@/lib/preview-ui-prd-bundle.generated';
 import { MOBILE_VIEWPORT_WIDTH, MOBILE_VIEWPORT_HEIGHT, PC_VIEWPORT_WIDTH, PC_VIEWPORT_HEIGHT } from '@/lib/viewport-constants';
+import { DesignSystemSnapshotSchema } from '@/types/design-system-snapshot';
+import { formatDesignSystemPrdMarkdown } from '@/lib/design-system/format-design-system-prd-appendix';
 
-/** 判断是否为占位 UI 代码（无实际界面）。仅当为真实生成的功能 UI 时，「界面」步骤才视为已完成。 */
-export function isPlaceholderUiCode(code: string | undefined): boolean {
-  if (!code || !code.trim()) return true;
-  const t = code.trim();
-  if (t === '// PLACEHOLDER') return true;
-  if (/生成\s*UI\s*后将替换/.test(code)) return true;
-  if (code.length < 280 && /这是\s*[\s\S]*?\s*页面[\s\S]*?生成\s*UI/.test(code)) return true;
-  // 「这是 XXX 页面」类简单占位（无真实组件）
-  if (code.length < 520 && /这是\s*[\s\S]*?页面/.test(code) && !/Button|Card|Input|ListItem|AppBar|Sidebar|Dialog|Badge|StatCard|PageHeader|NavBar|TabsList|Separator|Progress|Alert|Avatar/.test(code)) return true;
-  // 空白节点模板（generateBlankNodeCode）：BlankPage + 居中 div
-  if (code.length < 700 && /BlankPage\s*\(\)/.test(code) && /border\s+border-gray-200\s+flex\s+items-center\s+justify-center/.test(code)) return true;
-  // fallback 图生成：function App() + 「这是 XXX 页面」、无真实组件
-  if (code.length < 700 && /function\s+App\s*\(\)/.test(code) && /这是\s*[\s\S]*?页面/.test(code) && !/Button|Card|Input|ListItem|AppBar|Sidebar|Dialog|Badge|StatCard|PageHeader|NavBar|TabsList|Separator|Progress|Alert|Avatar/.test(code)) return true;
-  // 仅标题 + 单一句子（如单行 p 标签）的极简模板，无列表/表单/卡片等
-  if (code.length < 600 && /<h1[^>]*>[\s\S]*?<\/h1>/.test(code) && !/<(ul|ol|table|form|input|select|textarea|button)[\s>]/.test(code) && !/Button|Card|Input|ListItem|AppBar|Sidebar|Dialog|Badge|StatCard|PageHeader|NavBar|TabsList|Separator|Progress|Alert|Avatar/.test(code)) return true;
-  return false;
+function buildDesignSystemAppendixForPrd(
+  snapshot: unknown,
+  locked: boolean
+): string | undefined {
+  const p = DesignSystemSnapshotSchema.safeParse(snapshot);
+  if (!p.success) return undefined;
+  return formatDesignSystemPrdMarkdown(p.data, locked);
 }
+
+export { isPlaceholderUiCode };
 
 // 1. 定义文档的样式 (打印友好 + 屏幕阅读友好)
 const STYLES = `
@@ -349,6 +344,8 @@ export interface FullPrdData {
   docs: {
     globalRules: string; // Markdown
     dictionary: string; // Markdown Table
+    /** 有快照时：PRD 第 2 章 2.3 设计系统附录 */
+    designSystemAppendix?: string;
   };
   nodes: PageNode[]; // 升级为 PageNode 数组
 }
@@ -360,6 +357,9 @@ export function generateFullPrdHtml(data: FullPrdData): string {
   // 1. Prepare Markdown Content
   const parsedGlobalRules = marked.parse(data.docs.globalRules || '*(暂无内容)*');
   const parsedDictionary = marked.parse(data.docs.dictionary || '*(暂无内容)*');
+  const parsedDesignSystem = data.docs.designSystemAppendix?.trim()
+    ? marked.parse(data.docs.designSystemAppendix)
+    : '';
 
   // 2. Logic to handle Topology (Image vs Code)
   const renderTopology = (content: string) => {
@@ -729,6 +729,9 @@ export function generateFullPrdHtml(data: FullPrdData): string {
             <a href="#version-control" class="block px-4 py-2 hover:bg-slate-800 rounded text-white font-medium">0. 版本记录</a>
             <a href="#ch1" class="block px-4 py-2 hover:bg-slate-800 rounded">1. 项目综述</a>
             <a href="#ch2" class="block px-4 py-2 hover:bg-slate-800 rounded">2. 全局规范</a>
+            ${data.docs.designSystemAppendix?.trim()
+              ? '<a href="#ch2-design-system" class="block px-4 py-1 hover:bg-slate-800 rounded truncate pl-8 text-xs text-slate-400">2.3 项目设计系统</a>'
+              : ''}
             <a href="#ch3" class="block px-4 py-2 hover:bg-slate-800 rounded">3. 系统架构</a>
             <a href="#ch4" class="block px-4 py-2 hover:bg-slate-800 rounded">4. 业务流程</a>
             <a href="#ch5" class="block px-4 py-2 hover:bg-slate-800 rounded">5. 功能详述</a>
@@ -811,6 +814,15 @@ export function generateFullPrdHtml(data: FullPrdData): string {
                 <div class="markdown-body text-sm bg-slate-50 p-4 rounded border">
                     ${parsedDictionary}
                 </div>
+                ${parsedDesignSystem
+                  ? `
+                <div id="ch2-design-system" class="mt-10 scroll-mt-20 prd-scroll-target"></div>
+                <h3>2.3 项目设计系统</h3>
+                <p class="text-sm text-slate-500 mb-2">由画布「智能推荐」生成的设计意图快照，随 PRD 一并导出供评审对齐。</p>
+                <div class="markdown-body text-sm bg-emerald-50/40 p-4 rounded border border-emerald-100">
+                    ${parsedDesignSystem}
+                </div>`
+                  : ''}
             </section>
 
             <section id="ch3" class="mb-20 scroll-mt-10 prd-scroll-target">
@@ -1436,8 +1448,23 @@ export const exportToFullPrdHtml = async (options: {
   topologyImage?: string; // Base64 或 Mermaid 交互拓扑图
   swimlaneChart?: string; // Mermaid 业务泳道图
   dataDictionary?: string; // Markdown 数据字典
+  /** 画布设计系统快照（与 store 一致） */
+  designSystemSnapshot?: unknown;
+  designSystemLocked?: boolean;
 }) => {
-  const { projectMeta, globalRules, nodes, edges = [], nodePreviewUrls, architectureImage, topologyImage, swimlaneChart, dataDictionary } = options;
+  const {
+    projectMeta,
+    globalRules,
+    nodes,
+    edges = [],
+    nodePreviewUrls,
+    architectureImage,
+    topologyImage,
+    swimlaneChart,
+    dataDictionary,
+    designSystemSnapshot,
+    designSystemLocked,
+  } = options;
 
   // 构建全局规则 Markdown（使用三级标题）
   const globalRulesMarkdown = `
@@ -1591,6 +1618,13 @@ ${globalRules.dataTracking || '（待补充）'}
     docs: {
       globalRules: globalRulesMarkdown,
       dictionary: dictionaryMarkdown,
+      ...(() => {
+        const ap = buildDesignSystemAppendixForPrd(
+          designSystemSnapshot,
+          designSystemLocked === true
+        );
+        return ap ? { designSystemAppendix: ap } : {};
+      })(),
     },
     nodes: nodeData,
   };
@@ -1615,8 +1649,21 @@ export async function buildFullPrdHtmlString(options: {
   topologyImage?: string;
   swimlaneChart?: string;
   dataDictionary?: string;
+  designSystemSnapshot?: unknown;
+  designSystemLocked?: boolean;
 }): Promise<string> {
-  const { projectMeta, globalRules, nodes, edges = [], architectureImage, topologyImage, swimlaneChart, dataDictionary } = options;
+  const {
+    projectMeta,
+    globalRules,
+    nodes,
+    edges = [],
+    architectureImage,
+    topologyImage,
+    swimlaneChart,
+    dataDictionary,
+    designSystemSnapshot,
+    designSystemLocked,
+  } = options;
   const globalRulesMarkdown = `
 ### 性能要求
 ${globalRules.performance || '（待补充）'}
@@ -1692,7 +1739,17 @@ ${globalRules.dataTracking || '（待补充）'}
     },
     images: { architecture: architectureImage, topology: topologyImage },
     charts: { swimlane: swimlaneChart },
-    docs: { globalRules: globalRulesMarkdown, dictionary: dictionaryMarkdown },
+    docs: {
+      globalRules: globalRulesMarkdown,
+      dictionary: dictionaryMarkdown,
+      ...(() => {
+        const ap = buildDesignSystemAppendixForPrd(
+          designSystemSnapshot,
+          designSystemLocked === true
+        );
+        return ap ? { designSystemAppendix: ap } : {};
+      })(),
+    },
     nodes: nodeData,
   };
   return generateFullPrdHtml(fullPrdData);

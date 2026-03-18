@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
-import { Upload, Palette, Check, Loader2, X } from 'lucide-react';
+import { Upload, Palette, Check, Loader2, X, Lock, RefreshCw } from 'lucide-react';
 import { useCanvasStore } from '@/store/canvas-store';
 import type { UIThemeConfig } from '@/types/theme';
 import { NAMED_STYLES, STYLE_PREVIEW } from '@/types/theme';
@@ -13,7 +13,17 @@ interface StyleExtractorProps {
 }
 
 export function StyleExtractor({ onClose }: StyleExtractorProps) {
-  const { currentTheme, setTheme, stylePreset, setStylePreset, aiConfig } = useCanvasStore();
+  const {
+    currentTheme,
+    setTheme,
+    stylePreset,
+    setStylePreset,
+    aiConfig,
+    designSystemSnapshot,
+    designSystemLocked,
+    setDesignSystemLocked,
+    resetDesignSystem,
+  } = useCanvasStore();
   const [previewTheme, setPreviewTheme] = useState<UIThemeConfig | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -268,6 +278,57 @@ export function StyleExtractor({ onClose }: StyleExtractorProps) {
             })}
           </div>
         </div>
+
+        {stylePreset === 'auto' && (
+          <div className="mb-6 p-4 rounded-xl border border-zinc-700/80 bg-zinc-800/40">
+            <h3 className="text-sm font-medium text-zinc-300 mb-2 flex items-center gap-2">
+              <Lock className="w-4 h-4 text-cyan-400" aria-hidden />
+              智能推荐 · 设计系统锁定
+            </h3>
+            {!designSystemSnapshot ? (
+              <p className="text-xs text-zinc-500 leading-relaxed">
+                在「智能推荐」下成功生成页面 UI 后，系统会保存推荐说明；之后可在此勾选锁定，后续生成将复用同一套设计说明且不再单独请求推荐模型。
+              </p>
+            ) : (
+              <>
+                <p className="text-xs text-zinc-400 mb-3 leading-relaxed">
+                  已缓存：{designSystemSnapshot.style.name}。锁定后每次生成将注入该说明，跳过推荐 LLM。
+                </p>
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    aria-checked={designSystemLocked}
+                    checked={designSystemLocked}
+                    onChange={(e) => setDesignSystemLocked(e.target.checked)}
+                    className="w-4 h-4 rounded border-zinc-600 bg-zinc-900 text-cyan-500 focus:ring-2 focus:ring-cyan-500/30"
+                  />
+                  <span className="text-sm text-zinc-200">锁定当前设计系统</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        '将清除当前设计系统缓存并解锁。下次生成页面时会重新解析推荐（可能增加推荐调用）。确定？'
+                      )
+                    ) {
+                      return;
+                    }
+                    resetDesignSystem({ message: 'manual_reset' });
+                    toast.success('已重置', {
+                      description: '下次生成将重新解析设计系统',
+                    });
+                  }}
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-amber-700/50 bg-amber-950/20 text-sm text-amber-200/90 hover:bg-amber-950/40 transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4 shrink-0" aria-hidden />
+                  重新解析设计系统
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {/* 从图片提取 */}
         <h3 className="text-sm font-medium text-zinc-400 mb-3">从图片提取风格</h3>

@@ -274,7 +274,10 @@ export function PresentationMode({ initialNodeId, onClose }: PresentationModePro
   // 如果没有当前节点，显示空状态
   if (!currentNode) {
     return (
-      <div className="fixed inset-0 z-[100] bg-zinc-950 flex flex-col items-center justify-center">
+      <div
+        className="fixed inset-0 z-[100] bg-zinc-950 flex flex-col items-center justify-center"
+        data-presentation-mode="true"
+      >
         <div className="text-center">
           <h2 className="text-2xl font-semibold text-zinc-100 mb-4">演示模式</h2>
           <p className="text-zinc-400 mb-6">当前没有可显示的节点</p>

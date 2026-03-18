@@ -478,6 +478,9 @@ Generate appropriate scenarios based on the detected domain.`;
 export const generateGraph = createServerAction()
   .input(GenerateGraphInputSchema)
   .handler(async ({ input }) => {
+    // 强制刷到「运行 npm run dev」的终端（服务端日志在终端，不在浏览器控制台）
+    process.stdout.write('\n========== [generateGraph] 服务端被调用 ==========\n');
+    process.stdout.write('（建图相关日志请在此终端查看，不要看浏览器 F12 控制台）\n');
     const t0 = Date.now();
     const requestId = `graph-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     let warnings: string[] = [];
@@ -494,13 +497,14 @@ export const generateGraph = createServerAction()
       });
 
       if (!getOpenAIKey()) {
-        logError('❌ [generateGraph] OPENAI_API_KEY 未配置', { requestId });
+        logError('❌ [generateGraph] OPENAI_API_KEY 未配置，LLM 无法调用', { requestId });
         return {
           ok: false,
           type: 'validation_error',
           message: 'OPENAI_API_KEY 未配置',
         };
       }
+    log('🔑 [generateGraph] OPENAI_API_KEY 已配置，即将调用 LLM', { requestId });
 
     // 获取文本模型
     const textModel = input.aiConfig?.textModel || getTextModel();
@@ -529,24 +533,27 @@ export const generateGraph = createServerAction()
       elapsedMs: t1 - t0,
     });
 
-    // 单次 LLM 调用 - 通过 callText 和 runQueued
+    // 单次 LLM 调用：结构化输出（callObject + GraphResultSchema），从源头保证可解析，不做补丁解析
     const t2 = Date.now();
     let singleCallResult: z.infer<typeof SingleCallResultSchema> | null = null;
     let aiCallSuccess = false;
     let aiError: { type: 'RATE_LIMIT' | 'NETWORK' | 'PROVIDER' | 'PARSE'; message: string; cooldownSeconds?: number } | null = null;
 
-    // 合并系统提示和用户提示
-    const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
+    const messages: Array<{ role: 'system' | 'user'; content: string }> = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ];
 
-    log('⏱️ [generateGraph] t2: Starting single LLM call via callText', {
+    log('⏱️ [generateGraph] t2: Starting LLM call via callObject (structured output)', {
       requestId,
       elapsedMs: t2 - t0,
     });
 
-    const llmResult = await callText({
+    const llmResult = await callObject({
       model: textModel,
-      prompt: fullPrompt,
-      timeoutMs: 60000, // 60s timeout for graph generation
+      schema: GraphResultSchema,
+      messages,
+      timeoutMs: 120000,
       aiConfig: input.aiConfig,
       actionName: 'generateGraph',
       attachments: input.attachmentContent || input.mediaBase64 || '',
@@ -556,7 +563,6 @@ export const generateGraph = createServerAction()
     llmMetrics = llmResult.metrics;
 
     if (!llmResult.ok) {
-      // Handle error from callText
       logError('❌ [generateGraph] LLM call failed', {
         requestId,
         errorType: llmResult.type,
@@ -569,71 +575,23 @@ export const generateGraph = createServerAction()
         cooldownSeconds: llmResult.type === 'RATE_LIMIT' ? llmResult.cooldownSeconds : undefined,
       };
     } else {
-      // Parse JSON from response using safeParseZodJson (可恢复解析)
-      // 确保 llmResult.data 是 string 类型
-      const responseText = typeof llmResult.data === 'string' ? llmResult.data : String(llmResult.data || '');
-      
-      if (!responseText || responseText.trim().length === 0) {
-        logWarn('⚠️ [generateGraph] LLM 返回数据为空，使用降级图', {
-          requestId,
-          llmMetrics,
-        });
-        aiError = {
-          type: 'PARSE',
-          message: 'LLM 返回数据为空',
-        };
-      } else {
-        // 先解析为裸 JSON，再按 type 分支：clarification_needed / graph_generated / SingleCallResult
-        let raw: unknown;
-        try {
-          raw = JSON.parse(responseText.trim());
-        } catch {
-          raw = null;
-        }
-        const type = raw && typeof raw === 'object' && 'type' in raw ? (raw as { type?: string }).type : undefined;
-
-        // 禁止返回澄清请求：即使模型返回 clarification_needed 也忽略，仅解析为图或降级
-        if (type === 'graph_generated') {
-          const graphParse = GraphResultSchema.safeParse(raw);
-          if (graphParse.success) {
-            const defaultClarity = { confidence: 80, isVague: false, domain: '', object: '', action: '' };
-            singleCallResult = { clarity: defaultClarity, graph: graphParse.data };
-            aiCallSuccess = true;
-            log('✅ [generateGraph] AI 调用成功（graph_generated）', {
-              requestId,
-              nodesCount: singleCallResult.graph.nodes.length,
-              edgesCount: singleCallResult.graph.edges.length,
-              llmMetrics,
-            });
-          }
-        }
-
-        if (!aiCallSuccess) {
-          const parseResult = safeParseZodJson(responseText, SingleCallResultSchema);
-          if (parseResult.ok) {
-            singleCallResult = parseResult.data;
-            aiCallSuccess = true;
-            log('✅ [generateGraph] AI 调用成功（SingleCallResult）', {
-              requestId,
-              clarity: singleCallResult.clarity,
-              nodesCount: singleCallResult.graph.nodes.length,
-              edgesCount: singleCallResult.graph.edges.length,
-              llmMetrics,
-            });
-          } else {
-            logWarn('⚠️ [generateGraph] JSON 解析失败，使用降级图', {
-              requestId,
-              error: parseResult.error,
-              rawPreview: parseResult.raw || responseText.substring(0, 500),
-              llmMetrics,
-            });
-            aiError = {
-              type: 'PARSE',
-              message: `JSON 解析失败: ${parseResult.error}`,
-            };
-          }
-        }
-      }
+      const graphData = llmResult.data as z.infer<typeof GraphResultSchema>;
+      const defaultClarity = { confidence: 80, isVague: false, domain: '', object: '', action: '' };
+      singleCallResult = {
+        clarity: defaultClarity,
+        graph: {
+          global: graphData.global,
+          nodes: graphData.nodes,
+          edges: graphData.edges,
+        },
+      };
+      aiCallSuccess = true;
+      log('✅ [generateGraph] AI 调用成功（callObject 结构化返回）', {
+        requestId,
+        nodesCount: singleCallResult.graph.nodes.length,
+        edgesCount: singleCallResult.graph.edges.length,
+        llmMetrics,
+      });
     }
 
     const t2_end = Date.now(); // LLM call end
@@ -645,7 +603,7 @@ export const generateGraph = createServerAction()
       llmMetrics,
     });
 
-    // 如果 AI 调用失败（429/网络错误/解析错误）
+    // 如果 AI 调用失败（429/网络错误/解析错误/超时）
     if (!aiCallSuccess && aiError) {
       // ✅ Rate Limit 错误：直接返回错误，不使用降级图
       if (aiError.type === 'RATE_LIMIT') {
@@ -657,34 +615,8 @@ export const generateGraph = createServerAction()
         };
       }
 
-      // 非 429 的失败：先尝试返回澄清，在对话框中要求用户回复；若澄清生成失败再降级图
-      const hasMediaOrAttachment = !!(input.attachmentContent || input.mediaBase64);
-      const clarityAnalysis = await analyzeInputClarity(
-        input.prompt,
-        textModel,
-        input.aiConfig,
-        input.attachmentContent,
-        input.mediaBase64,
-        input.mediaType
-      );
-      const clarificationResult = await generateClarificationRequest(
-        clarityAnalysis,
-        textModel,
-        hasMediaOrAttachment
-      );
-      if (clarificationResult && typeof clarificationResult === 'object' && clarificationResult.type === 'clarification_needed') {
-        log('📋 [generateGraph] 生成失败，返回澄清请求（对话框中要求用户回复）', {
-          requestId,
-          errorType: aiError.type,
-        });
-        return {
-          type: 'clarification_needed',
-          data: (clarificationResult as { data: unknown }).data,
-        };
-      }
-
-      // 澄清生成失败或未返回：使用降级图
-      logWarn('⚠️ [generateGraph] AI 调用失败，澄清未可用，使用降级图', {
+      // 非 429 的失败：直接使用降级图，保证用户一定能进入画布（不再先走澄清，避免「永远进不了画布」）
+      logWarn('⚠️ [generateGraph] AI 调用失败，直接使用降级图以保证进入画布', {
         requestId,
         errorType: aiError.type,
         errorMessage: aiError.message,
@@ -693,7 +625,6 @@ export const generateGraph = createServerAction()
 
       fallbackUsed = true;
       const fallbackResult = buildFallbackGraph(input.prompt);
-      
       const t3_fallback = Date.now();
       const totalDuration = t3_fallback - t0;
       log('✅ [generateGraph] 降级图生成完成', {
@@ -761,6 +692,30 @@ export const generateGraph = createServerAction()
 
     const graphResult = singleCallResult.graph;
 
+    // 若 LLM 返回了空图，改用降级图，避免前端出现「无法生成画布」
+    if (!graphResult.nodes?.length && !graphResult.edges?.length) {
+      logWarn('⚠️ [generateGraph] LLM 返回了空图，改用降级图', { requestId });
+      fallbackUsed = true;
+      const fallbackResult = buildFallbackGraph(input.prompt);
+      return {
+        type: 'graph_generated',
+        global: fallbackResult.global,
+        nodes: fallbackResult.nodes,
+        edges: fallbackResult.edges,
+        warnings: ['LLM 返回了空图，已使用降级图生成', ...fallbackResult.warnings],
+        metrics: {
+          t0,
+          t1,
+          t2,
+          t3: Date.now(),
+          totalMs: Date.now() - t0,
+          queuedMs: llmMetrics.queuedMs,
+          dedupHit: llmMetrics.dedupHit,
+          fallbackUsed: true,
+        },
+      };
+    }
+
     log('✅ [generateGraph] 开始处理 AI 结果', {
       requestId,
       nodesCount: graphResult.nodes.length,
@@ -803,14 +758,29 @@ export const generateGraph = createServerAction()
                 eventsCount: node.events.length,
               });
             }
-            if (!node.dataQueries || node.dataQueries.length === 0) {
-              logError(`❌ [generateGraph] View页面缺少数据查询: ${node.label}`, {
-                nodeId: node.id,
-                pageType,
-              });
-            }
           }
           
+          const safeId = String(node.id || `node-${index}`).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 40);
+          const effectiveViewQueries =
+            isView && (!node.dataQueries || node.dataQueries.length === 0)
+              ? (() => {
+                  logWarn(`⚠️ [generateGraph] View 页未返回 dataQueries，已注入占位（可编辑）: ${node.label}`, {
+                    nodeId: node.id,
+                  });
+                  return [
+                    {
+                      id: `Q-auto-${safeId}`,
+                      description: `「${node.label}」页面主数据展示与加载（模型未输出 dataQueries 时的占位，请在节点详情补充排序/过滤/数据源）`,
+                      sorting: undefined as string | undefined,
+                      filtering: undefined as string | undefined,
+                      dataSource: undefined as string | undefined,
+                    },
+                  ];
+                })()
+              : isView && node.dataQueries
+                ? node.dataQueries
+                : undefined;
+
           // 记录节点数据信息
           log(`📊 [generateGraph] 处理节点 ${index + 1}/${graphResult.nodes.length}: ${node.label}`, {
             nodeId: node.id,
@@ -819,8 +789,8 @@ export const generateGraph = createServerAction()
             userStoriesCount: node.userStories?.length || 0,
             hasEvents: !!node.events && isAction,
             eventsCount: isAction ? (node.events?.length || 0) : 0,
-            hasDataQueries: !!node.dataQueries && isView,
-            dataQueriesCount: isView ? (node.dataQueries?.length || 0) : 0,
+            hasDataQueries: !!effectiveViewQueries && isView,
+            dataQueriesCount: isView ? (effectiveViewQueries?.length || 0) : 0,
             hasBusinessContext: !!node.businessContext,
           });
         // 计算节点位置（水平排列，每行最多3个）
@@ -898,14 +868,16 @@ export const generateGraph = createServerAction()
                 })),
                 outcome: event.outcome,
               })) : undefined,
-              // 数据查询需求列表（仅用于View类型页面）
-              dataQueries: (isView && node.dataQueries) ? node.dataQueries.map(query => ({
-                id: query.id,
-                description: query.description,
-                sorting: query.sorting,
-                filtering: query.filtering,
-                dataSource: query.dataSource,
-              })) : undefined,
+              // 数据查询需求列表（仅用于View类型页面；缺失时已在上方注入占位）
+              dataQueries: effectiveViewQueries
+                ? effectiveViewQueries.map((query) => ({
+                    id: query.id,
+                    description: query.description,
+                    sorting: query.sorting,
+                    filtering: query.filtering,
+                    dataSource: query.dataSource,
+                  }))
+                : undefined,
               // 可追溯性映射（页面与全局架构的关联）
               traceability: node.traceability ? {
                 implementsJourney: node.traceability.implementsJourney,

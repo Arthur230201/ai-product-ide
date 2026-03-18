@@ -6,7 +6,9 @@
 import { z } from 'zod';
 import { callText } from '@/lib/ai/llm';
 import { getModelForTier } from '@/lib/ai-config';
+import { logWarn } from '@/lib/logger';
 import type { GenerationTier } from '@/lib/ai-config';
+import type { DesignSystemSnapshot } from '@/types/design-system-snapshot';
 
 const DesignSystemRecommendSchema = z.object({
   patternSummary: z.string().max(1200).describe('页面结构/版式建议'),
@@ -26,6 +28,32 @@ const DesignSystemRecommendSchema = z.object({
 });
 
 export type DesignSystemRecommend = z.infer<typeof DesignSystemRecommendSchema>;
+
+export function buildDesignSystemSnapshotFromRecommend(
+  d: DesignSystemRecommend,
+  markdownBlock: string
+): DesignSystemSnapshot {
+  return {
+    schemaVersion: 1,
+    engineVersion: 'llm-draft-1',
+    source: 'llm_draft',
+    createdAt: new Date().toISOString(),
+    pattern: { summary: d.patternSummary },
+    style: { name: d.styleName, keywords: d.styleKeywords },
+    colors: {
+      primary: d.colors.primary,
+      secondary: d.colors.secondary,
+      cta: d.colors.cta,
+      background: d.colors.background,
+      text: d.colors.text,
+      notes: d.colors.notes,
+    },
+    typography: d.typography,
+    keyEffects: d.keyEffects,
+    antiPatterns: d.antiPatterns,
+    markdownBlock,
+  };
+}
 
 function parseJsonFromModelText(text: string): unknown {
   const t = text.trim();
@@ -92,14 +120,11 @@ export type RecommendDesignSystemInput = {
   tier?: GenerationTier;
 };
 
-/**
- * 返回可追加到 system 的 Markdown；关闭开关或失败时返回空字符串。
- */
-export async function recommendDesignSystemMarkdown(
+async function runRecommendDesignSystemLLM(
   input: RecommendDesignSystemInput
-): Promise<string> {
+): Promise<DesignSystemRecommend | null> {
   if (process.env.AI_DESIGN_SYSTEM_RECOMMEND === '0') {
-    return '';
+    return null;
   }
 
   const pm = input.projectMeta;
@@ -140,18 +165,51 @@ export async function recommendDesignSystemMarkdown(
   });
 
   if (!result.ok) {
-    return '';
+    logWarn('[design_system_resolve_fail] recommendDesignSystem LLM 失败', {
+      code: result.type,
+      message: result.message?.slice?.(0, 200),
+    });
+    return null;
   }
 
   const raw = parseJsonFromModelText(result.data);
   if (!raw || typeof raw !== 'object') {
-    return '';
+    logWarn('[design_system_resolve_fail] recommendDesignSystem JSON 不可解析', {
+      preview: result.data?.slice?.(0, 120),
+    });
+    return null;
   }
 
   const parsed = DesignSystemRecommendSchema.safeParse(raw);
   if (!parsed.success) {
-    return '';
+    logWarn('[design_system_resolve_fail] recommendDesignSystem zod 校验失败', {
+      issues: parsed.error.issues.slice(0, 5),
+    });
+    return null;
   }
 
-  return toMarkdown(parsed.data);
+  return parsed.data;
+}
+
+/**
+ * 返回可追加到 system 的 Markdown；关闭开关或失败时返回空字符串。
+ */
+export async function recommendDesignSystemMarkdown(
+  input: RecommendDesignSystemInput
+): Promise<string> {
+  const d = await runRecommendDesignSystemLLM(input);
+  return d ? toMarkdown(d) : '';
+}
+
+/** 推荐 + 可持久化快照（M1） */
+export async function recommendDesignSystemWithSnapshot(
+  input: RecommendDesignSystemInput
+): Promise<{ markdown: string; snapshot: DesignSystemSnapshot | null }> {
+  const d = await runRecommendDesignSystemLLM(input);
+  if (!d) return { markdown: '', snapshot: null };
+  const markdown = toMarkdown(d);
+  return {
+    markdown,
+    snapshot: buildDesignSystemSnapshotFromRecommend(d, markdown),
+  };
 }

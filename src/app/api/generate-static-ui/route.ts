@@ -7,7 +7,7 @@ const VIEWPORT_PRESETS = ['mobile', 'desktop'] as const;
 
 /**
  * POST /api/generate-static-ui
- * Body: { prompt?: string, nodeLabel: string, stylePreset?: string, viewportPreset?: 'mobile'|'desktop' }
+ * Body: { prompt?, nodeLabel, stylePreset?, viewportPreset?, projectMeta?, pageDescription?, designSystemLocked?, designSystemSnapshot? }
  * Returns: { ok, type, html?, stage?, message? }
  */
 export async function POST(request: Request) {
@@ -24,12 +24,29 @@ export async function POST(request: Request) {
     const viewportPreset = typeof body?.viewportPreset === 'string' && VIEWPORT_PRESETS.includes(body.viewportPreset as (typeof VIEWPORT_PRESETS)[number])
       ? (body.viewportPreset as (typeof VIEWPORT_PRESETS)[number])
       : 'mobile';
+    const pageDescription = typeof body?.pageDescription === 'string' ? body.pageDescription.trim() : undefined;
+    const pm = body?.projectMeta;
+    const projectMeta =
+      pm && typeof pm === 'object' && pm !== null && typeof (pm as { projectName?: string }).projectName === 'string'
+        ? {
+            projectName: String((pm as { projectName: string }).projectName),
+            industry: String((pm as { industry?: string }).industry ?? ''),
+            targetAudience: String((pm as { targetAudience?: string }).targetAudience ?? ''),
+            description: String((pm as { description?: string }).description ?? ''),
+          }
+        : undefined;
+    const designSystemLocked = body?.designSystemLocked === true;
+    const designSystemSnapshot = body?.designSystemSnapshot;
     const inputPrompt = String(prompt || `请为"${nodeLabel}"页面生成静态 HTML 界面。`);
     const raw = await generateStaticUIFromText({
       prompt: inputPrompt,
       nodeLabel,
+      pageDescription,
+      projectMeta,
       stylePreset,
       viewportPreset,
+      designSystemLocked,
+      designSystemSnapshot,
     });
     // zsa 可能返回 [data, null] 或 [null, error] 或直接返回 data
     const isTuple = Array.isArray(raw) && raw.length === 2;
