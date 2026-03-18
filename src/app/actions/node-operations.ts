@@ -5,7 +5,7 @@ import { join } from 'path';
 import { createServerAction } from 'zsa';
 import { z } from 'zod';
 import { log, logError, logWarn } from '@/lib/logger';
-import { getTextModel, getModelForTier, getOpenAIKey, ensureOpenAIKey } from '@/lib/ai-config';
+import { getTextModel, getVisionModel, getModelForTier, getOpenAIKey, ensureOpenAIKey } from '@/lib/ai-config';
 import type { GenerationTier } from '@/lib/ai-config';
 import {
   buildUIGenerationSystemPrompt,
@@ -14,6 +14,7 @@ import {
   buildUIEditUserPrompt,
 } from '@/lib/prompts/ui-generation-prompt';
 import { UI_UX_PRO_MAX_GUIDANCE } from '@/lib/prompts/ui-ux-pro-max-guidance';
+import { recommendDesignSystemMarkdown } from '@/lib/design-system/recommend-design-system';
 import { STYLE_PRESET_IDS } from '@/types/theme';
 import { callText, callObject } from '@/lib/ai/llm';
 import type { AIResult } from '@/lib/ai/llm';
@@ -30,6 +31,144 @@ export type UIGenerationResponse =
   | { type: 'api_error'; requestId?: string; message?: string }
   | { type: 'validation_error'; requestId?: string; message?: string }
   | { type: 'timeout'; requestId?: string; message?: string };
+
+/** 节点编辑·需求 Tab：多轮对话更新需求或发起澄清 */
+const NodeEditSpecChatSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('clarify'),
+    question: z.string(),
+    options: z
+      .array(z.object({ id: z.string(), label: z.string(), desc: z.string().optional() }))
+      .min(1)
+      .max(6),
+  }),
+  z.object({
+    kind: z.literal('updated'),
+    title: z.string().optional(),
+    requirements: z.array(z.string()).min(1).max(80),
+  }),
+]);
+
+export type NodeEditSpecChatResult = z.infer<typeof NodeEditSpecChatSchema>;
+
+/** 节点编辑需求/实现/测试：图片或 HTML 附件（非 UI 生成路径） */
+export type NodeEditPanelMedia =
+  | { kind: 'image'; base64: string; mimeType: string }
+  | { kind: 'html'; snippet: string };
+
+type NodeEditUserContentPart =
+  | { type: 'text'; text: string }
+  | { type: 'image'; image: string };
+
+function buildNodeEditUserContent(
+  primaryText: string,
+  media?: NodeEditPanelMedia[]
+): string | NodeEditUserContentPart[] {
+  if (!media?.length) return primaryText;
+  const parts: NodeEditUserContentPart[] = [{ type: 'text', text: primaryText }];
+  for (const m of media) {
+    if (m.kind === 'image') {
+      parts.push({ type: 'image', image: `data:${m.mimeType};base64,${m.base64}` });
+    } else {
+      parts.push({
+        type: 'text',
+        text: `\n【用户提供的 HTML 片段】\n${m.snippet.slice(0, 60000)}`,
+      });
+    }
+  }
+  return parts;
+}
+
+export async function nodeEditSpecUserChat(input: {
+  nodeLabel: string;
+  currentRequirements: string[];
+  userRounds: string[];
+  media?: NodeEditPanelMedia[];
+  aiConfig?: { visionModel?: string; textModel?: string };
+}): Promise<{ ok: true; data: NodeEditSpecChatResult } | { ok: false; message: string }> {
+  try {
+    ensureOpenAIKey();
+    const reqLines = input.currentRequirements.length
+      ? input.currentRequirements.map((r, i) => `${i + 1}. ${r}`).join('\n')
+      : '（暂无）';
+    const roundsText = input.userRounds
+      .map((r, i) => (i === 0 ? `【用户说明】${r}` : `【对追问的回复 ${i}】${r}`))
+      .join('\n');
+    const system = `你是产品经理。用户在「节点编辑-需求」Tab 下通过 AI 对话框修改「${input.nodeLabel}」的需求。
+当前需求条目：
+${reqLines}
+
+用户可能附上产品截图、流程图、界面稿或 HTML 原型；请从中提炼业务与交互需求，与已有条目合并。
+规则：
+- 若用户意图明确，输出 kind=updated，给出合并后的完整需求列表（中文，每条一行语义完整）。
+- 若信息不足需确认，输出 kind=clarify，给出 question 与 2–6 个选项（id 用简短英文）。`;
+    const userText = `${roundsText}\n\n请严格按 schema 输出 JSON。`;
+    const hasImage = input.media?.some((m) => m.kind === 'image');
+    const model = hasImage ? getVisionModel(input.aiConfig) : getTextModel(input.aiConfig);
+    const userContent = buildNodeEditUserContent(userText, input.media);
+    const result = await callObject({
+      schema: NodeEditSpecChatSchema,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: userContent },
+      ],
+      model,
+      actionName: 'nodeEditSpecUserChat',
+      aiConfig: input.aiConfig,
+      attachments: input.media?.some((m) => m.kind === 'image') ? 'vision' : '',
+    });
+    if (!result.ok) return { ok: false, message: result.message || '需求对话失败' };
+    return { ok: true, data: result.data };
+  } catch (e) {
+    logError('nodeEditSpecUserChat', e);
+    return { ok: false, message: e instanceof Error ? e.message : '需求对话失败' };
+  }
+}
+
+/** 节点编辑·实现 Tab：技术/架构问答 */
+export async function nodeEditImplChat(input: {
+  nodeLabel: string;
+  userMessage: string;
+  requirements: string[];
+  media?: NodeEditPanelMedia[];
+  aiConfig?: { visionModel?: string; textModel?: string };
+}): Promise<{ ok: true; reply: string } | { ok: false; message: string }> {
+  try {
+    ensureOpenAIKey();
+    const reqText =
+      input.requirements.length > 0
+        ? input.requirements.map((r, i) => `${i + 1}. ${r}`).join('\n')
+        : '（暂无需求条目，请结合节点名称推断）';
+    const q = input.userMessage.trim() || '（用户主要提供附件，请结合附件从实现角度解读与建议。）';
+    const systemImpl = `你是系统架构师。用户在「节点编辑-实现」Tab 下就页面「${input.nodeLabel}」提出实现相关问题。用户可能附上截图或 HTML，请一并纳入分析。请用中文回答：可涉及 API 设计、数据表思路、模块边界等，条理清晰。`;
+    const userBlock = `【当前需求摘要】\n${reqText}\n\n【用户问题】\n${q}`;
+    const hasImage = input.media?.some((m) => m.kind === 'image');
+    const model = hasImage ? getVisionModel(input.aiConfig) : getTextModel(input.aiConfig);
+    const result =
+      input.media?.length ?
+        await callText({
+          model,
+          messages: [
+            { role: 'system', content: systemImpl },
+            { role: 'user', content: buildNodeEditUserContent(userBlock, input.media) },
+          ],
+          actionName: 'nodeEditImplChat',
+          aiConfig: input.aiConfig,
+          attachments: hasImage ? 'vision' : '',
+        })
+      : await callText({
+          model,
+          prompt: `${systemImpl}\n\n${userBlock}`,
+          actionName: 'nodeEditImplChat',
+          aiConfig: input.aiConfig,
+        });
+    if (!result.ok) return { ok: false, message: result.message || '回答失败' };
+    return { ok: true, reply: result.data.trim() };
+  } catch (e) {
+    logError('nodeEditImplChat', e);
+    return { ok: false, message: e instanceof Error ? e.message : '回答失败' };
+  }
+}
 
 // ==================== 直接调用的函数（用于 NodeDetailPanel）====================
 
@@ -350,11 +489,14 @@ export async function generateImplementation(input: {
 export async function generateTestCases(input: {
   title: string;
   requirements: string[];
+  media?: NodeEditPanelMedia[];
+  aiConfig?: { visionModel?: string; textModel?: string };
 }): Promise<AIResult<{ cases: string[] }>> {
   try {
     ensureOpenAIKey();
-    if (!input.requirements || input.requirements.length === 0) {
-      throw new Error('需求列表为空，无法生成测试用例');
+    const reqBase = [...(input.requirements || [])].filter((x) => String(x).trim());
+    if (reqBase.length === 0 && !input.media?.length) {
+      throw new Error('需求列表为空且无附件，无法生成测试用例');
     }
 
     // 构建系统提示词
@@ -379,10 +521,10 @@ export async function generateTestCases(input: {
 
 不要输出表格以外的说明、标题或列表。单元格内若有换行可用空格代替，不要使用 | 符号以免破坏表格。`;
 
-    // 构建用户提示词
-    const requirementsText = input.requirements
-      .map((req, index) => `${index + 1}. ${req}`)
-      .join('\n');
+    const requirementsText =
+      reqBase.length > 0
+        ? reqBase.map((req, index) => `${index + 1}. ${req}`).join('\n')
+        : '（暂无结构化需求，请主要依据用户附件与说明生成测试要点）';
 
     const userPrompt = `请为以下功能模块生成测试用例：
 
@@ -391,19 +533,31 @@ export async function generateTestCases(input: {
 **功能需求：**
 ${requirementsText}
 
-请生成全面的测试用例，覆盖正常流程、边界条件、异常情况和数据验证。`;
+请生成全面的测试用例，覆盖正常流程、边界条件、异常情况和数据验证。用户可能附上界面截图或 HTML，请把可见交互与文案纳入测试场景。`;
 
-    // 获取模型配置（使用默认文本模型）
-    const textModel = getTextModel();
-    
-    // ✅ 使用 callText 统一 gateway
-    const result = await callText({
-      model: textModel,
-      prompt: `${systemPrompt}\n\n${userPrompt}`,
-      temperature: 0.7, // 稍微高一点的温度，鼓励创造性
-      actionName: 'generateTestCases',
-      aiConfig: {},
-    });
+    const hasImage = input.media?.some((m) => m.kind === 'image');
+    const model = hasImage ? getVisionModel(input.aiConfig) : getTextModel(input.aiConfig);
+
+    const result =
+      input.media?.length ?
+        await callText({
+          model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: buildNodeEditUserContent(userPrompt, input.media) },
+          ],
+          temperature: 0.7,
+          actionName: 'generateTestCases',
+          aiConfig: input.aiConfig ?? {},
+          attachments: hasImage ? 'vision' : '',
+        })
+      : await callText({
+          model,
+          prompt: `${systemPrompt}\n\n${userPrompt}`,
+          temperature: 0.7,
+          actionName: 'generateTestCases',
+          aiConfig: input.aiConfig ?? {},
+        });
 
     if (!result.ok) {
       return {
@@ -1145,22 +1299,41 @@ export const generateUIFromText = createServerAction()
           systemPrompt += buildDesignSystemEnforcement(input.themeConfig);
           log(`📐 [generateUIFromText] 已注入主题约束，vibe: ${input.themeConfig.vibe || '—'}`);
         }
-        if (input.stylePreset === 'neutral') systemPrompt += NEUTRAL_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'cyberpunk') systemPrompt += CYBERPUNK_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'warm') systemPrompt += WARM_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'brutal') systemPrompt += BRUTAL_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'flat') systemPrompt += FLAT_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'corporate') systemPrompt += CORPORATE_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'neo') systemPrompt += NEO_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'bento') systemPrompt += BENTO_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'aurora') systemPrompt += AURORA_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'dark') systemPrompt += DARK_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'accessible') systemPrompt += ACCESSIBLE_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'clay') systemPrompt += CLAY_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'liquid') systemPrompt += LIQUID_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'soft') systemPrompt += SOFT_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'retro') systemPrompt += RETRO_STYLE_ENFORCEMENT;
-        if (input.stylePreset === 'y2k') systemPrompt += Y2K_STYLE_ENFORCEMENT;
+        const preset = input.stylePreset;
+        if (preset && preset !== 'auto') {
+          if (preset === 'neutral') systemPrompt += NEUTRAL_STYLE_ENFORCEMENT;
+          if (preset === 'cyberpunk') systemPrompt += CYBERPUNK_STYLE_ENFORCEMENT;
+          if (preset === 'warm') systemPrompt += WARM_STYLE_ENFORCEMENT;
+          if (preset === 'brutal') systemPrompt += BRUTAL_STYLE_ENFORCEMENT;
+          if (preset === 'flat') systemPrompt += FLAT_STYLE_ENFORCEMENT;
+          if (preset === 'corporate') systemPrompt += CORPORATE_STYLE_ENFORCEMENT;
+          if (preset === 'neo') systemPrompt += NEO_STYLE_ENFORCEMENT;
+          if (preset === 'bento') systemPrompt += BENTO_STYLE_ENFORCEMENT;
+          if (preset === 'aurora') systemPrompt += AURORA_STYLE_ENFORCEMENT;
+          if (preset === 'dark') systemPrompt += DARK_STYLE_ENFORCEMENT;
+          if (preset === 'accessible') systemPrompt += ACCESSIBLE_STYLE_ENFORCEMENT;
+          if (preset === 'clay') systemPrompt += CLAY_STYLE_ENFORCEMENT;
+          if (preset === 'liquid') systemPrompt += LIQUID_STYLE_ENFORCEMENT;
+          if (preset === 'soft') systemPrompt += SOFT_STYLE_ENFORCEMENT;
+          if (preset === 'retro') systemPrompt += RETRO_STYLE_ENFORCEMENT;
+          if (preset === 'y2k') systemPrompt += Y2K_STYLE_ENFORCEMENT;
+        } else if (preset === 'auto') {
+          log('📐 [generateUIFromText] 智能推荐模式：不注入固定风格 enforcement');
+        }
+      }
+      if (input.stylePreset === 'auto') {
+        const recommendMd = await recommendDesignSystemMarkdown({
+          projectMeta: input.projectMeta,
+          nodeLabel: input.nodeLabel,
+          pageDescription: input.pageDescription,
+          prompt: input.prompt,
+          aiConfig: input.aiConfig,
+          tier: 'draft',
+        });
+        if (recommendMd) {
+          systemPrompt += `\n\n${recommendMd}`;
+          log('📐 [generateUIFromText] 已注入「本次推荐设计系统」Markdown');
+        }
       }
       systemPrompt += UI_UX_PRO_MAX_GUIDANCE;
       const useEdit = shouldUseEditMode(input.existingCode, input.prompt ?? '');
@@ -1178,9 +1351,19 @@ export const generateUIFromText = createServerAction()
             input.pageDescription
           );
       // 在用户提示中显式强调当前选中的 UI 风格，提高模型遵守率
-      if (input.stylePreset || input.themeConfig?.vibe) {
+      if (input.stylePreset === 'auto') {
+        let autoLine =
+          '【智能推荐模式】请严格遵循 System 中的「本次推荐设计系统」（若存在）与通用 UI 设计基准，形成统一视觉语言；未锁定单一命名风格预设。';
+        if (input.themeConfig?.vibe) {
+          autoLine += ` 已与主题氛围「${input.themeConfig.vibe}」协调。`;
+        }
+        userPromptFinal += `\n\n${autoLine}`;
+        log('📐 [generateUIFromText] 已向 user 注入智能推荐说明');
+      } else if (input.stylePreset || input.themeConfig?.vibe) {
         const styleLine = [
-          input.stylePreset ? `风格预设：${input.stylePreset}（必须严格采用该预设的视觉与组件风格）` : '',
+          input.stylePreset && input.stylePreset !== 'auto'
+            ? `风格预设：${input.stylePreset}（必须严格采用该预设的视觉与组件风格）`
+            : '',
           input.themeConfig?.vibe ? `主题氛围：${input.themeConfig.vibe}` : '',
           input.themeConfig?.colors?.primary ? `主色：${input.themeConfig.colors.primary}` : '',
         ].filter(Boolean).join('；');

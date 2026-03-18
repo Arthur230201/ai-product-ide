@@ -80,6 +80,7 @@ export const defaultTheme: UIThemeConfig = {
 
 /** 内置风格 ID：按视觉/气质分类，参考 UIUXProMax 等设计系统 */
 export const STYLE_PRESET_IDS = [
+  'auto',
   'neutral', 'glass', 'flat', 'corporate', 'neo', 'cyberpunk', 'warm', 'brutal',
   'bento', 'aurora', 'dark', 'accessible', 'clay', 'liquid', 'soft', 'retro', 'y2k',
   'custom',
@@ -108,6 +109,18 @@ export interface StylePreviewConfig {
   isDark?: boolean;
 }
 export const STYLE_PREVIEW: Record<StylePresetId, StylePreviewConfig> = {
+  auto: {
+    primary: '#8b5cf6',
+    secondary: '#06b6d4',
+    bg: 'linear-gradient(135deg, #1e1b4b 0%, #0f172a 50%, #134e4a 100%)',
+    cardBg: 'rgba(255,255,255,0.08)',
+    text: '#f5f3ff',
+    textSecondary: '#a5b4fc',
+    radius: '12px',
+    cardRadius: '16px',
+    shadow: '0 0 24px rgba(139,92,246,0.2)',
+    isDark: true,
+  },
   neutral: {
     primary: '#374151',
     secondary: '#6b7280',
@@ -315,6 +328,24 @@ export const STYLE_PREVIEW: Record<StylePresetId, StylePreviewConfig> = {
 
 /** 对用户展示的命名风格（按视觉气质分类，含示例与适用场景） */
 export const NAMED_STYLES: ({ id: StylePresetId; label: string; theme: UIThemeConfig } & StyleExample)[] = [
+  {
+    id: 'auto',
+    label: '智能推荐',
+    example: '按项目与页面描述推荐版式与色板，不锁定单一预设',
+    bestFor: ['新功能探索', '行业差异化', '多风格尝试'],
+    theme: {
+      ...defaultTheme,
+      colors: {
+        primary: 'violet-600',
+        secondary: 'cyan-600',
+        background: { light: 'slate-50', dark: 'slate-950' },
+        surface: 'white',
+        text: { primary: 'slate-900', secondary: 'slate-600' },
+        border: 'slate-200',
+      },
+      vibe: 'Context-driven（智能推荐：生成时由系统推荐设计系统，不锁单一预设）',
+    },
+  },
   {
     id: 'neutral',
     label: '极简中性',
